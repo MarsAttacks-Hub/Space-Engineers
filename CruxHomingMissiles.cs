@@ -24,7 +24,7 @@ namespace IngameScript
     {
 
 
-        //TODO
+        // TODO
         // spyral doesn't work
 
         readonly string antennaName = "A [M]1";
@@ -361,6 +361,7 @@ namespace IngameScript
                     UpdateBroadcastRange(platformPosition);
 
                     Vector3D velocityVec = CONTROLLER.GetShipVelocities().LinearVelocity;
+                    //double speedSquared = velocityVec.LengthSquared();
                     double speedSquared = velocityVec.Length();
                     if (speedSquared > 1)
                     {

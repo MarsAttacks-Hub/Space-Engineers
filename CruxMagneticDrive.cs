@@ -23,9 +23,6 @@ namespace IngameScript
     {
 
 
-        //TODO
-        //manage Me.CustomData
-
         readonly string rotorsName = "Rotor_MD_A";
         readonly string rotorsInvName = "Rotor_MD_B";
         readonly string plusXname = "Merge_MD-X";
@@ -37,20 +34,23 @@ namespace IngameScript
         readonly string thrustersName = "[CRX] HThruster";
         readonly string controllersName = "[CRX] Controller";
         readonly string gyrosName = "[CRX] Gyro";
+        readonly string managerName = "[CRX] PB Manager";
 
         const string argSetup = "Setup";
         const string argIdleThrusters = "ToggleThrusters";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
+        const string argSunchaseOff = "SunchaseOff";
 
         bool useGyrosToStabilize = true;    //If the script will override gyros to try and combat torque
         readonly bool useRoll = true;
         bool idleThrusters = true;
-        static readonly float maxSpeed = 105f;
-        static readonly float minSpeed = 5f;
+        readonly float maxSpeed = 105f;
+        readonly float minSpeed = 5f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
 
+        bool sunChaseOff = false;
         bool switchOnce = false;
         bool setOnce = false;
         bool hasVector = false;
@@ -72,6 +72,7 @@ namespace IngameScript
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyThrust> THRUSTERS = new List<IMyThrust>();
         IMyShipController CONTROLLER = null;
+        IMyProgrammableBlock MANAGERPB;
 
         Program()
         {
@@ -83,7 +84,7 @@ namespace IngameScript
         {
             GetBlocks();
 
-            if (useGyrosToStabilize)//TODO
+            if (useGyrosToStabilize)
             {
                 Me.CustomData = "GyroStabilize=true";
             }
@@ -151,6 +152,19 @@ namespace IngameScript
                     }
                     Runtime.UpdateFrequency = UpdateFrequency.Update1;
                     setOnce = false;
+
+                    if (MANAGERPB != null)
+                    {
+                        if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                        {
+                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                        }
+                    }
+                }
+
+                if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                {
+                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                 }
             }
 
@@ -169,11 +183,11 @@ namespace IngameScript
             {
                 case argSetup: Setup(); break;
                 case argIdleThrusters: idleThrusters = !idleThrusters; break;
-                case argGyroStabilizeOn://TODO
+                case argGyroStabilizeOn:
                     useGyrosToStabilize = true;
                     Me.CustomData = "GyroStabilize=true";
                     break;
-                case argGyroStabilizeOff://TODO
+                case argGyroStabilizeOff:
                     useGyrosToStabilize = false;
                     Me.CustomData = "GyroStabilize=false";
                     break;
@@ -501,6 +515,8 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains(minusZname));
             THRUSTERS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyThrust>(THRUSTERS, block => block.CustomName.Contains(thrustersName));
+
+            MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
         }
 
 

@@ -23,10 +23,7 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
-
-        //TODO
-        // assemblers takes uranium ingots as input ???
-
+        
         readonly string solarsName = "[CRX] Solar";
         readonly string turbinesName = "[CRX] Wind Turbine";
         readonly string batteriesName = "[CRX] Battery";
@@ -55,6 +52,8 @@ namespace IngameScript
         readonly string shipPrefix = "[CRX] ";
 
         const string argSunchaseToggle = "SunchaseToggle";
+        const string argSunchaseOn = "SunchaseOn";
+        const string argSunchaseOff = "SunchaseOff";
         const string argDeadMan = "DeadMan";
         const string argSetup = "Setup";
         const string argTogglePB = "TogglePB";
@@ -72,8 +71,7 @@ namespace IngameScript
         readonly int lcdNameColumns = 25;
         readonly float solarPanelMaxRatio = 1;  // multiplier for modded panels
         readonly double minSpeed = 0.1;
-        readonly int labelPadding = 40;
-
+        
         bool controlDampeners = true;
         bool sunChaserPaused = true;
         float shipSize = .16f;  //.04f  small blocks
@@ -329,6 +327,15 @@ namespace IngameScript
             {
                 ParseCockpitConfigData(cockpit);
             }
+
+            if (!sunChaserPaused)
+            {
+                Me.CustomData = "GyroStabilize=true";
+            }
+            else
+            {
+                Me.CustomData = "GyroStabilize=false";
+            }
         }
 
         void Main(string argument)
@@ -408,7 +415,27 @@ namespace IngameScript
         {
             switch (argument)
             {
-                case argSunchaseToggle: sunChaserPaused = !sunChaserPaused; if (sunChaserPaused == false) { foreach (IMyGyro block in GYROS) { block.GyroOverride = false; }; } break;
+                case argSunchaseToggle:
+                    sunChaserPaused = !sunChaserPaused;
+                    if (!sunChaserPaused)
+                    {
+                        Me.CustomData = "GyroStabilize=true";
+                    }
+                    else
+                    {
+                        foreach (IMyGyro block in GYROS) { block.GyroOverride = false; };
+                        Me.CustomData = "GyroStabilize=false";
+                    }
+                    break;
+                case argSunchaseOff:
+                    sunChaserPaused = true;
+                    foreach (IMyGyro block in GYROS) { block.GyroOverride = false; };
+                    Me.CustomData = "GyroStabilize=false";
+                    break;
+                case argSunchaseOn:
+                    sunChaserPaused = false;
+                    Me.CustomData = "GyroStabilize=true";
+                    break;
                 case argDeadMan: controlDampeners = !controlDampeners; break;
                 case argSetup: Setup(); break;
                 case argTogglePB: togglePB = !togglePB; if (togglePB) { foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 255, 255); }; Runtime.UpdateFrequency = UpdateFrequency.Update10; } else { foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 0, 0); }; Runtime.UpdateFrequency = UpdateFrequency.None; } break;

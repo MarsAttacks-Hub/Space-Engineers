@@ -32,6 +32,7 @@ namespace IngameScript
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
         readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
         readonly string alarmsName = "[CRX] Alarm Lidar";
+        readonly string managerName = "[CRX] PB Manager";
 
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
@@ -44,6 +45,7 @@ namespace IngameScript
         const string argAimTarget = "AimTarget";
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
+        const string argSunchaseOff = "SunchaseOff";
 
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
@@ -57,12 +59,13 @@ namespace IngameScript
         bool MDOn = false;
         bool MDOff = false;
         bool runMDOnce = false;
+        bool sunChaseOff = false;
 
         Vector3D targetPosition = new Vector3D();
 
         const float globalTimestep = 1.0f / 60.0f;
         const double rad2deg = 180 / Math.PI;
-        const double angleTolerance = 5;   // degrees
+        const double angleTolerance = 0.1;   // degrees
 
         public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
         public List<IMyJumpDrive> JUMPERS = new List<IMyJumpDrive>();
@@ -73,6 +76,7 @@ namespace IngameScript
         public List<IMySoundBlock> ALARMS = new List<IMySoundBlock>();
         public IMyRemoteControl REMOTE;
         IMyProgrammableBlock MAGNETICDRIVEPB;
+        IMyProgrammableBlock MANAGERPB;
 
         PID yawController;
         PID pitchController;
@@ -140,13 +144,23 @@ namespace IngameScript
                             MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
                         }
                     }
+                    if (MANAGERPB != null)
+                    {
+                        if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                        {
+                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                        }
+                    }
                     runMDOnce = true;
                 }
                 if (!MDOff && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
                 {
                     MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
                 }
-                //if (MDOn) { Echo("Magnetic drive turned OFF"); } else { Echo("Magnetic drive failed to turn OFF"); }
+                if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                {
+                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                }
 
                 AimAtTarget();
             }
@@ -588,6 +602,7 @@ namespace IngameScript
             }
 
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
+            MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
         }
 
         void InitPIDControllers(IMyTerminalBlock block)

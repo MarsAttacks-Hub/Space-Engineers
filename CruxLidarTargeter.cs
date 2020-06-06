@@ -24,10 +24,9 @@ namespace IngameScript
     {
 
 
-        //TODO
-        // method that calculate the delay between scans based on the distance of the target and the number of lidars
-        // when a missile hit the target the tracking is lost, rescan the target doesn't work ---> problem caused by the sudden accelleration caused by the impact???
-        // turn off PB sunChase also
+        // TODO
+        // when a missile hit the target the tracking is lost, rescan the target doesn't work
+        // when locked on target and both ship and target are still, aim wobble side to side
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -49,6 +48,7 @@ namespace IngameScript
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
         readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
+        readonly string managerName = "[CRX] PB Manager";
 
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";
@@ -62,6 +62,7 @@ namespace IngameScript
         const string argSetup = "Setup";
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
+        const string argSunchaseOff = "SunchaseOff";
 
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
@@ -86,12 +87,14 @@ namespace IngameScript
         int cockpitTargetSurface = 0;
         int autoMissilesCounter = 0;
         long currentTick = 1;
+        long lostTicks = 0;
         bool doOnce = false;
         bool shootOnce = false;
         bool missilesLoaded = false;
         double targetDiameter;
         bool MDOn = false;
         bool MDOff = false;
+        bool sunChaseOff = false;
 
         const float globalTimestep = 1.0f / 60.0f;  //0.016f;
         const long ticksToScan = 11;
@@ -119,6 +122,7 @@ namespace IngameScript
         IMyShipController CONTROLLER;
         IMyRadioAntenna ANTENNA;
         IMyProgrammableBlock MAGNETICDRIVEPB;
+        IMyProgrammableBlock MANAGERPB;
 
         public IMyUnicastListener UNILISTENER;
         public IMyBroadcastListener BROADCASTLISTENER;
@@ -225,10 +229,21 @@ namespace IngameScript
                             MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
                         }
                     }
+                    if (MANAGERPB != null)
+                    {
+                        if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                        {
+                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                        }
+                    }
                 }
                 if (!MDOff && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
                 {
                     MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                }
+                if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                {
+                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                 }
 
                 //------------------------------------
@@ -242,6 +257,7 @@ namespace IngameScript
                         if (IsValidLidarTarget(ref targ))
                         {
                             TARGET = targ;
+                            lostTicks = 0;
                             targetFound = true;
                             break;
                         }
@@ -448,7 +464,6 @@ namespace IngameScript
                 {
                     if (IsValidLidarTarget(ref entityInfo))
                     {
-                        double lidarTargetSpeed = entityInfo.Velocity.Length();
                         targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
 
                         TARGET = entityInfo;
@@ -459,14 +474,25 @@ namespace IngameScript
             }
             else
             {
-                float elapsedTime = currentTick * globalTimestep;
-                Vector3D targetPos = TARGET.Position + (TARGET.Velocity * elapsedTime);
+                Vector3D trgtPos;
+                if (TARGET.HitPosition.HasValue)
+                {
+                    trgtPos = (Vector3D)TARGET.HitPosition;
+                }
+                else
+                {
+                    trgtPos = TARGET.Position;
+                }
+
+                float elapsedTime = (currentTick + lostTicks) * globalTimestep;
+                Vector3D targetPos = trgtPos + (TARGET.Velocity * elapsedTime);
 
                 double overshootDistance = targetDiameter / 2;
                 IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
                 double dist = Vector3D.Distance(targetPos, lidar.GetPosition());
                 if (lidar.CanScan(dist))
                 {
+                    //TODO this may be the problem
                     Vector3D testTargetPosition = targetPos + (Vector3D.Normalize(targetPos - lidar.GetPosition()) * overshootDistance);
 
                     MyDetectedEntityInfo entityInfo = lidar.Raycast(testTargetPosition);
@@ -478,11 +504,13 @@ namespace IngameScript
 
                             TARGET = entityInfo;
 
+                            lostTicks = 0;
                             targetFound = true;
                         }
                         else
                         {
                             currentTick -= 1;
+                            lostTicks++;
                         }
                     }
                 }
@@ -505,7 +533,7 @@ namespace IngameScript
             return maxRangeCamera;
         }
 
-        bool IsValidLidarTarget(ref MyDetectedEntityInfo entityInfo)//TODO
+        bool IsValidLidarTarget(ref MyDetectedEntityInfo entityInfo)
         {
             if (entityInfo.Type == MyDetectedEntityType.LargeGrid || entityInfo.Type == MyDetectedEntityType.SmallGrid)
             {
@@ -521,9 +549,18 @@ namespace IngameScript
         void LockOnTarget(IMyShipController REF)
         {
             MatrixD refWorldMatrix = REF.WorldMatrix;
-            float elapsedTime = currentTick * globalTimestep;
-            Vector3D targetPos = TARGET.Position + (TARGET.Velocity * elapsedTime);
-            Vector3D aimDirection;
+            float elapsedTime = (currentTick + lostTicks) * globalTimestep;
+            Vector3D trgtPos;
+            if (TARGET.HitPosition.HasValue)
+            {
+                trgtPos = (Vector3D)TARGET.HitPosition;
+            }
+            else
+            {
+                trgtPos = TARGET.Position;
+            }
+
+            Vector3D targetPos = trgtPos + (TARGET.Velocity * elapsedTime);
 
             MyDetectedEntityInfo prevtarget;
             if (!PREV_TARGET.IsEmpty())
@@ -536,11 +573,12 @@ namespace IngameScript
             }
 
             Vector3D targetAccel = Vector3D.Zero;
-            if ((!Vector3D.IsZero(TARGET.Velocity) || !Vector3D.IsZero(prevtarget.Velocity)) && !Vector3D.IsZero((TARGET.Velocity - prevtarget.Velocity)))
+            if ((!Vector3D.IsZero(TARGET.Velocity) || !Vector3D.IsZero(prevtarget.Velocity)) && !Vector3D.IsZero(TARGET.Velocity - prevtarget.Velocity))
             {
                 targetAccel = (TARGET.Velocity - prevtarget.Velocity) / elapsedTime;
             }
 
+            Vector3D aimDirection;
             switch (weaponType)
             {
                 case 0://none
@@ -1089,6 +1127,7 @@ namespace IngameScript
             CONTROLLER = CONTROLLERS[0];
 
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
+            MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
         }
 
         void SetBlocks()
