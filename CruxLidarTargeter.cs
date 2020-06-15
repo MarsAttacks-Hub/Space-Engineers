@@ -621,11 +621,11 @@ namespace IngameScript
 
                                         break;
                                     }
-                                }
-                                else
-                                {
-                                    currentTick -= 1;
-                                    lostTicks++;
+									else
+									{
+										currentTick -= 1;
+										lostTicks++;
+									}
                                 }
                             }
                         }
