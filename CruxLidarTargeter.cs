@@ -601,13 +601,13 @@ namespace IngameScript
                         pos += Vector3D.Normalize(pos - lidar.GetPosition()) * overshootDistance;
                         lerpPositions.Add(pos);
                     }
-                    foreach (Vector3D position in lerpPositions)
+                    foreach (Vector3D lerpPos in lerpPositions)
                     {
                         lidar = GetCameraWithMaxRange(LIDARS);
-                        dist = Vector3D.Distance(position, lidar.GetPosition());
+                        dist = Vector3D.Distance(lerpPos, lidar.GetPosition());
                         if (lidar.CanScan(dist))
                         {
-                            MyDetectedEntityInfo entityInfo = lidar.Raycast(testTargetPosition);
+                            MyDetectedEntityInfo entityInfo = lidar.Raycast(lerpPos);
                             if (!entityInfo.IsEmpty())
                             {
                                 if (entityInfo.EntityId == targetId)
