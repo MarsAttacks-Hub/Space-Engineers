@@ -25,7 +25,6 @@ namespace IngameScript
 
 
         // TODO
-        // when a missile hit the target the tracking is lost, rescan the target doesn't work
         // when locked on target and both ship and target are still, aim wobble side to side
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -73,6 +72,7 @@ namespace IngameScript
         readonly int autoMissilesDelay = 91;
         readonly bool autoMissiles = true;
         readonly bool autoRockets = true;
+        readonly double initialLockDistance = 5000;
         readonly double rocketProjectileForwardOffset = 4;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
         readonly double rocketProjectileInitialSpeed = 100;
         readonly double rocketProjectileAccelleration = 600;
@@ -82,6 +82,7 @@ namespace IngameScript
         readonly double gatlingProjectileInitialSpeed = 400;
         readonly double gatlingProjectileAccelleration = 0;
         readonly double gatlingProjectileMaxSpeed = 400;
+        readonly List<double> lerpValues = new List<double>() { 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1 };
 
         int selectedMissile = 1;
         int cockpitTargetSurface = 0;
@@ -90,11 +91,22 @@ namespace IngameScript
         long lostTicks = 0;
         bool doOnce = false;
         bool shootOnce = false;
+        bool centerOnce = false;
         bool missilesLoaded = false;
         double targetDiameter;
         bool MDOn = false;
         bool MDOff = false;
         bool sunChaseOff = false;
+
+        Vector3 targetVelocity;
+        Vector3D targetPosition;
+        Vector3D? targetHitPosition;
+        long targetId;
+        string targetName;
+        MatrixD targetOrientation;
+        BoundingBoxD targetBoundingBox;
+        long targetTimeStamp;
+        Vector3 prevTargetVelocity = Vector3.Zero;
 
         const float globalTimestep = 1.0f / 60.0f;  //0.016f;
         const long ticksToScan = 11;
@@ -126,9 +138,6 @@ namespace IngameScript
 
         public IMyUnicastListener UNILISTENER;
         public IMyBroadcastListener BROADCASTLISTENER;
-
-        MyDetectedEntityInfo TARGET;
-        MyDetectedEntityInfo PREV_TARGET;
 
         readonly MyIni myIni = new MyIni();
 
@@ -203,12 +212,23 @@ namespace IngameScript
 
             GetMessages();
 
-            if (!TARGET.IsEmpty())
+            if (targetName != null)
             {
                 if (currentTick > ticksToScan)
                 {
-                    TARGET = new MyDetectedEntityInfo();
-                    PREV_TARGET = new MyDetectedEntityInfo();
+                    targetVelocity = default(Vector3);
+                    targetPosition = default(Vector3D);
+                    targetHitPosition = default(Vector3D?);
+                    targetId = default(long);
+                    targetName = null;
+                    targetOrientation = default(MatrixD);
+                    targetBoundingBox = default(BoundingBoxD);
+                    targetTimeStamp = default(long);
+
+                    prevTargetVelocity = default(Vector3);
+
+                    currentTick = 1;
+
                     return;
                 }
 
@@ -256,7 +276,15 @@ namespace IngameScript
                         MyDetectedEntityInfo targ = turret.GetTargetedEntity();
                         if (IsValidLidarTarget(ref targ))
                         {
-                            TARGET = targ;
+                            targetVelocity = targ.Velocity;
+                            targetPosition = targ.Position;
+                            targetHitPosition = targ.HitPosition;
+                            targetId = targ.EntityId;
+                            targetName = targ.Name;
+                            targetOrientation = targ.Orientation;
+                            targetBoundingBox = targ.BoundingBox;
+                            targetTimeStamp = targ.TimeStamp;
+
                             lostTicks = 0;
                             targetFound = true;
                             break;
@@ -307,11 +335,11 @@ namespace IngameScript
 
                 //------------------------------------
 
-                PREV_TARGET = TARGET;
-
+                prevTargetVelocity = targetVelocity;
+                
                 if (autoRockets)
                 {
-                    double targetDistance = Vector3D.Distance(TARGET.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
+                    double targetDistance = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                     ManageGuns(targetDistance);
                 }
             }
@@ -322,6 +350,7 @@ namespace IngameScript
                     UnlockShip();
                     TurnAlarmOff();
                     doOnce = false;
+                    centerOnce = false;
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     if (MissileIDs.Count > 0)
                     {
@@ -350,7 +379,15 @@ namespace IngameScript
                         MyDetectedEntityInfo targ = turret.GetTargetedEntity();
                         if (IsValidLidarTarget(ref targ))
                         {
-                            TARGET = targ;
+                            targetVelocity = targ.Velocity;
+                            targetPosition = targ.Position;
+                            targetHitPosition = targ.HitPosition;
+                            targetId = targ.EntityId;
+                            targetName = targ.Name;
+                            targetOrientation = targ.Orientation;
+                            targetBoundingBox = targ.BoundingBox;
+                            targetTimeStamp = targ.TimeStamp;
+
                             break;
                         }
                     }
@@ -382,7 +419,7 @@ namespace IngameScript
                 case argSetup: Setup(); break;
                 case argLock: AcquireTarget(); break;
                 case commandLaunch:
-                    if (!TARGET.IsEmpty())
+                    if (targetName != null)
                     {
                         foreach (IMyRadioAntenna block in MISSILEANTENNAS)
                         {
@@ -406,13 +443,23 @@ namespace IngameScript
                 case argClear:
                     GetBlocks();
                     SetBlocks();
-                    TARGET = new MyDetectedEntityInfo();
-                    PREV_TARGET = new MyDetectedEntityInfo();
+                    currentTick = 1;
+                    lostTicks = 0;
+                    targetVelocity = default(Vector3);
+                    targetPosition = default(Vector3D);
+                    targetHitPosition = default(Vector3D?);
+                    targetId = default(long);
+                    targetName = null;
+                    targetOrientation = default(MatrixD);
+                    targetBoundingBox = default(BoundingBoxD);
+                    targetTimeStamp = default(long);
+                    prevTargetVelocity = default(Vector3);
                     TurnAlarmOff();
                     GetMissileAntennas();
                     SetMissileAntennas();
                     selectedMissile = 1;
                     doOnce = false;
+                    centerOnce = false;
                     break;
                 case argSwitchWeapon:
                     weaponType = (weaponType == 1 ? 2 : 1);
@@ -456,17 +503,26 @@ namespace IngameScript
         bool AcquireTarget()
         {
             bool targetFound = false;
-            if (TARGET.IsEmpty())
+            if (targetName == null)
             {
                 IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-                MyDetectedEntityInfo entityInfo = lidar.Raycast(lidar.AvailableScanRange, 0, 0);
+                MyDetectedEntityInfo entityInfo = lidar.Raycast(initialLockDistance, 0, 0);
                 if (!entityInfo.IsEmpty())
                 {
                     if (IsValidLidarTarget(ref entityInfo))
                     {
                         targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
 
-                        TARGET = entityInfo;
+                        targetVelocity = entityInfo.Velocity;
+                        targetPosition = entityInfo.Position;
+                        targetHitPosition = entityInfo.HitPosition;
+                        targetId = entityInfo.EntityId;
+                        targetName = entityInfo.Name;
+                        targetOrientation = entityInfo.Orientation;
+                        targetBoundingBox = entityInfo.BoundingBox;
+                        targetTimeStamp = entityInfo.TimeStamp;
+
+                        lostTicks = 0;
 
                         targetFound = true;
                     }
@@ -475,34 +531,50 @@ namespace IngameScript
             else
             {
                 Vector3D trgtPos;
-                if (TARGET.HitPosition.HasValue)
+                if (!centerOnce)
                 {
-                    trgtPos = (Vector3D)TARGET.HitPosition;
+                    trgtPos = targetPosition;
+                    centerOnce = true;
                 }
                 else
                 {
-                    trgtPos = TARGET.Position;
+                    if (targetHitPosition.HasValue)
+                    {
+                        trgtPos = (Vector3D)targetHitPosition;
+                    }
+                    else
+                    {
+                        trgtPos = targetPosition;
+                    }
                 }
-
+                
                 float elapsedTime = (currentTick + lostTicks) * globalTimestep;
-                Vector3D targetPos = trgtPos + (TARGET.Velocity * elapsedTime);
+                Vector3D targetPos = trgtPos + (targetVelocity * elapsedTime);
+
+                IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
 
                 double overshootDistance = targetDiameter / 2;
-                IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-                double dist = Vector3D.Distance(targetPos, lidar.GetPosition());
+                Vector3D testTargetPosition = targetPos + (Vector3D.Normalize(targetPos - lidar.GetPosition()) * overshootDistance);
+
+                double dist = Vector3D.Distance(testTargetPosition, lidar.GetPosition());
                 if (lidar.CanScan(dist))
                 {
-                    //TODO this may be the problem
-                    Vector3D testTargetPosition = targetPos + (Vector3D.Normalize(targetPos - lidar.GetPosition()) * overshootDistance);
-
+                    
                     MyDetectedEntityInfo entityInfo = lidar.Raycast(testTargetPosition);
                     if (!entityInfo.IsEmpty())
                     {
-                        if (entityInfo.EntityId == TARGET.EntityId)
+                        if (entityInfo.EntityId == targetId)
                         {
                             targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
 
-                            TARGET = entityInfo;
+                            targetVelocity = entityInfo.Velocity;
+                            targetPosition = entityInfo.Position;
+                            targetHitPosition = entityInfo.HitPosition;
+                            targetId = entityInfo.EntityId;
+                            targetName = entityInfo.Name;
+                            targetOrientation = entityInfo.Orientation;
+                            targetBoundingBox = entityInfo.BoundingBox;
+                            targetTimeStamp = entityInfo.TimeStamp;
 
                             lostTicks = 0;
                             targetFound = true;
@@ -511,6 +583,51 @@ namespace IngameScript
                         {
                             currentTick -= 1;
                             lostTicks++;
+                        }
+                    }
+                    else
+                    {//TODO
+                        List<Vector3D> lerpPositions = new List<Vector3D>();
+                        foreach (double lerpVal in lerpValues)
+                        {
+                            Vector3D pos = Vector3D.Lerp(targetBoundingBox.Min, targetBoundingBox.Max, lerpVal);
+                            pos += Vector3D.Normalize(pos - lidar.GetPosition()) * overshootDistance;
+                            lerpPositions.Add(pos);
+                        }
+                        foreach (Vector3D position in lerpPositions)
+                        {
+                            lidar = GetCameraWithMaxRange(LIDARS);
+                            dist = Vector3D.Distance(position, lidar.GetPosition());
+                            if (lidar.CanScan(dist))
+                            {
+                                entityInfo = lidar.Raycast(testTargetPosition);
+                                if (!entityInfo.IsEmpty())
+                                {
+                                    if (entityInfo.EntityId == targetId)
+                                    {
+                                        targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
+
+                                        targetVelocity = entityInfo.Velocity;
+                                        targetPosition = entityInfo.Position;
+                                        targetHitPosition = entityInfo.HitPosition;
+                                        targetId = entityInfo.EntityId;
+                                        targetName = entityInfo.Name;
+                                        targetOrientation = entityInfo.Orientation;
+                                        targetBoundingBox = entityInfo.BoundingBox;
+                                        targetTimeStamp = entityInfo.TimeStamp;
+
+                                        lostTicks = 0;
+                                        targetFound = true;
+
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    currentTick -= 1;
+                                    lostTicks++;
+                                }
+                            }
                         }
                     }
                 }
@@ -551,47 +668,37 @@ namespace IngameScript
             MatrixD refWorldMatrix = REF.WorldMatrix;
             float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             Vector3D trgtPos;
-            if (TARGET.HitPosition.HasValue)
+            if (targetHitPosition.HasValue)
             {
-                trgtPos = (Vector3D)TARGET.HitPosition;
+                trgtPos = (Vector3D)targetHitPosition;
             }
             else
             {
-                trgtPos = TARGET.Position;
+                trgtPos = targetPosition;
             }
 
-            Vector3D targetPos = trgtPos + (TARGET.Velocity * elapsedTime);
-
-            MyDetectedEntityInfo prevtarget;
-            if (!PREV_TARGET.IsEmpty())
-            {
-                prevtarget = PREV_TARGET;
-            }
-            else
-            {
-                prevtarget = TARGET;
-            }
+            Vector3D targetPos = trgtPos + (targetVelocity * elapsedTime);
 
             Vector3D targetAccel = Vector3D.Zero;
-            if ((!Vector3D.IsZero(TARGET.Velocity) || !Vector3D.IsZero(prevtarget.Velocity)) && !Vector3D.IsZero(TARGET.Velocity - prevtarget.Velocity))
+            if ((!Vector3D.IsZero(targetVelocity) || !Vector3D.IsZero(prevTargetVelocity)) && !Vector3D.IsZero(targetVelocity - prevTargetVelocity))
             {
-                targetAccel = (TARGET.Velocity - prevtarget.Velocity) / elapsedTime;
+                targetAccel = (targetVelocity - prevTargetVelocity) / elapsedTime;
             }
 
             Vector3D aimDirection;
             switch (weaponType)
             {
                 case 0://none
-                    aimDirection = ComputeInterceptPoint(targetPos, TARGET.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                    aimDirection = ComputeInterceptPoint(targetPos, targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
                     break;
                 case 1://rockets
-                    aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, TARGET.Velocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+                    aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetVelocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
                     break;
                 case 2://gatlings
-                    aimDirection = ComputeInterceptPoint(targetPos, TARGET.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
+                    aimDirection = ComputeInterceptPoint(targetPos, targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
                     break;
                 default:
-                    aimDirection = ComputeInterceptPoint(targetPos, TARGET.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                    aimDirection = ComputeInterceptPoint(targetPos, targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
                     break;
             }
 
@@ -822,13 +929,13 @@ namespace IngameScript
         void SendMissileBroadcastMessage(string cmd)
         {
             Vector3D targetPos;
-            if (TARGET.HitPosition.HasValue)
+            if (targetHitPosition.HasValue)
             {
-                targetPos = TARGET.HitPosition.Value;
+                targetPos = targetHitPosition.Value;
             }
             else
             {
-                targetPos = TARGET.Position;
+                targetPos = targetPosition;
             }
 
             long fakeId = 0;
@@ -836,7 +943,7 @@ namespace IngameScript
                 MyTuple<Vector3, Vector3D>>>();
 
             var tuple = MyTuple.Create(MyTuple.Create(fakeId, cmd, CONTROLLER.CubeGrid.WorldVolume.Center),
-              MyTuple.Create(TARGET.Velocity, targetPos));
+              MyTuple.Create(targetVelocity, targetPos));
 
             immArray.Add(tuple);
 
@@ -846,13 +953,13 @@ namespace IngameScript
         void SendMissileUnicastMessage(string cmd)
         {
             Vector3D targetPos;
-            if (TARGET.HitPosition.HasValue)
+            if (targetHitPosition.HasValue)
             {
-                targetPos = TARGET.HitPosition.Value;
+                targetPos = targetHitPosition.Value;
             }
             else
             {
-                targetPos = TARGET.Position;
+                targetPos = targetPosition;
             }
 
             List<long> lostMissiles = new List<long>();
@@ -862,7 +969,7 @@ namespace IngameScript
                     MyTuple<Vector3, Vector3D>>>();
 
                 var tuple = MyTuple.Create(MyTuple.Create(id, cmd, CONTROLLER.CubeGrid.WorldVolume.Center),
-                    MyTuple.Create(TARGET.Velocity, targetPos));
+                    MyTuple.Create(targetVelocity, targetPos));
 
                 immArray.Add(tuple);
 
@@ -1063,24 +1170,24 @@ namespace IngameScript
                 targetLog.Append("Missiles Loaded\n");
             }
 
-            targetLog.Append("ID: ").Append(TARGET.EntityId.ToString()).Append("\n");
+            targetLog.Append("ID: ").Append(targetId.ToString()).Append("\n");
 
-            targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
+            targetLog.Append("Name: ").Append(targetName).Append("\n");
 
-            long targetLastDetected = TARGET.TimeStamp / 1000;
+            long targetLastDetected = targetTimeStamp / 1000;
             targetLog.Append("Detected Since: ").Append(targetLastDetected).Append(" s\n");
 
-            targetLog.Append("Speed: ").Append(TARGET.Velocity.Length().ToString("0.0")).Append("\n");
+            targetLog.Append("Speed: ").Append(targetVelocity.Length().ToString("0.0")).Append("\n");
 
-            double targetDistance = Vector3D.Distance(TARGET.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
+            double targetDistance = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
             targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
 
-            double targetRadius = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
+            double targetRadius = Vector3D.Distance(targetBoundingBox.Min, targetBoundingBox.Max);
             targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
 
-            string targX = TARGET.Position.X.ToString("0.00");
-            string targY = TARGET.Position.Y.ToString("0.00");
-            string targZ = TARGET.Position.Z.ToString("0.00");
+            string targX = targetPosition.X.ToString("0.00");
+            string targY = targetPosition.Y.ToString("0.00");
+            string targZ = targetPosition.Z.ToString("0.00");
             targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
         }
 

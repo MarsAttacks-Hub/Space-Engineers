@@ -64,6 +64,7 @@ namespace IngameScript
         readonly double gatlingProjectileInitialSpeed = 400;
         readonly double gatlingProjectileAccelleration = 0;
         readonly double gatlingProjectileMaxSpeed = 400;
+        readonly double PNGain = 3;
 
         const double brakingAngleTolerance = 10;    //degrees
         const double rad2deg = 180 / Math.PI;
@@ -96,11 +97,17 @@ namespace IngameScript
         bool tooBelow = true;
         double spiralTime = 0;
         double rollSpeed = 0;   // maximum of 3
-
+        double missileAccel = 10;
+        double missileMass = 0;
+        double missileThrust = 0;
+        double prevYaw = 0;
+        double prevPitch = 0;
         Vector3D platformPosition;
+        Vector3D prevPosition = new Vector3D();
         Vector3D prevVelocity = new Vector3();
         Vector3D currentAcceleration;
         Vector3D targetPosition;
+        Vector3D prevTargetPosition = new Vector3D();
         Vector3 targetVelocity;
         Vector3 prevTargetVelocity = new Vector3();
         Vector3D targetAccelerationVector;
@@ -149,6 +156,8 @@ namespace IngameScript
             foreach (IMyThrust block in ALLTHRUSTERS) { block.Enabled = false; }
 
             InitPIDControllers(CONTROLLER as IMyTerminalBlock);
+
+            CalculateBaseAcceleration();
 
             isLargeGrid = CONTROLLER.CubeGrid.GridSizeEnum == MyCubeSize.Large;
             fuseDistance = isLargeGrid ? 16 : 7;
@@ -213,6 +222,7 @@ namespace IngameScript
                     {
                         Runtime.UpdateFrequency = UpdateFrequency.Update1;
                         UpdateGlobalTimeStep();
+                        //CalculateBaseAcceleration();
                         status = "Cruising";
                         currentTick = 1;
 
@@ -291,12 +301,14 @@ namespace IngameScript
                                     }
                                     else
                                     {
-                                        LockOnTarget(CONTROLLER);
+                                        //LockOnTarget(CONTROLLER);
+                                        MissileGuidance();
                                     }
                                 }
                                 else
                                 {
-                                    LockOnTarget(CONTROLLER);
+                                    //LockOnTarget(CONTROLLER);
+                                    MissileGuidance();
                                 }
                             }
                             else if (missileType == 1)
@@ -306,7 +318,8 @@ namespace IngameScript
                                 {
                                     foreach (IMyWarhead block in WARHEADS) { block.Detonate(); }
                                 }
-                                LockOnTarget(CONTROLLER);
+                                //LockOnTarget(CONTROLLER);
+                                MissileGuidance();
                             }
                             else if (missileType == 2)
                             {
@@ -317,7 +330,9 @@ namespace IngameScript
 
                             currentTick++;
                             prevTargetVelocity = targetVelocity;
+                            prevTargetPosition = targetPosition;
                             prevVelocity = CONTROLLER.GetShipVelocities().LinearVelocity;
+                            prevPosition = CONTROLLER.CubeGrid.WorldVolume.Center;
                         }
                         else
                         {
@@ -480,19 +495,156 @@ namespace IngameScript
             IGC.SendUnicastMessage(platFormId, platformTag, immArray.ToImmutable());
         }
 
+        void MissileGuidance()
+        {
+            //Finds Current Target
+            Vector3D ENEMY_POS = targetPosition;
+
+            //Sorts CurrentVelocities
+            Vector3D MissilePosition = GYROS[0].CubeGrid.WorldVolume.Center;
+            Vector3D MissilePositionPrev = prevPosition;
+            Vector3D MissileVelocity = (MissilePosition - MissilePositionPrev) / globalTimestep;
+
+            Vector3D TargetPosition = ENEMY_POS;
+            Vector3D TargetPositionPrev = prevTargetPosition;
+            Vector3D TargetVelocity = (TargetPosition - prevTargetPosition) / globalTimestep;
+
+            //Setup LOS rates and PN system
+            Vector3D LOS_Old = Vector3D.Normalize(TargetPositionPrev - MissilePositionPrev);
+            Vector3D LOS_New = Vector3D.Normalize(TargetPosition - MissilePosition);
+            Vector3D Rel_Vel = Vector3D.Normalize(TargetVelocity - MissileVelocity);
+
+            //And Assigners
+            Vector3D am = new Vector3D(1, 0, 0);
+            double LOS_Rate;
+            Vector3D LOS_Delta;
+            Vector3D MissileForwards = THRUSTERS[0].WorldMatrix.Backward;
+
+            //Vector/Rotation Rates
+            if (LOS_Old.Length() == 0)
+            { LOS_Delta = new Vector3D(0, 0, 0); LOS_Rate = 0.0; }
+            else
+            { LOS_Delta = LOS_New - LOS_Old; LOS_Rate = LOS_Delta.Length() / globalTimestep; }
+
+            //Closing Velocity
+            double Vclosing = (TargetVelocity - MissileVelocity).Length();
+
+            //If Under Gravity Use Gravitational Accel
+            Vector3D GravityComp = -CONTROLLER.GetNaturalGravity();
+
+            //Calculate the final lateral acceleration
+            Vector3D LateralDirection = Vector3D.Normalize(Vector3D.Cross(Vector3D.Cross(Rel_Vel, LOS_New), Rel_Vel));
+            Vector3D LateralAccelerationComponent = LateralDirection * PNGain * LOS_Rate * Vclosing + LOS_Delta * 9.8 * (0.5 * PNGain); //Eases Onto Target Collision LOS_Delta * 9.8 * (0.5 * Gain)
+
+            //If Impossible Solution (ie maxes turn rate) Use Drift Cancelling For Minimum T
+            double OversteerReqt = (LateralAccelerationComponent).Length() / missileAccel;
+            if (OversteerReqt > 0.98)
+            {
+                LateralAccelerationComponent = missileAccel * Vector3D.Normalize(LateralAccelerationComponent + (OversteerReqt * Vector3D.Normalize(-MissileVelocity)) * 40);
+            }
+
+            //Calculates And Applies Thrust In Correct Direction (Performs own inequality check)
+            double ThrustPower = VectorProjectionScalar(MissileForwards, Vector3D.Normalize(LateralAccelerationComponent)); //TESTTESTTEST
+            ThrustPower = isLargeGrid ? MathHelper.Clamp(ThrustPower, 0.9, 1) : ThrustPower;
+
+            ThrustPower = MathHelper.Clamp(ThrustPower, 0.4, 1); //for improved thrust performance on the get-go
+            foreach (IMyThrust thruster in THRUSTERS)
+            {
+                if (thruster.ThrustOverride != (thruster.MaxThrust * ThrustPower)) //12 increment inequality to help conserve on performance
+                { thruster.ThrustOverride = (float)(thruster.MaxThrust * ThrustPower); }
+            }
+
+            //Calculates Remaining Force Component And Adds Along LOS
+            double RejectedAccel = Math.Sqrt(missileAccel * missileAccel - LateralAccelerationComponent.LengthSquared()); //Accel has to be determined whichever way you slice it
+            if (double.IsNaN(RejectedAccel)) { RejectedAccel = 0; }
+            LateralAccelerationComponent += LOS_New * RejectedAccel;
+
+            //-----------------------------------------------
+
+            //Guides To Target Using Gyros
+            am = Vector3D.Normalize(LateralAccelerationComponent + GravityComp);
+            double Yaw; double Pitch;
+            GyroTurn(am, 18, 0.3, THRUSTERS[0], GYROS, prevYaw, prevPitch, out Pitch, out Yaw);
+
+            //Updates For Next Tick Round
+            //prevTargetPosition = TargetPosition;
+            //prevPosition = MissilePosition;
+            prevYaw = Yaw;
+            prevPitch = Pitch;
+        }
+
+        void GyroTurn(Vector3D TARGETVECTOR, double GAIN, double DAMPINGGAIN, IMyTerminalBlock REF, List<IMyGyro> GYROS, double YawPrev, double PitchPrev, out double NewPitch, out double NewYaw)
+        {
+            //Pre Setting Factors
+            NewYaw = 0;
+            NewPitch = 0;
+
+            //Retrieving Forwards And Up
+            Vector3D ShipUp = REF.WorldMatrix.Up;
+            Vector3D ShipForward = REF.WorldMatrix.Backward; //Backward for thrusters
+
+            //Create And Use Inverse Quatinion                   
+            Quaternion Quat_Two = Quaternion.CreateFromForwardUp(ShipForward, ShipUp);
+            var InvQuat = Quaternion.Inverse(Quat_Two);
+
+            Vector3D DirectionVector = TARGETVECTOR; //RealWorld Target Vector
+            Vector3D RCReferenceFrameVector = Vector3D.Transform(DirectionVector, InvQuat); //Target Vector In Terms Of RC Block
+
+            //Convert To Local Azimuth And Elevation
+            double ShipForwardAzimuth = 0;
+            double ShipForwardElevation = 0;
+            Vector3D.GetAzimuthAndElevation(RCReferenceFrameVector, out ShipForwardAzimuth, out ShipForwardElevation);
+
+            //Post Setting Factors
+            NewYaw = ShipForwardAzimuth;
+            NewPitch = ShipForwardElevation;
+
+            //Applies Some PID Damping
+            ShipForwardAzimuth += DAMPINGGAIN * ((ShipForwardAzimuth - YawPrev) / globalTimestep);
+            ShipForwardElevation += DAMPINGGAIN * ((ShipForwardElevation - PitchPrev) / globalTimestep);
+
+            //Does Some Rotations To Provide For any Gyro-Orientation
+            var REF_Matrix = MatrixD.CreateWorld(REF.GetPosition(), (Vector3)ShipForward, (Vector3)ShipUp).GetOrientation();
+            var Vector = Vector3.Transform((new Vector3D(ShipForwardElevation, ShipForwardAzimuth, 0)), REF_Matrix); //Converts To World
+
+            foreach (IMyGyro GYRO in GYROS)
+            {
+                var TRANS_VECT = Vector3.Transform(Vector, Matrix.Transpose(GYRO.WorldMatrix.GetOrientation()));  //Converts To Gyro Local
+
+                //Logic Checks for NaN's
+                if (double.IsNaN(TRANS_VECT.X) || double.IsNaN(TRANS_VECT.Y) || double.IsNaN(TRANS_VECT.Z))
+                { return; }
+
+                //Applies To Scenario
+                GYRO.Pitch = (float)MathHelper.Clamp((-TRANS_VECT.X) * GAIN, -1000, 1000);
+                GYRO.Yaw = (float)MathHelper.Clamp(((-TRANS_VECT.Y)) * GAIN, -1000, 1000);
+                GYRO.Roll = (float)MathHelper.Clamp(((-TRANS_VECT.Z)) * GAIN, -1000, 1000);
+                GYRO.GyroOverride = true;
+            }
+        }
+
+        public static double VectorProjectionScalar(Vector3D IN, Vector3D Axis_norm)//Use For Magnitudes Of Vectors In Directions (0-IN.length)
+        {
+            double OUT = 0;
+            OUT = Vector3D.Dot(IN, Axis_norm);
+            if (OUT == double.NaN)
+            { OUT = 0; }
+            return OUT;
+        }
+
         void LockOnTarget(IMyShipController REF)
         {
             MatrixD refWorldMatrix = REF.WorldMatrix;
             float elapsedTime = currentTick * globalTimestep;
             Vector3D targetPos = targetPosition + (targetVelocity * elapsedTime);
 
-            if (Vector3D.IsZero(prevTargetVelocity))
+            if (Vector3.IsZero(prevTargetVelocity))
             {
                 prevTargetVelocity = targetVelocity;
             }
 
             Vector3D targetAccel = Vector3D.Zero;
-            if ((!Vector3D.IsZero(targetVelocity) || !Vector3D.IsZero(prevTargetVelocity)) && !Vector3D.IsZero((targetVelocity - prevTargetVelocity)))
+            if ((!Vector3.IsZero(targetVelocity) || !Vector3.IsZero(prevTargetVelocity)) && !Vector3.IsZero((targetVelocity - prevTargetVelocity)))
             {
                 targetAccel = (targetVelocity - prevTargetVelocity) / elapsedTime;
             }
@@ -501,16 +653,16 @@ namespace IngameScript
             switch (weaponType)
             {
                 case 0://none
-                    aimDirection = ComputeInterceptPoint(targetPos, targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                    aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
                     break;
                 case 1://rockets
-                    aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetVelocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+                    aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, (Vector3D)targetVelocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
                     break;
                 case 2://gatlings
-                    aimDirection = ComputeInterceptPoint(targetPos, targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
+                    aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
                     break;
                 default:
-                    aimDirection = ComputeInterceptPoint(targetPos, targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                    aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
                     break;
             }
 
@@ -810,6 +962,26 @@ namespace IngameScript
             foreach (IMyShipMergeBlock item in MERGES) { item.Enabled = false; }
             foreach (IMyShipConnector item in CONNECTORS) { item.Enabled = false; }
             foreach (IMyThrust item in ALLTHRUSTERS) { item.Enabled = true; }
+        }
+
+        void CalculateBaseAcceleration()
+        {
+            //missileMass = CONTROLLER.CalculateShipMass().TotalMass;
+            missileMass = 0;
+            missileThrust = 0;
+
+            foreach (IMyTerminalBlock block in TBLOCKS)//TODO add armor blocks Mass
+            {
+                missileMass += block.Mass;
+            }
+
+            foreach (IMyThrust item in THRUSTERS)
+            {
+                item.Enabled = true;
+                missileThrust += (double)item.MaxThrust;
+            }
+
+            missileAccel = missileThrust / missileMass;
         }
 
         void PredictTarget()
