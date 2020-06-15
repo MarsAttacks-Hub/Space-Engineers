@@ -547,7 +547,8 @@ namespace IngameScript
                         trgtPos = targetPosition;
                     }
                 }
-                
+                bool useOffet = false;
+
                 float elapsedTime = (currentTick + lostTicks) * globalTimestep;
                 Vector3D targetPos = trgtPos + (targetVelocity * elapsedTime);
 
@@ -559,7 +560,6 @@ namespace IngameScript
                 double dist = Vector3D.Distance(testTargetPosition, lidar.GetPosition());
                 if (lidar.CanScan(dist))
                 {
-                    
                     MyDetectedEntityInfo entityInfo = lidar.Raycast(testTargetPosition);
                     if (!entityInfo.IsEmpty())
                     {
@@ -586,51 +586,64 @@ namespace IngameScript
                         }
                     }
                     else
-                    {//TODO
-                        List<Vector3D> lerpPositions = new List<Vector3D>();
-                        foreach (double lerpVal in lerpValues)
+                    {
+                        useOffet = true;
+                    }
+                }
+
+                if (useOffet)//TODO
+                {
+                    int sameId = 0;
+                    List<Vector3D> lerpPositions = new List<Vector3D>();
+                    foreach (double lerpVal in lerpValues)
+                    {
+                        Vector3D pos = Vector3D.Lerp(targetBoundingBox.Min, targetBoundingBox.Max, lerpVal);
+                        pos += Vector3D.Normalize(pos - lidar.GetPosition()) * overshootDistance;
+                        lerpPositions.Add(pos);
+                    }
+                    foreach (Vector3D position in lerpPositions)
+                    {
+                        lidar = GetCameraWithMaxRange(LIDARS);
+                        dist = Vector3D.Distance(position, lidar.GetPosition());
+                        if (lidar.CanScan(dist))
                         {
-                            Vector3D pos = Vector3D.Lerp(targetBoundingBox.Min, targetBoundingBox.Max, lerpVal);
-                            pos += Vector3D.Normalize(pos - lidar.GetPosition()) * overshootDistance;
-                            lerpPositions.Add(pos);
-                        }
-                        foreach (Vector3D position in lerpPositions)
-                        {
-                            lidar = GetCameraWithMaxRange(LIDARS);
-                            dist = Vector3D.Distance(position, lidar.GetPosition());
-                            if (lidar.CanScan(dist))
+                            MyDetectedEntityInfo entityInfo = lidar.Raycast(testTargetPosition);
+                            if (!entityInfo.IsEmpty())
                             {
-                                entityInfo = lidar.Raycast(testTargetPosition);
-                                if (!entityInfo.IsEmpty())
+                                if (entityInfo.EntityId == targetId)
                                 {
-                                    if (entityInfo.EntityId == targetId)
-                                    {
-                                        targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
+                                    targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
 
-                                        targetVelocity = entityInfo.Velocity;
-                                        targetPosition = entityInfo.Position;
-                                        targetHitPosition = entityInfo.HitPosition;
-                                        targetId = entityInfo.EntityId;
-                                        targetName = entityInfo.Name;
-                                        targetOrientation = entityInfo.Orientation;
-                                        targetBoundingBox = entityInfo.BoundingBox;
-                                        targetTimeStamp = entityInfo.TimeStamp;
+                                    targetVelocity = entityInfo.Velocity;
+                                    targetPosition = entityInfo.Position;
+                                    targetHitPosition = entityInfo.HitPosition;
+                                    targetId = entityInfo.EntityId;
+                                    targetName = entityInfo.Name;
+                                    targetOrientation = entityInfo.Orientation;
+                                    targetBoundingBox = entityInfo.BoundingBox;
+                                    targetTimeStamp = entityInfo.TimeStamp;
 
-                                        lostTicks = 0;
-                                        targetFound = true;
+                                    lostTicks = 0;
+                                    targetFound = true;
 
-                                        break;
-                                    }
-									else
-									{
-										currentTick -= 1;
-										lostTicks++;
-									}
+                                    sameId = 0;
+
+                                    break;
+                                }
+                                else
+                                {
+                                    sameId++;
                                 }
                             }
                         }
                     }
+                    if (sameId > 0)
+                    {
+                        currentTick -= 1;
+                        lostTicks++;
+                    }
                 }
+
             }
             return targetFound;
         }
