@@ -26,6 +26,7 @@ namespace IngameScript
 
         // TODO
         // when locked on target and both ship and target are still, aim wobble side to side
+        // Match target speed and direction
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -52,10 +53,14 @@ namespace IngameScript
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";
         const string commandLost = "Lost";
+        const string commandSpiral = "Spiral";
+        const string commandBeamRide = "BeamRide";
 
         const string argClear = "Clear";
         const string argLock = "Lock";
         const string argSwitchWeapon = "SwitchGun";
+        const string argAutoFire = "AutoFire";
+        const string argAutoMissiles = "AutoMissiles";
         const string argSwitchPayLoad = "SwitchPayLoad";
         const string argLoadMissiles = "LoadMissiles";
         const string argSetup = "Setup";
@@ -68,10 +73,11 @@ namespace IngameScript
 
         int weaponType = 1; //0 None - 1 Rockets - 2 Gatlings
         int selectedPayLoad = 0;    //0 Missiles - 1 Drones
+        bool autoFire = true;
+        bool autoMissiles = false;
         readonly int missilesCount = 2;
         readonly int autoMissilesDelay = 91;
-        readonly bool autoMissiles = true;
-        readonly bool autoRockets = true;
+        readonly int writeDelay = 10;
         readonly double initialLockDistance = 5000;
         readonly double rocketProjectileForwardOffset = 4;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
         readonly double rocketProjectileInitialSpeed = 100;
@@ -82,6 +88,7 @@ namespace IngameScript
         readonly double gatlingProjectileInitialSpeed = 400;
         readonly double gatlingProjectileAccelleration = 0;
         readonly double gatlingProjectileMaxSpeed = 400;
+        readonly double gatlingProjectileMaxRange = 1000;
         readonly List<double> lerpValues = new List<double>() { 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1 };
 
         int selectedMissile = 1;
@@ -90,6 +97,7 @@ namespace IngameScript
         long currentTick = 1;
         long lostTicks = 0;
         bool doOnce = false;
+        bool farShootOnce = false;
         bool shootOnce = false;
         bool centerOnce = false;
         bool missilesLoaded = false;
@@ -97,13 +105,14 @@ namespace IngameScript
         bool MDOn = false;
         bool MDOff = false;
         bool sunChaseOff = false;
+        int writeCount = 0;
+        bool launchNormal = true;
 
         Vector3 targetVelocity;
         Vector3D targetPosition;
         Vector3D? targetHitPosition;
         long targetId;
         string targetName;
-        MatrixD targetOrientation;
         BoundingBoxD targetBoundingBox;
         long targetTimeStamp;
         Vector3 prevTargetVelocity = Vector3.Zero;
@@ -145,7 +154,9 @@ namespace IngameScript
         readonly MyItemType gatlingAmmo = MyItemType.MakeAmmo("NATO_25x184mm");
         readonly MyItemType iceOre = MyItemType.MakeOre("Ice");
 
-        public List<long> MissileIDs = new List<long>();
+        public Dictionary<long, string> MissileIDs = new Dictionary<long, string>();
+
+        public List<MyTuple<long, double, double, string>> missilesInfo = new List<MyTuple<long, double, double, string>>();
 
         public StringBuilder targetLog = new StringBuilder("");
         public StringBuilder missileLog = new StringBuilder("");
@@ -190,7 +201,7 @@ namespace IngameScript
             autoMissilesCounter = autoMissilesDelay + 1;
         }
 
-        void Main(string arg)
+        void Main(string arg, UpdateType updateSource)
         {
             Echo($"MISSILEANTENNAS:{MISSILEANTENNAS.Count}");
             Echo($"LIDARS:{LIDARS.Count}");
@@ -207,9 +218,10 @@ namespace IngameScript
             Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
             Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
 
-            targetLog.Clear();
-            missileLog.Clear();
-
+            if (MissileIDs.Count == 0 && missileLog.Length != 0)
+            {
+                missileLog.Clear();
+            }
             GetMessages();
 
             if (targetName != null)
@@ -221,18 +233,20 @@ namespace IngameScript
                     targetHitPosition = default(Vector3D?);
                     targetId = default(long);
                     targetName = null;
-                    targetOrientation = default(MatrixD);
                     targetBoundingBox = default(BoundingBoxD);
                     targetTimeStamp = default(long);
-
                     prevTargetVelocity = default(Vector3);
+                    prevTargetVelocity = Vector3.Zero;
 
                     currentTick = 1;
 
                     return;
                 }
 
-                ReadTargetInfo();
+                if (writeCount == writeDelay)
+                {
+                    ReadTargetInfo();
+                }
 
                 //------------------------------------
 
@@ -281,7 +295,6 @@ namespace IngameScript
                             targetHitPosition = targ.HitPosition;
                             targetId = targ.EntityId;
                             targetName = targ.Name;
-                            targetOrientation = targ.Orientation;
                             targetBoundingBox = targ.BoundingBox;
                             targetTimeStamp = targ.TimeStamp;
 
@@ -325,7 +338,10 @@ namespace IngameScript
                     currentTick = 1;
                     if (MissileIDs.Count > 0)
                     {
-                        SendMissileUnicastMessage(commandUpdate);
+                        foreach (var id in MissileIDs)
+                        {
+                            SendMissileUnicastMessage(commandUpdate, id.Key);//TODO
+                        }
                     }
                 }
 
@@ -336,8 +352,8 @@ namespace IngameScript
                 //------------------------------------
 
                 prevTargetVelocity = targetVelocity;
-                
-                if (autoRockets)
+
+                if (autoFire)
                 {
                     double targetDistance = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                     ManageGuns(targetDistance);
@@ -349,13 +365,25 @@ namespace IngameScript
                 {
                     UnlockShip();
                     TurnAlarmOff();
+                    targetLog.Clear();
                     doOnce = false;
                     centerOnce = false;
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
+
+                    /*
                     if (MissileIDs.Count > 0)
                     {
-                        SendMissileUnicastMessage(commandLost);
+                        //Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                        foreach (var id in MissileIDs)
+                        {
+                            if (id.Value.Contains(commandUpdate))
+                            {
+                                SendMissileUnicastMessage(commandLost, id.Key);//TODO
+                            }
+                        }
                     }
+                    //else {  Runtime.UpdateFrequency = UpdateFrequency.Update10; }
+                    */
 
                     if (MAGNETICDRIVEPB != null)
                     {
@@ -372,6 +400,28 @@ namespace IngameScript
 
                 //------------------------------------
 
+                if (MissileIDs.Count > 0)
+                {
+                    //if (scanTick >= scanTickDelay) {
+                    foreach (var id in MissileIDs)
+                    {
+                        if ((id.Value.Contains(commandUpdate) || id.Value.Contains(commandBeamRide) || id.Value.Contains(commandLaunch)) && !id.Value.Contains("Drone"))
+                        {
+                            SendMissileUnicastMessage(commandBeamRide, id.Key);//TODO
+                        }
+                        else
+                        {
+                            if (!id.Value.Contains(commandLost))
+                            {
+                                SendMissileUnicastMessage(commandLost, id.Key);//TODO
+                            }
+                        }
+                    }
+                    //scanTick = 0; } scanTick++;
+                }
+
+                //------------------------------------
+
                 foreach (IMyLargeTurretBase turret in TURRETS)
                 {
                     if (!turret.GetTargetedEntity().IsEmpty())
@@ -384,7 +434,6 @@ namespace IngameScript
                             targetHitPosition = targ.HitPosition;
                             targetId = targ.EntityId;
                             targetName = targ.Name;
-                            targetOrientation = targ.Orientation;
                             targetBoundingBox = targ.BoundingBox;
                             targetTimeStamp = targ.TimeStamp;
 
@@ -407,9 +456,18 @@ namespace IngameScript
                 missilesLoaded = false;
             }
 
-            ProcessArgs(arg);
+            if (!String.IsNullOrEmpty(arg))
+            {
+                ProcessArgs(arg);
+            }
 
-            WriteInfo();
+            if (writeCount == writeDelay)
+            {
+                WriteInfo();
+                writeCount = 0;
+            }
+            writeCount++;
+
         }
 
         void ProcessArgs(string arg)
@@ -419,7 +477,31 @@ namespace IngameScript
                 case argSetup: Setup(); break;
                 case argLock: AcquireTarget(); break;
                 case commandLaunch:
-                    if (targetName != null)
+                    if (MissileIDs.Count > 0 && targetName == null)
+                    {
+                        int count = 0;
+                        foreach (var id in MissileIDs)
+                        {
+                            if (id.Value.Contains(commandLost) && !id.Value.Contains("Drone"))
+                            {
+                                SendMissileUnicastMessage(commandBeamRide, id.Key);//TODO
+                                count++;
+                            }
+                        }
+                        if (count > 0)
+                        {
+                            launchNormal = false;
+                        }
+                        else
+                        {
+                            launchNormal = true;
+                        }
+                    }
+                    else
+                    {
+                        launchNormal = true;
+                    }
+                    if (launchNormal)
                     {
                         foreach (IMyRadioAntenna block in MISSILEANTENNAS)
                         {
@@ -437,7 +519,7 @@ namespace IngameScript
                             SetMissileAntennas();
                             selectedMissile = 1;
                         }
-                        SendMissileBroadcastMessage(commandLaunch);
+                        SendMissileBroadcastMessage(commandLaunch);//TODO
                     }
                     break;
                 case argClear:
@@ -450,19 +532,29 @@ namespace IngameScript
                     targetHitPosition = default(Vector3D?);
                     targetId = default(long);
                     targetName = null;
-                    targetOrientation = default(MatrixD);
                     targetBoundingBox = default(BoundingBoxD);
                     targetTimeStamp = default(long);
                     prevTargetVelocity = default(Vector3);
+                    prevTargetVelocity = Vector3.Zero;
                     TurnAlarmOff();
                     GetMissileAntennas();
                     SetMissileAntennas();
                     selectedMissile = 1;
                     doOnce = false;
                     centerOnce = false;
+                    foreach (var id in MissileIDs)
+                    {
+                        SendMissileUnicastMessage(commandLost, id.Key);//TODO
+                    }
                     break;
                 case argSwitchWeapon:
                     weaponType = (weaponType == 1 ? 2 : 1);
+                    break;
+                case argAutoFire:
+                    autoFire = !autoFire;
+                    break;
+                case argAutoMissiles:
+                    autoMissiles = !autoMissiles;
                     break;
                 case argSwitchPayLoad:
                     if (selectedPayLoad == 1)
@@ -481,6 +573,18 @@ namespace IngameScript
                     }
                     break;
                 case argLoadMissiles: LoadMissiles(); break;
+                case commandSpiral:
+                    if (MissileIDs.Count > 0 && targetName != null)
+                    {
+                        foreach (var id in MissileIDs)
+                        {
+                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))
+                            {
+                                SendMissileUnicastMessage(commandSpiral, id.Key);//TODO
+                            }
+                        }
+                    }
+                    break;
             }
         }
 
@@ -512,18 +616,15 @@ namespace IngameScript
                     if (IsValidLidarTarget(ref entityInfo))
                     {
                         targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
-
                         targetVelocity = entityInfo.Velocity;
                         targetPosition = entityInfo.Position;
                         targetHitPosition = entityInfo.HitPosition;
                         targetId = entityInfo.EntityId;
                         targetName = entityInfo.Name;
-                        targetOrientation = entityInfo.Orientation;
                         targetBoundingBox = entityInfo.BoundingBox;
                         targetTimeStamp = entityInfo.TimeStamp;
 
                         lostTicks = 0;
-
                         targetFound = true;
                     }
                 }
@@ -566,13 +667,11 @@ namespace IngameScript
                         if (entityInfo.EntityId == targetId)
                         {
                             targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
-
                             targetVelocity = entityInfo.Velocity;
                             targetPosition = entityInfo.Position;
                             targetHitPosition = entityInfo.HitPosition;
                             targetId = entityInfo.EntityId;
                             targetName = entityInfo.Name;
-                            targetOrientation = entityInfo.Orientation;
                             targetBoundingBox = entityInfo.BoundingBox;
                             targetTimeStamp = entityInfo.TimeStamp;
 
@@ -591,7 +690,7 @@ namespace IngameScript
                     }
                 }
 
-                if (useOffet)//TODO
+                if (useOffet)
                 {
                     int sameId = 0;
                     List<Vector3D> lerpPositions = new List<Vector3D>();
@@ -619,13 +718,11 @@ namespace IngameScript
                                     targetHitPosition = entityInfo.HitPosition;
                                     targetId = entityInfo.EntityId;
                                     targetName = entityInfo.Name;
-                                    targetOrientation = entityInfo.Orientation;
                                     targetBoundingBox = entityInfo.BoundingBox;
                                     targetTimeStamp = entityInfo.TimeStamp;
 
                                     lostTicks = 0;
                                     targetFound = true;
-
                                     sameId = 0;
 
                                     break;
@@ -886,12 +983,9 @@ namespace IngameScript
 
         void GetMessages()
         {
-            string status = "";
-            //Vector3D missilePos = Vector3D.Zero;
-            double missileVel = 0;
-            double missileDistanceFromTarget = 0;
-            long missileId = 0;
             bool received = false;
+
+            missilesInfo.Clear();
 
             if (UNILISTENER.HasPendingMessage)
             {
@@ -899,43 +993,49 @@ namespace IngameScript
                 {
                     var igcMessage = UNILISTENER.AcceptMessage();
 
-                    missileId = igcMessage.Source;
-
-                    int count = 0;
-                    foreach (long id in MissileIDs)
-                    {
-                        if (id == missileId)
-                        {
-                            count++;
-                        }
-                    }
-                    if (count == 0)
-                    {
-                        MissileIDs.Add(missileId);
-                    }
+                    long missileId = igcMessage.Source;
 
                     if (igcMessage.Data is ImmutableArray<MyTuple<string, Vector3D, double, double>>)
                     {
                         var data = (ImmutableArray<MyTuple<string, Vector3D, double, double>>)igcMessage.Data;
 
-                        status = data[0].Item1;
-                        //missilePos = data[0].Item2;
-                        missileVel = data[0].Item3;
-                        missileDistanceFromTarget = data[0].Item4;
-
                         received = true;
+
+                        if (writeCount == writeDelay)
+                        {
+                            var tup = MyTuple.Create(missileId, data[0].Item4, data[0].Item3, data[0].Item1);
+                            missilesInfo.Add(tup);
+                        }
+
+                        int count = 0;
+                        foreach (var idStatus in MissileIDs)
+                        {
+                            if (idStatus.Key == missileId)
+                            {
+                                count++;
+                            }
+                        }
+                        if (count == 0)
+                        {
+                            MissileIDs.Add(missileId, data[0].Item1);
+                        }
                     }
                 }
             }
 
-            //missileLog.Clear();
-            missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
-            if (received)
+            if (received && writeCount == writeDelay)
             {
-                missileLog.Append("Missile ID: ").Append(missileId.ToString()).Append("\n");
-                missileLog.Append("Missile status: ").Append(status.ToString()).Append("\n");
-                missileLog.Append("Dist. From Target: ").Append(missileDistanceFromTarget.ToString()).Append("\n");
-                missileLog.Append("Missile Speed: ").Append(missileVel.ToString()).Append("\n");
+                missileLog.Clear();
+                missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
+                foreach (var inf in missilesInfo)
+                {
+                    missileLog.Append("Missile ID: ").Append(inf.Item1.ToString()).Append("\n");
+                    missileLog.Append("Missile Speed: ").Append(inf.Item3.ToString()).Append("\n");
+                    if (inf.Item4.Contains(commandUpdate) || inf.Item4.Contains(commandSpiral))
+                    {
+                        missileLog.Append("Dist. From Target: ").Append(inf.Item2.ToString("0.00")).Append("\n");
+                    }
+                }
             }
         }
 
@@ -952,10 +1052,10 @@ namespace IngameScript
             }
 
             long fakeId = 0;
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D>,
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD>,
                 MyTuple<Vector3, Vector3D>>>();
 
-            var tuple = MyTuple.Create(MyTuple.Create(fakeId, cmd, CONTROLLER.CubeGrid.WorldVolume.Center),
+            var tuple = MyTuple.Create(MyTuple.Create(fakeId, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix),
               MyTuple.Create(targetVelocity, targetPos));
 
             immArray.Add(tuple);
@@ -963,7 +1063,7 @@ namespace IngameScript
             IGC.SendBroadcastMessage(missileAntennaTag, immArray.ToImmutable());
         }
 
-        void SendMissileUnicastMessage(string cmd)
+        void SendMissileUnicastMessage(string cmd, long id)
         {
             Vector3D targetPos;
             if (targetHitPosition.HasValue)
@@ -976,26 +1076,24 @@ namespace IngameScript
             }
 
             List<long> lostMissiles = new List<long>();
-            foreach (long id in MissileIDs)
+
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD>,
+                MyTuple<Vector3, Vector3D>>>();
+
+            var tuple = MyTuple.Create(MyTuple.Create(id, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix),
+                MyTuple.Create(targetVelocity, targetPos));
+
+            immArray.Add(tuple);
+
+            bool uniMessageSent = IGC.SendUnicastMessage(id, missileAntennaTag, immArray.ToImmutable());
+
+            if (!uniMessageSent)
             {
-                var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D>,
-                    MyTuple<Vector3, Vector3D>>>();
-
-                var tuple = MyTuple.Create(MyTuple.Create(id, cmd, CONTROLLER.CubeGrid.WorldVolume.Center),
-                    MyTuple.Create(targetVelocity, targetPos));
-
-                immArray.Add(tuple);
-
-                bool uniMessageSent = IGC.SendUnicastMessage(id, missileAntennaTag, immArray.ToImmutable());
-
-                if (!uniMessageSent)
-                {
-                    lostMissiles.Add(id);
-                }
+                lostMissiles.Add(id);
             }
-            foreach (long id in lostMissiles)
+            foreach (long lostId in lostMissiles)
             {
-                MissileIDs.Remove(id);
+                MissileIDs.Remove(lostId);
             }
         }
 
@@ -1046,22 +1144,35 @@ namespace IngameScript
 
         void ManageGuns(double distanceFromTarget)
         {
-            if (distanceFromTarget < 800)
+            if (distanceFromTarget < gatlingProjectileMaxRange && distanceFromTarget >= rocketProjectileMaxRange)
+            {
+                if (!farShootOnce)
+                {
+                    weaponType = 2;
+                    foreach (IMyTerminalBlock block in GATLINGS) { if (block.HasAction("Shoot_On")) { block.ApplyAction("Shoot_On"); } }
+                    farShootOnce = true;
+                    shootOnce = false;
+                }
+            }
+            else if (distanceFromTarget < rocketProjectileMaxRange)
             {
                 if (!shootOnce)
                 {
-                    foreach (IMyTerminalBlock block in GATLINGS) { if (block.HasAction("Shoot_On")) { block.ApplyAction("Shoot_On"); } }
+                    weaponType = 1;
                     foreach (IMyTerminalBlock block in ROCKETS) { if (block.HasAction("Shoot_On")) { block.ApplyAction("Shoot_On"); } }
                     shootOnce = true;
+                    farShootOnce = false;
                 }
             }
             else
             {
-                if (shootOnce)
+                if (shootOnce || farShootOnce)
                 {
+                    weaponType = 2;
                     foreach (IMyTerminalBlock block in GATLINGS) { if (block.HasAction("Shoot_Off")) { block.ApplyAction("Shoot_Off"); } }
                     foreach (IMyTerminalBlock block in ROCKETS) { if (block.HasAction("Shoot_Off")) { block.ApplyAction("Shoot_Off"); } }
                     shootOnce = false;
+                    farShootOnce = false;
                 }
             }
         }
