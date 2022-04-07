@@ -62,12 +62,12 @@ namespace IngameScript
         readonly double rocketProjectileForwardOffset = 4;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
         readonly double rocketProjectileInitialSpeed = 100;
         readonly double rocketProjectileAccelleration = 600;
-        readonly double rocketProjectileMaxSpeed = 200;
+        readonly double rocketProjectileMaxSpeed = 180;
         readonly double rocketProjectileMaxRange = 800;
         readonly double gatlingProjectileForwardOffset = 0;
         readonly double gatlingProjectileInitialSpeed = 400;
         readonly double gatlingProjectileAccelleration = 0;
-        readonly double gatlingProjectileMaxSpeed = 400;
+        readonly double gatlingProjectileMaxSpeed = 380;
         readonly double PNGain = 3;
 
         const double brakingAngleTolerance = 10; //degrees
@@ -315,13 +315,14 @@ namespace IngameScript
                             double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                             double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                             double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
-                            if (distanceShip2Target <= spiralStart + spiralSafe)
+                            //if (distanceShip2Target <= spiralStart + spiralSafe)
+                            if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
                             {
                                 MissileGuidance();
                             }
                             else
                             {
-                                if (useSpiral && distanceFromTarget <= spiralStart && distanceFromShip >= spiralSafe)
+                                if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
                                 {
                                     SpiralGuidance();
                                 }
@@ -340,13 +341,14 @@ namespace IngameScript
                             {
                                 foreach (IMyWarhead block in WARHEADS) { block.Detonate(); }
                             }
-                            if (distanceShip2Target <= spiralStart + spiralSafe)
+                            //if (distanceShip2Target <= spiralStart + spiralSafe)
+                            if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
                             {
                                 MissileGuidance();
                             }
                             else
                             {
-                                if (useSpiral && distanceFromTarget <= spiralStart && distanceFromShip >= spiralSafe)
+                                if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
                                 {
                                     SpiralGuidance();
                                 }
@@ -456,6 +458,7 @@ namespace IngameScript
 
         void GetMessages()
         {
+            /*
             if (UNICASTLISTENER.HasPendingMessage)
             {
                 while (UNICASTLISTENER.HasPendingMessage)
@@ -490,7 +493,9 @@ namespace IngameScript
                     }
                 }
             }
-            else if (BROADCASTLISTENER.HasPendingMessage)
+            else 
+            */
+            if (BROADCASTLISTENER.HasPendingMessage)
             {
                 while (BROADCASTLISTENER.HasPendingMessage)
                 {
@@ -525,7 +530,8 @@ namespace IngameScript
                                 targetVelocity = tup2.Item1;
                                 targetPosition = tup2.Item2;
                             }
-                            else if (myId == Me.EntityId)
+                            //else 
+                            if (myId == Me.EntityId)
                             {
                                 command = tup1.Item2;
                                 platformPosition = tup1.Item3;
