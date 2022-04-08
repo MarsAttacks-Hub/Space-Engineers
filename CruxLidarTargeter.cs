@@ -106,6 +106,7 @@ namespace IngameScript
         bool fudgeVectorSwitch = false;
 
         Vector3 prevTargetVelocity = Vector3.Zero;
+        string targetName = null;
         double targetDiameter;
         MyDetectedEntityInfo targetInfo;
 
@@ -198,6 +199,7 @@ namespace IngameScript
 
         void Main(string arg, UpdateType updateSource)
         {
+            Echo($"CURRENTTICK:{currentTick}");
             Echo($"MISSILEANTENNAS:{MISSILEANTENNAS.Count}");
             Echo($"LIDARS:{LIDARS.Count}");
             Echo($"CONTROLLERS:{CONTROLLERS.Count}");
@@ -213,15 +215,9 @@ namespace IngameScript
             Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
             Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
 
-            bool messageReceived = GetMessages();
+            GetMessages();
 
-            if (writeCount == writeDelay)//TODO
-            {
-                ClearLogs();
-                WriteMessages(messageReceived);
-            }
-
-            if (!String.IsNullOrEmpty(targetInfo.Name))//TODO is safe to check the name id targetInfo is set to defaut???
+            if (!String.IsNullOrEmpty(targetName))
             {
                 if (lostTicks > ticksScanDelay)//if lidars or turrets doesn't detect a enemy for some time reset the script
                 {
@@ -273,11 +269,13 @@ namespace IngameScript
 
                 ManageGuns();
 
-                if (writeCount == writeDelay)//TODO
+                if (currentTick == ticksScanDelay)
                 {
-                    WriteTargetInfo();
+                    ReadMessages();
+                    ReadTargetInfo();
                 }
-                if (currentTick == ticksScanDelay)//TODO
+
+                if (writeCount == writeDelay)
                 {
                     WriteDebug();
                 }
@@ -309,13 +307,12 @@ namespace IngameScript
                 ProcessArgs(arg);
             }
 
-            if (writeCount == writeDelay)//TODO
+            if (writeCount == writeDelay)
             {
                 WriteInfo();
                 writeCount = 0;
             }
             writeCount++;
-
         }
 
         void ProcessArgs(string arg)
@@ -325,7 +322,7 @@ namespace IngameScript
                 case argSetup: Setup(); break;
                 case argLock: AcquireTarget(); break;
                 case commandLaunch:
-                    if (MissileIDs.Count > 0 && String.IsNullOrEmpty(targetInfo.Name) && missilesLoaded)
+                    if (MissileIDs.Count > 0 && !String.IsNullOrEmpty(targetName) && missilesLoaded)
                     {
                         int count = 0;
                         foreach (var id in MissileIDs)
@@ -400,11 +397,11 @@ namespace IngameScript
                     break;
                 case argLoadMissiles: LoadMissiles(); break;
                 case commandSpiral:
-                    if (MissileIDs.Count > 0 && !String.IsNullOrEmpty(targetInfo.Name))
+                    if (MissileIDs.Count > 0 && !String.IsNullOrEmpty(targetName))
                     {
                         foreach (var id in MissileIDs)
                         {
-                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))
+                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))//TODO
                             {
                                 SendMissileUnicastMessage(commandSpiral, id.Key);
                             }
@@ -466,7 +463,7 @@ namespace IngameScript
         bool AcquireTarget()
         {
             bool targetFound = false;
-            if (String.IsNullOrEmpty(targetInfo.Name)) // case argLock
+            if (String.IsNullOrEmpty(targetName)) // case argLock
             {
                 targetFound = ScanTarget();
             }
@@ -515,6 +512,7 @@ namespace IngameScript
                 {
                     if (entityInfo.EntityId == targetInfo.EntityId)
                     {
+                        targetName = entityInfo.Name;
                         targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
                         targetInfo = entityInfo;
                         targetFound = true;
@@ -552,6 +550,7 @@ namespace IngameScript
                 {
                     if (entityInfo.EntityId == targetInfo.EntityId)
                     {
+                        targetName = entityInfo.Name;
                         targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
                         targetInfo = entityInfo;
                         targetFound = true;
@@ -590,6 +589,7 @@ namespace IngameScript
                     {
                         if (entityInfo.EntityId == targetInfo.EntityId)
                         {
+                            targetName = entityInfo.Name;
                             targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
                             targetInfo = entityInfo;
                             targetFound = true;
@@ -628,6 +628,7 @@ namespace IngameScript
                 {
                     if (entityInfo.EntityId == targetInfo.EntityId)
                     {
+                        targetName = entityInfo.Name;
                         targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
                         targetInfo = entityInfo;
                         targetFound = true;
@@ -935,10 +936,10 @@ namespace IngameScript
             return received;
         }
 
-        void WriteMessages(bool messageReceived)
+        void ReadMessages()
         {
-            //if (messageReceived && writeCount == writeDelay)//TODO not sure it works
-            if (writeCount == writeDelay)
+            missileLog.Clear();
+            if (MissileIDs.Count() > 0)
             {
                 missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
                 foreach (var inf in missilesInfo)
@@ -1010,6 +1011,7 @@ namespace IngameScript
             ClearLogs();
             ClearDebugLogs();
 
+            targetName = null;
             targetDiameter = 0;
             targetInfo = default(MyDetectedEntityInfo);
             prevTargetVelocity = default(Vector3);
@@ -1325,8 +1327,9 @@ namespace IngameScript
             }
         }
 
-        void WriteTargetInfo()
+        void ReadTargetInfo()
         {
+            targetLog.Clear();
             targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString()).Append("\n");
             if (!missilesLoaded)
             {
