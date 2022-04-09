@@ -215,10 +215,10 @@ namespace IngameScript
             Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
             Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
 
-            GetMessages();
-
             if (targetName != null)
             {
+                GetMessages();
+
                 if (lostTicks > ticksScanDelay)//if lidars or turrets doesn't detect a enemy for some time reset the script
                 {
                     ResetTargeter();
@@ -781,22 +781,29 @@ namespace IngameScript
                 targetAccel = (targetInfo.Velocity - prevTargetVelocity) / elapsedTime;
             }
             Vector3D aimDirection;
-            switch (weaponType)//TODO case based on distance from target also
+            double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+            if (distanceFromTarget > gatlingProjectileMaxRange)
             {
-                case 0://none
-                    aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-                    break;
-                case 1://rockets
-                    aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetInfo.Velocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
-                    break;
-                case 2://gatlings
-                    aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
-                    break;
-                default:
-                    aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-                    break;
+                aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
             }
-
+            else
+            {
+                switch (weaponType)
+                {
+                    case 0://none
+                        aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                        break;
+                    case 1://rockets
+                        aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetInfo.Velocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+                        break;
+                    case 2://gatlings
+                        aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
+                        break;
+                    default:
+                        aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                        break;
+                }
+            }
             aimDirection -= refWorldMatrix.Translation;
 
             double yawAngle, pitchAngle;
@@ -972,7 +979,8 @@ namespace IngameScript
 
             if (UNILISTENER.HasPendingMessage)
             {
-                MissileIDs.Clear();
+                //MissileIDs.Clear();//TODO
+                Dictionary<long, string> tempMissileIDs = new Dictionary<long, string>();
                 missilesInfo.Clear();
 
                 while (UNILISTENER.HasPendingMessage)
@@ -993,9 +1001,12 @@ namespace IngameScript
                             missilesInfo.Add(tup);
                         }
 
-                        MissileIDs.Add(missileId, data[0].Item1);
+                        tempMissileIDs.Add(missileId, data[0].Item1);
                     }
                 }
+
+                //eliminate duplicates by preferring entries from the first dictionary
+                MissileIDs = tempMissileIDs.Concat(MissileIDs.Where(kvp => !tempMissileIDs.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
             return received;
         }
@@ -1047,6 +1058,14 @@ namespace IngameScript
             immArray.Add(tuple);
 
             bool uniMessageSent = IGC.SendUnicastMessage(id, missileAntennaTag, immArray.ToImmutable());
+
+            if (!uniMessageSent)
+            {
+                if (MissileIDs.ContainsKey(id))
+                {
+                    MissileIDs.Remove(id);//TODO
+                }
+            }
 
             return uniMessageSent;
         }
