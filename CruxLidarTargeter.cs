@@ -86,7 +86,6 @@ namespace IngameScript
         readonly double gatlingProjectileAccelleration = 0;
         readonly double gatlingProjectileMaxSpeed = 400;
         readonly double gatlingProjectileMaxRange = 1000;
-        readonly List<double> lerpValues = new List<double>() { 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1 };
         readonly Random random = new Random();
         readonly int fudgeAttempts = 8;
 
@@ -104,6 +103,7 @@ namespace IngameScript
         int writeCount = 0;
         bool launchNormal = true;
         bool fudgeVectorSwitch = false;
+        double fudgeFactor = 5;
 
         Vector3 prevTargetVelocity = Vector3.Zero;
         Vector3D targetPosition;
@@ -150,6 +150,7 @@ namespace IngameScript
         readonly MyItemType iceOre = MyItemType.MakeOre("Ice");
 
         public Dictionary<long, string> MissileIDs = new Dictionary<long, string>();
+        public List<double> LostMissileIDs = new List<double>();
 
         public List<MyTuple<long, double, double, string>> missilesInfo = new List<MyTuple<long, double, double, string>>();
 
@@ -217,7 +218,9 @@ namespace IngameScript
 
             if (targetName != null)
             {
+                RemoveLostMissiles();
                 GetMessages();
+                ReadMessages();
 
                 if (lostTicks > ticksScanDelay)//if lidars or turrets doesn't detect a enemy for some time reset the script
                 {
@@ -269,16 +272,7 @@ namespace IngameScript
 
                 ManageGuns();
 
-                if (currentTick == ticksScanDelay)
-                {
-                    ReadMessages();
-                    ReadTargetInfo();
-                }
-
-                if (writeCount == writeDelay)
-                {
-                    WriteDebug();
-                }
+                ReadTargetInfo();
             }
             else
             {
@@ -310,6 +304,7 @@ namespace IngameScript
             if (writeCount == writeDelay)
             {
                 WriteInfo();
+                WriteDebug();
                 writeCount = 0;
             }
             writeCount++;
@@ -397,7 +392,7 @@ namespace IngameScript
                     break;
                 case argLoadMissiles: LoadMissiles(); break;
                 case commandSpiral:
-                    if (MissileIDs.Count > 0 && targetName != null)
+                    if (targetName != null)
                     {
                         foreach (var id in MissileIDs)
                         {
@@ -501,11 +496,6 @@ namespace IngameScript
                             }
                         }
                     }
-                    //if (!targetFound)
-                    //{
-                    //targetFound = ScanDelayedLerpTarget();
-                    //LidarLog.Append("Lerping targetFound: " + targetFound + "\n");
-                    //}
                 }
             }
             return targetFound;
@@ -618,48 +608,6 @@ namespace IngameScript
             return targetFound;
         }
 
-        bool ScanDelayedLerpTarget()
-        {
-            bool targetFound = false;
-            IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            float elapsedTime = (currentTick + lostTicks) * globalTimestep;
-            double overshootDistance = targetDiameter / 2;
-            List<Vector3D> lerpPositions = new List<Vector3D>();
-            foreach (double lerpVal in lerpValues)
-            {
-                Vector3D boundingBoxMin = targetInfo.BoundingBox.Min + (targetInfo.Velocity * elapsedTime);
-                Vector3D boundingBoxMax = targetInfo.BoundingBox.Max + (targetInfo.Velocity * elapsedTime);
-                Vector3D pos = Vector3D.Lerp(boundingBoxMin, boundingBoxMax, lerpVal);
-                pos += Vector3D.Normalize(pos - lidar.GetPosition()) * overshootDistance;
-                lerpPositions.Add(pos);
-            }
-            foreach (Vector3D lerpPos in lerpPositions)
-            {
-                lidar = GetCameraWithMaxRange(LIDARS);
-                double dist = Vector3D.Distance(lerpPos, lidar.GetPosition());
-                if (lidar.CanScan(dist))
-                {
-                    MyDetectedEntityInfo entityInfo = lidar.Raycast(lerpPos);
-                    if (!entityInfo.IsEmpty())
-                    {
-                        if (entityInfo.EntityId == targetInfo.EntityId)
-                        {
-                            targetName = entityInfo.Name;
-                            targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
-                            targetInfo = entityInfo;
-                            DetermineTargetPostion();
-                            targetFound = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            LidarLog.Append("ScanDelayedLerpTarget, targetFound: " + targetFound + "\n");
-
-            return targetFound;
-        }
-
         bool ScanFudgeTarget()
         {
             bool targetFound = false;
@@ -668,6 +616,8 @@ namespace IngameScript
             float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             Vector3D scanPosition = trgtPos + targetInfo.Velocity * elapsedTime;
             scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition());
+            double overshootDistance = targetDiameter / 2;
+            scanPosition += Vector3D.Normalize(scanPosition - lidar.GetPosition()) * overshootDistance;
             double dist = Vector3D.Distance(scanPosition, lidar.GetPosition());
             if (lidar.CanScan(dist))
             {
@@ -685,12 +635,21 @@ namespace IngameScript
                 }
             }
 
+            if (!targetFound)
+            {
+                fudgeFactor++;
+            }
+            else
+            {
+                fudgeFactor = 5;
+            }
+
             LidarLog.Append("ScanFudgeTarget, targetFound: " + targetFound + "\n");
 
             return targetFound;
         }
 
-        Vector3D CalculateFudgeVector(Vector3D targetDirection, double fudgeFactor = 5)
+        Vector3D CalculateFudgeVector(Vector3D targetDirection)
         {
             fudgeVectorSwitch = !fudgeVectorSwitch;
 
@@ -738,7 +697,6 @@ namespace IngameScript
                     currentTick = 0;
                 }
             }
-
             currentTick++;
         }
 
@@ -976,10 +934,8 @@ namespace IngameScript
         bool GetMessages()
         {
             bool received = false;
-
             if (UNILISTENER.HasPendingMessage)
             {
-                //MissileIDs.Clear();//TODO
                 Dictionary<long, string> tempMissileIDs = new Dictionary<long, string>();
                 missilesInfo.Clear();
 
@@ -995,16 +951,12 @@ namespace IngameScript
 
                         received = true;
 
-                        if (writeCount == writeDelay)
-                        {
-                            var tup = MyTuple.Create(missileId, data[0].Item4, data[0].Item3, data[0].Item1);
-                            missilesInfo.Add(tup);
-                        }
+                        var tup = MyTuple.Create(missileId, data[0].Item4, data[0].Item3, data[0].Item1);
+                        missilesInfo.Add(tup);
 
                         tempMissileIDs.Add(missileId, data[0].Item1);
                     }
                 }
-
                 //eliminate duplicates by preferring entries from the first dictionary
                 MissileIDs = tempMissileIDs.Concat(MissileIDs.Where(kvp => !tempMissileIDs.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
@@ -1013,13 +965,13 @@ namespace IngameScript
 
         void ReadMessages()
         {
-            missileLog.Clear();
             if (MissileIDs.Count() > 0)
             {
+                missileLog.Clear();
                 missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
                 foreach (var inf in missilesInfo)
                 {
-                    missileLog.Append("Missile ID: ").Append(inf.Item1.ToString()).Append("\n");
+                    missileLog.Append("Command: ").Append(inf.Item4).Append(", Missile ID: ").Append(inf.Item1.ToString()).Append("\n");
                     missileLog.Append("Missile Speed: ").Append(inf.Item3.ToString()).Append("\n");
                     if (inf.Item4.Contains(commandUpdate) || inf.Item4.Contains(commandSpiral))
                     {
@@ -1061,13 +1013,31 @@ namespace IngameScript
 
             if (!uniMessageSent)
             {
-                if (MissileIDs.ContainsKey(id))
-                {
-                    MissileIDs.Remove(id);//TODO
-                }
+                LostMissileIDs.Add(id);
             }
 
             return uniMessageSent;
+        }
+
+        void RemoveLostMissiles()
+        {
+            Dictionary<long, string> TempMissileIDs = new Dictionary<long, string>();
+            foreach (var entry in MissileIDs)
+            {
+                bool found = false;
+                foreach (var id in LostMissileIDs)
+                {
+                    if (entry.Key == id)
+                    {
+                        found = true;
+                    }
+                }
+                if (!found)
+                {
+                    TempMissileIDs.Add(entry.Key, entry.Value);
+                }
+            }
+            MissileIDs = TempMissileIDs;
         }
 
         void ResetTargeter()
@@ -1094,6 +1064,7 @@ namespace IngameScript
             farShootOnce = false;
             autoMissilesCounter = autoMissilesDelay + 1;
             missilesLoaded = false;
+            fudgeFactor = 5;
 
             foreach (var id in MissileIDs)
             {
@@ -1399,36 +1370,39 @@ namespace IngameScript
 
         void ReadTargetInfo()
         {
-            targetLog.Clear();
-            targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString()).Append("\n");
-            if (!missilesLoaded)
+            if (currentTick == ticksScanDelay)
             {
-                targetLog.Append("Missiles Not Loaded\n");
+                targetLog.Clear();
+                targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString()).Append("\n");
+                if (!missilesLoaded)
+                {
+                    targetLog.Append("Missiles Not Loaded\n");
+                }
+                else
+                {
+                    targetLog.Append("Missiles Loaded\n");
+                }
+
+                targetLog.Append("ID: ").Append(targetInfo.EntityId.ToString()).Append("\n");
+
+                targetLog.Append("Name: ").Append(targetInfo.Name).Append("\n");
+
+                long targetLastDetected = targetInfo.TimeStamp / 1000;
+                targetLog.Append("Detected Since: ").Append(targetLastDetected).Append(" s\n");
+
+                targetLog.Append("Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append("\n");
+
+                double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
+                targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
+
+                double targetRadius = Vector3D.Distance(targetInfo.BoundingBox.Min, targetInfo.BoundingBox.Max);
+                targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
+
+                string targX = targetInfo.Position.X.ToString("0.00");
+                string targY = targetInfo.Position.Y.ToString("0.00");
+                string targZ = targetInfo.Position.Z.ToString("0.00");
+                targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
             }
-            else
-            {
-                targetLog.Append("Missiles Loaded\n");
-            }
-
-            targetLog.Append("ID: ").Append(targetInfo.EntityId.ToString()).Append("\n");
-
-            targetLog.Append("Name: ").Append(targetInfo.Name).Append("\n");
-
-            long targetLastDetected = targetInfo.TimeStamp / 1000;
-            targetLog.Append("Detected Since: ").Append(targetLastDetected).Append(" s\n");
-
-            targetLog.Append("Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append("\n");
-
-            double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
-            targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
-
-            double targetRadius = Vector3D.Distance(targetInfo.BoundingBox.Min, targetInfo.BoundingBox.Max);
-            targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
-
-            string targX = targetInfo.Position.X.ToString("0.00");
-            string targY = targetInfo.Position.Y.ToString("0.00");
-            string targZ = targetInfo.Position.Z.ToString("0.00");
-            targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
         }
 
         void ClearLogs()
