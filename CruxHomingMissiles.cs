@@ -1315,7 +1315,7 @@ namespace IngameScript
                 if (block is IMyBatteryBlock) { (block as IMyBatteryBlock).ChargeMode = ChargeMode.Discharge; }
             }
             foreach (IMyShipMergeBlock item in MERGES) { item.Enabled = false; }
-            foreach (IMyShipConnector item in CONNECTORS) { item.Enabled = false; }
+            foreach (IMyShipConnector item in CONNECTORS) { item.Disconnect(); item.Enabled = false; }//TODO
             foreach (IMyThrust item in ALLTHRUSTERS) { item.Enabled = true; }
         }
 
@@ -1325,7 +1325,7 @@ namespace IngameScript
             missileMass = 0;
             missileThrust = 0;
 
-            foreach (IMyTerminalBlock block in TBLOCKS)//TODO add armor blocks Mass
+            foreach (IMyTerminalBlock block in TBLOCKS)//TODO add armor blocks Mass and inventories mass
             {
                 missileMass += block.Mass;
             }

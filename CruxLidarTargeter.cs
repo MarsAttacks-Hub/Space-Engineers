@@ -38,13 +38,13 @@ namespace IngameScript
         readonly string projectorsMissilesName = "Missile";
         readonly string projectorsDronesName = "Drone";
         readonly string missileAntennasName = "A [M]";
-        readonly string shipPrefix = "[CRX] ";
         readonly string missilePrefix = "[M]";
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
         readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
         readonly string managerName = "[CRX] PB Manager";
-        readonly string debugPanelName = "[CRX] Debug Lidar";
+        readonly string cargoName = "[CRX] Cargo";
+        //readonly string debugPanelName = "[CRX] Debug Lidar";
 
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";
@@ -74,7 +74,7 @@ namespace IngameScript
         readonly int missilesCount = 2;
         readonly int autoMissilesDelay = 91;
         readonly int writeDelay = 10;
-        readonly bool creative = true;
+        readonly bool creative = false;
         readonly double initialLockDistance = 5000d;
         readonly double rocketProjectileForwardOffset = 4d;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
         readonly double rocketProjectileInitialSpeed = 100d;
@@ -130,16 +130,14 @@ namespace IngameScript
         public List<IMyRadioAntenna> MISSILEANTENNAS = new List<IMyRadioAntenna>();
         public List<IMyTerminalBlock> ROCKETS = new List<IMyTerminalBlock>();
         public List<IMyTerminalBlock> GATLINGS = new List<IMyTerminalBlock>();
-        public List<IMyTerminalBlock> BLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
+        public List<IMyCargoContainer> CARGOS = new List<IMyCargoContainer>();
         public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
-        public List<IMyTerminalBlock> MISSILEBLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
-        public List<IMyInventory> MISSILEINVENTORIES = new List<IMyInventory>();
 
         IMyShipController CONTROLLER;
         IMyRadioAntenna ANTENNA;
         IMyProgrammableBlock MAGNETICDRIVEPB;
         IMyProgrammableBlock MANAGERPB;
-        IMyTextPanel DEBUG;
+        //IMyTextPanel DEBUG;
 
         public IMyUnicastListener UNILISTENER;
         public IMyBroadcastListener BROADCASTLISTENER;
@@ -156,9 +154,10 @@ namespace IngameScript
 
         public StringBuilder targetLog = new StringBuilder("");
         public StringBuilder missileLog = new StringBuilder("");
-        public StringBuilder LidarLog = new StringBuilder("");
-        public StringBuilder AntennaLog = new StringBuilder("");
-        public StringBuilder messageIdLog = new StringBuilder("");
+        //public StringBuilder LidarLog = new StringBuilder("");
+        //public StringBuilder AntennaLog = new StringBuilder("");
+        //public StringBuilder messageIdLog = new StringBuilder("");
+        //public StringBuilder loadLog = new StringBuilder("");
 
         PID yawController;
         PID pitchController;
@@ -216,6 +215,7 @@ namespace IngameScript
             Echo($"GATLINGS:{GATLINGS.Count}");
             Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
             Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
+            Echo($"CARGOS:{CARGOS.Count}");
 
             if (targetName != null)
             {
@@ -242,8 +242,7 @@ namespace IngameScript
 
                 if (targetFound && currentTick == ticksScanDelay)// send message to missiles every some ticks
                 {
-                    AntennaLog.Clear();
-
+                    //AntennaLog.Clear();
                     foreach (var id in MissileIDs)
                     {
                         SendMissileUnicastMessage(commandUpdate, id.Key);
@@ -283,11 +282,11 @@ namespace IngameScript
             }
 
             bool completed = CheckProjectors();
-            if (completed)
+            if (completed && !missilesLoaded)
             {
-                missilesLoaded = LoadMissiles();//TODO doesn't seems to work
+                missilesLoaded = LoadMissiles();
             }
-            else
+            if (!completed)
             {
                 missilesLoaded = false;
             }
@@ -300,7 +299,7 @@ namespace IngameScript
             if (writeCount == writeDelay)
             {
                 WriteInfo();
-                WriteDebug();
+                //WriteDebug();
                 writeCount = 0;
             }
             writeCount++;
@@ -453,13 +452,11 @@ namespace IngameScript
 
         bool AcquireTarget()
         {
-            LidarLog.Clear();
-
+            //LidarLog.Clear();
             bool targetFound = false;
             if (targetName == null) // case argLock
             {
                 targetFound = ScanTarget(false);
-
                 if (targetFound)
                 {
                     targetFound = ScanTargetCenter(true);
@@ -477,10 +474,8 @@ namespace IngameScript
             {
                 if (currentTick == ticksScanDelay) // if target is not lost scan every some ticks
                 {
-                    LidarLog.Clear();
-
+                    //LidarLog.Clear();
                     targetFound = ScanDelayedTarget();
-
                     if (!targetFound)
                     {
                         for (int i = 0; i < fudgeAttempts; i++)
@@ -527,9 +522,7 @@ namespace IngameScript
                     }
                 }
             }
-
-            LidarLog.Append("ScanTarget, targetFound: " + targetFound + "\n");
-
+            //LidarLog.Append("ScanTarget, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -567,9 +560,7 @@ namespace IngameScript
                     }
                 }
             }
-
-            LidarLog.Append("ScanTargetCenter, targetFound: " + targetFound + "\n");
-
+            //LidarLog.Append("ScanTargetCenter, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -598,9 +589,7 @@ namespace IngameScript
                     }
                 }
             }
-
-            LidarLog.Append("ScanDelayedTarget, targetFound: " + targetFound + "\n");
-
+            //LidarLog.Append("ScanDelayedTarget, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -639,9 +628,7 @@ namespace IngameScript
             {
                 fudgeFactor = 5;
             }
-
-            LidarLog.Append("ScanFudgeTarget, targetFound: " + targetFound + "\n");
-
+            //LidarLog.Append("ScanFudgeTarget, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -952,20 +939,14 @@ namespace IngameScript
                         tempMissileIDs.Add(missileId, data[0].Item1);
                     }
                 }
-
                 //eliminate duplicates by preferring entries from the first dictionary
                 missilesInfo = tempMissilesInfo.Concat(missilesInfo.Where(kvp => !tempMissilesInfo.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 MissileIDs = tempMissileIDs.Concat(MissileIDs.Where(kvp => !tempMissileIDs.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
-
-            messageIdLog.Append("GetMessages: " + received + "\n");
-            messageIdLog.Append("MissileIDs: ");
-            foreach (var entry in MissileIDs)
-            {
-                messageIdLog.Append(entry.Key + "\n");
-            }
-            messageIdLog.Append("\n");
-
+            //messageIdLog.Append("GetMessages: " + received + "\n");
+            //messageIdLog.Append("MissileIDs: ");
+            //foreach (var entry in MissileIDs) { messageIdLog.Append(entry.Key + "\n"); }
+            //messageIdLog.Append("\n");
             return received;
         }
 
@@ -1021,22 +1002,18 @@ namespace IngameScript
             {
                 LostMissileIDs.Add(id);
             }
-
-            AntennaLog.Append("Command: " + cmd + ", Unicast Message Sent:" + uniMessageSent + ", to ID: " + id + "\n");
-
+            //AntennaLog.Append("Command: " + cmd + ", Unicast Message Sent:" + uniMessageSent + ", to ID: " + id + "\n");
             return uniMessageSent;
         }
 
         void RemoveLostMissiles()
         {
-            messageIdLog.Clear();
-            messageIdLog.Append("MissileIDs: ");
-
+            //messageIdLog.Clear();
+            //messageIdLog.Append("MissileIDs: ");
             Dictionary<long, string> TempMissileIDs = new Dictionary<long, string>();
             foreach (var entry in MissileIDs)
             {
-                messageIdLog.Append(entry.Key + ", ");
-
+                //messageIdLog.Append(entry.Key + ", ");
                 bool found = false;
                 foreach (var id in LostMissileIDs)
                 {
@@ -1050,15 +1027,10 @@ namespace IngameScript
                     TempMissileIDs.Add(entry.Key, entry.Value);
                 }
             }
-
-            messageIdLog.Append("\n");
-            messageIdLog.Append("TempMissileIDs: ");
-            foreach (var entry in TempMissileIDs)
-            {
-                messageIdLog.Append(entry.Key + ", ");
-            }
-            messageIdLog.Append(" \n");
-
+            //messageIdLog.Append("\n");
+            //messageIdLog.Append("TempMissileIDs: ");
+            //foreach (var entry in TempMissileIDs) { messageIdLog.Append(entry.Key + ", "); }
+            //messageIdLog.Append(" \n");
             Dictionary<long, MyTuple<double, double, string>> tempMissilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
             foreach (var entry in missilesInfo)
             {
@@ -1088,7 +1060,7 @@ namespace IngameScript
             TurnAlarmOff();
             TurnGunsOff();
             ClearLogs();
-            ClearDebugLogs();
+            //ClearDebugLogs();
 
             targetName = null;
             targetDiameter = 0;
@@ -1290,8 +1262,18 @@ namespace IngameScript
             foreach (IMyTerminalBlock block in ROCKETS) { if (block.HasAction("Shoot_Off")) { block.ApplyAction("Shoot_Off"); } }
         }
 
-        bool LoadMissiles()
+        bool LoadMissiles()//meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
         {
+            //loadLog.Clear();
+            //loadLog.Append("LoadMissiles, creative: " + creative + "\n");
+            List<IMyShipConnector> MISSILECONNECTORS = new List<IMyShipConnector>();
+            GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(MISSILECONNECTORS, b => b.CustomName.Contains(missilePrefix));
+            if (MISSILECONNECTORS.Count == 0)
+            {
+                return false;
+            }
+            foreach (IMyShipConnector block in MISSILECONNECTORS) { block.Connect(); }
+
             bool allFilled = false;
             if (creative)
             {
@@ -1299,95 +1281,215 @@ namespace IngameScript
             }
             else
             {
-                int filled = 0;
-                for (int i = 1; i <= missilesCount; i++)
+                List<IMyTerminalBlock> MISSILEBLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
+                List<IMyInventory> MISSILEINVENTORIES = new List<IMyInventory>();
+                float margin = 0.1f;
+                if (selectedPayLoad == 0)//missiles
                 {
                     MISSILEBLOCKSWITHINVENTORY.Clear();
-                    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix + i) && !(block is IMyShipConnector) && !(block is IMyCargoContainer) && !(block is IMyGasTank));
+                    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix) && !(block is IMyGasTank));
                     MISSILEINVENTORIES.Clear();
                     MISSILEINVENTORIES.AddRange(MISSILEBLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-
+                    int loaded = 0;
                     foreach (IMyInventory inventory in MISSILEINVENTORIES)
                     {
-                        if (!inventory.IsFull)
+                        //loadLog.Append("MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
+                        MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
+                        if (inventory.CanItemsBeAdded(availableVolume, iceOre))
                         {
-                            MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
-                            if (inventory.CanItemsBeAdded(availableVolume, iceOre))
-                            {
-                                foreach (IMyInventory sourceInventory in INVENTORIES)
-                                {
-                                    MyInventoryItem? itemFound = sourceInventory.FindItem(iceOre);
-                                    if (itemFound.HasValue)
-                                    {
-                                        MyFixedPoint itemAmount = sourceInventory.GetItemAmount(iceOre);
-                                        if (sourceInventory.CanTransferItemTo(inventory, iceOre))
-                                        {
-                                            sourceInventory.TransferItemTo(inventory,
-                                                itemFound.Value,
-                                                Math.Min(availableVolume.ToIntSafe(), itemAmount.ToIntSafe()));
-                                            if (inventory.IsFull)
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else if (inventory.CanItemsBeAdded(availableVolume, missileAmmo))
-                            {
-                                foreach (IMyInventory sourceInventory in INVENTORIES)
-                                {
-                                    MyInventoryItem? itemFound = sourceInventory.FindItem(missileAmmo);
-                                    if (itemFound.HasValue)
-                                    {
-                                        MyFixedPoint itemAmount = sourceInventory.GetItemAmount(missileAmmo);
-                                        if (sourceInventory.CanTransferItemTo(inventory, missileAmmo))
-                                        {
-                                            sourceInventory.TransferItemTo(inventory,
-                                                itemFound.Value,
-                                                Math.Min(availableVolume.ToIntSafe(), itemAmount.ToIntSafe()));
-                                            if (inventory.IsFull)
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
-                            {
-                                foreach (IMyInventory sourceInventory in INVENTORIES)
-                                {
-                                    MyInventoryItem? itemFound = sourceInventory.FindItem(gatlingAmmo);
-                                    if (itemFound.HasValue)
-                                    {
-                                        MyFixedPoint itemAmount = sourceInventory.GetItemAmount(gatlingAmmo);
-                                        if (sourceInventory.CanTransferItemTo(inventory, gatlingAmmo))
-                                        {
-                                            sourceInventory.TransferItemTo(inventory,
-                                                itemFound.Value,
-                                                Math.Min(availableVolume.ToIntSafe(), itemAmount.ToIntSafe()));
-                                            if (inventory.IsFull)
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            TransferItems(availableVolume, inventory, iceOre);
                         }
-                        else
+                        if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
                         {
-                            filled++;
+                            loaded++;
                         }
                     }
+                    //loadLog.Append("loaded: " + loaded + ", MISSILEINVENTORIES: " + MISSILEINVENTORIES.Count + "\n");
+                    if (loaded == MISSILEINVENTORIES.Count)
+                    {
+                        allFilled = true;
+                    }
                 }
-                if (filled == MISSILEINVENTORIES.Count)
+                else if (selectedPayLoad == 1)//drones
                 {
-                    allFilled = true;
+                    MISSILEBLOCKSWITHINVENTORY.Clear();
+                    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix) && !(block is IMyGasTank));
+                    int inventoriesCount = 0;
+                    int loaded = 0;
+                    foreach (IMyTerminalBlock block in MISSILEBLOCKSWITHINVENTORY)
+                    {
+                        if (block is IMyCargoContainer)
+                        {
+                            MISSILEINVENTORIES.Clear();
+                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
+                            inventoriesCount += MISSILEINVENTORIES.Count;
+                            //loadLog.Append("IMyCargoContainer, count: " + MISSILEINVENTORIES.Count + "\n");
+                            int alt = 0;
+                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
+                            {
+                                //loadLog.Append("IMyCargoContainer, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
+                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
+                                if (alt == 0)
+                                {
+                                    if (inventory.CanItemsBeAdded(availableVolume, iceOre))
+                                    {
+                                        TransferItems(availableVolume, inventory, iceOre);
+                                    }
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    {
+                                        loaded++;
+                                    }
+                                    alt++;
+                                }
+                                else
+                                {
+                                    if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
+                                    {
+                                        TransferItems(availableVolume, inventory, gatlingAmmo);
+                                    }
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    {
+                                        loaded++;
+                                    }
+                                    alt = 0;
+                                }
+                            }
+                        }
+                        else if (block is IMyShipConnector)
+                        {
+                            MISSILEINVENTORIES.Clear();
+                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
+                            inventoriesCount += MISSILEINVENTORIES.Count;
+                            //loadLog.Append("IMyShipConnector, count: " + MISSILEINVENTORIES.Count + "\n");
+                            int alt = 0;
+                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
+                            {
+                                //loadLog.Append("IMyShipConnector, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
+                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
+                                if (alt == 0)
+                                {
+                                    if (inventory.CanItemsBeAdded(availableVolume, iceOre))
+                                    {
+                                        TransferItems(availableVolume, inventory, iceOre);
+                                    }
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    {
+                                        loaded++;
+                                    }
+                                    alt++;
+                                }
+                                else
+                                {
+                                    if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
+                                    {
+                                        TransferItems(availableVolume, inventory, gatlingAmmo);
+                                    }
+
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    {
+                                        loaded++;
+                                    }
+                                    alt = 0;
+                                }
+                            }
+                        }
+                        else if (block is IMyGasGenerator)
+                        {
+                            MISSILEINVENTORIES.Clear();
+                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
+                            inventoriesCount += MISSILEINVENTORIES.Count;
+                            //loadLog.Append("IMyGasGenerator, count: " + MISSILEINVENTORIES.Count + "\n");
+                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
+                            {
+                                //loadLog.Append("IMyGasGenerator, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
+                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
+                                if (inventory.CanItemsBeAdded(availableVolume, iceOre))
+                                {
+                                    TransferItems(availableVolume, inventory, iceOre);
+                                }
+                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                {
+                                    loaded++;
+                                }
+                            }
+                        }
+                        else if (block is IMySmallGatlingGun)
+                        {
+                            MISSILEINVENTORIES.Clear();
+                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
+                            inventoriesCount += MISSILEINVENTORIES.Count;
+                            //loadLog.Append("IMySmallGatlingGun, count: " + MISSILEINVENTORIES.Count + "\n");
+                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
+                            {
+                                //loadLog.Append("IMySmallGatlingGun, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
+                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
+                                if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
+                                {
+                                    TransferItems(availableVolume, inventory, gatlingAmmo);
+                                }
+                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                {
+                                    loaded++;
+                                }
+                            }
+                        }
+                        else if (block is IMyLargeTurretBase)
+                        {
+                            MISSILEINVENTORIES.Clear();
+                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
+                            inventoriesCount += MISSILEINVENTORIES.Count;
+                            //loadLog.Append("IMyLargeTurretBase, count: " + MISSILEINVENTORIES.Count + "\n");
+                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
+                            {
+                                //loadLog.Append("IMyLargeTurretBase, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
+                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
+                                if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
+                                {
+                                    TransferItems(availableVolume, inventory, gatlingAmmo);
+                                }
+                                else if (inventory.CanItemsBeAdded(availableVolume, missileAmmo))
+                                {
+                                    TransferItems(availableVolume, inventory, missileAmmo);
+                                }
+                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                {
+                                    loaded++;
+                                }
+                            }
+                        }
+                    }
+                    //loadLog.Append("loaded: " + loaded + ", inventoriesCount: " + inventoriesCount + "\n");
+                    if (loaded == inventoriesCount)
+                    {
+                        allFilled = true;
+                    }
                 }
             }
+
+            //if (allFilled) { foreach (IMyShipConnector block in MISSILECONNECTORS) { block.Disconnect(); } }//the missile PB does the disconnection
+
             return allFilled;
+        }
+
+        bool TransferItems(MyFixedPoint availableVolume, IMyInventory inventory, MyItemType item)
+        {
+            bool tranferred = false;
+            foreach (IMyInventory sourceInventory in INVENTORIES)
+            {
+                MyInventoryItem? itemFound = sourceInventory.FindItem(item);
+                if (itemFound.HasValue)
+                {
+                    MyFixedPoint itemAmount = sourceInventory.GetItemAmount(item);
+                    if (sourceInventory.CanTransferItemTo(inventory, item))
+                    {
+                        //MyFixedPoint amount;
+                        //if ((float)availableVolume < (float)itemAmount) { amount = availableVolume; } else { amount = itemAmount; }//fill the inventories slower
+                        tranferred = sourceInventory.TransferItemTo(inventory, itemFound.Value, availableVolume);
+                        if (tranferred) { break; }
+                    }
+                }
+            }
+            return tranferred;
         }
 
         void WriteInfo()
@@ -1403,14 +1505,14 @@ namespace IngameScript
 
         void WriteDebug()
         {
-            if (DEBUG != null)
-            {
-                StringBuilder text = new StringBuilder("");
-                text.Append(messageIdLog);
-                text.Append(LidarLog);
-                text.Append(AntennaLog);
-                DEBUG.WriteText(text);
-            }
+            //if (DEBUG != null) {
+            StringBuilder text = new StringBuilder("");
+            //text.Append(messageIdLog);
+            //text.Append(LidarLog);
+            //text.Append(AntennaLog);
+            //text.Append(loadLog);
+            //DEBUG.WriteText(text); 
+            //}
         }
 
         void ReadTargetInfo()
@@ -1461,12 +1563,9 @@ namespace IngameScript
 
         void ClearDebugLogs()
         {
-            LidarLog.Clear();
-            AntennaLog.Clear();
-            if (DEBUG != null)
-            {
-                DEBUG.WriteText("");
-            }
+            //LidarLog.Clear();
+            //AntennaLog.Clear();
+            //if (DEBUG != null) { DEBUG.WriteText(""); }
         }
 
         void GetBlocks()
@@ -1495,10 +1594,10 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(ROCKETS, b => b.CustomName.Contains(rocketsName));
             GATLINGS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(GATLINGS, b => b.CustomName.Contains(gatlingsName));
-            BLOCKSWITHINVENTORY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(shipPrefix)); //&& block.IsSameConstructAs(Me)
+            CARGOS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(CARGOS, b => b.CustomName.Contains(cargoName));
             INVENTORIES.Clear();
-            INVENTORIES.AddRange(BLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            INVENTORIES.AddRange(CARGOS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
 
             SURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
@@ -1514,7 +1613,7 @@ namespace IngameScript
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
 
-            DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
         void SetBlocks()
