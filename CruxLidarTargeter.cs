@@ -158,6 +158,7 @@ namespace IngameScript
         public StringBuilder missileLog = new StringBuilder("");
         public StringBuilder LidarLog = new StringBuilder("");
         public StringBuilder AntennaLog = new StringBuilder("");
+        public StringBuilder messageIdLog = new StringBuilder("");
 
         PID yawController;
         PID pitchController;
@@ -248,9 +249,7 @@ namespace IngameScript
 
                     foreach (var id in MissileIDs)
                     {
-                        bool messageSent = SendMissileUnicastMessage(commandUpdate, id.Key);
-
-                        AntennaLog.Append(commandUpdate + "Unicast Message Sent:" + messageSent + ", to ID: " + id.Key + "\n");
+                        SendMissileUnicastMessage(commandUpdate, id.Key);
                     }
 
                     if (autoMissiles)
@@ -937,6 +936,7 @@ namespace IngameScript
             if (UNILISTENER.HasPendingMessage)
             {
                 Dictionary<long, string> tempMissileIDs = new Dictionary<long, string>();
+                List<MyTuple<long, double, double, string>> tempMissilesInfo = new List<MyTuple<long, double, double, string>>();
                 missilesInfo.Clear();
 
                 while (UNILISTENER.HasPendingMessage)
@@ -953,13 +953,26 @@ namespace IngameScript
 
                         var tup = MyTuple.Create(missileId, data[0].Item4, data[0].Item3, data[0].Item1);
                         missilesInfo.Add(tup);
+                        //tempMissilesInfo.Add(tup);
 
                         tempMissileIDs.Add(missileId, data[0].Item1);
                     }
                 }
+
+                //missilesInfo = tempMissilesInfo.Concat(missilesInfo.Where(entry => tempMissilesInfo.GetEnumerator().Current.Item1 != entry.Item1)).ToList();
+
                 //eliminate duplicates by preferring entries from the first dictionary
                 MissileIDs = tempMissileIDs.Concat(MissileIDs.Where(kvp => !tempMissileIDs.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
+
+            messageIdLog.Append("GetMessages: " + received + "\n");
+            messageIdLog.Append("MissileIDs: ");
+            foreach (var entry in MissileIDs)
+            {
+                messageIdLog.Append(entry.Key + "\n");
+            }
+            messageIdLog.Append("\n");
+
             return received;
         }
 
@@ -1016,14 +1029,21 @@ namespace IngameScript
                 LostMissileIDs.Add(id);
             }
 
+            AntennaLog.Append("Command: " + cmd + ", Unicast Message Sent:" + uniMessageSent + ", to ID: " + id + "\n");
+
             return uniMessageSent;
         }
 
         void RemoveLostMissiles()
         {
+            messageIdLog.Clear();
+            messageIdLog.Append("MissileIDs: ");
+
             Dictionary<long, string> TempMissileIDs = new Dictionary<long, string>();
             foreach (var entry in MissileIDs)
             {
+                messageIdLog.Append(entry.Key + ", ");
+
                 bool found = false;
                 foreach (var id in LostMissileIDs)
                 {
@@ -1037,6 +1057,15 @@ namespace IngameScript
                     TempMissileIDs.Add(entry.Key, entry.Value);
                 }
             }
+
+            messageIdLog.Append("\n");
+            messageIdLog.Append("TempMissileIDs: ");
+            foreach (var entry in TempMissileIDs)
+            {
+                messageIdLog.Append(entry.Key + ", ");
+            }
+            messageIdLog.Append(" \n");
+
             MissileIDs = TempMissileIDs;
         }
 
@@ -1351,8 +1380,8 @@ namespace IngameScript
             foreach (IMyTextSurface surface in SURFACES)
             {
                 StringBuilder text = new StringBuilder("");
-                text.Append(targetLog.ToString());
                 text.Append(missileLog.ToString());
+                text.Append(targetLog.ToString());
                 surface.WriteText(text);
             }
         }
@@ -1362,6 +1391,7 @@ namespace IngameScript
             if (DEBUG != null)
             {
                 StringBuilder text = new StringBuilder("");
+                text.Append(messageIdLog);
                 text.Append(LidarLog);
                 text.Append(AntennaLog);
                 DEBUG.WriteText(text);
@@ -1373,30 +1403,29 @@ namespace IngameScript
             if (currentTick == ticksScanDelay)
             {
                 targetLog.Clear();
-                targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString()).Append("\n");
+                targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString()); //.Append("\n");
                 if (!missilesLoaded)
                 {
-                    targetLog.Append("Missiles Not Loaded\n");
+                    targetLog.Append(" Not Loaded\n");
                 }
                 else
                 {
-                    targetLog.Append("Missiles Loaded\n");
+                    targetLog.Append(" Loaded\n");
                 }
 
-                targetLog.Append("ID: ").Append(targetInfo.EntityId.ToString()).Append("\n");
+                //targetLog.Append("ID: ").Append(targetInfo.EntityId.ToString()).Append("\n");
+                targetLog.Append("Target Name: ").Append(targetInfo.Name).Append("\n");
 
-                targetLog.Append("Name: ").Append(targetInfo.Name).Append("\n");
+                //long targetLastDetected = targetInfo.TimeStamp / 1000;
+                //targetLog.Append("Detected Since: ").Append(targetLastDetected).Append(" s\n");
 
-                long targetLastDetected = targetInfo.TimeStamp / 1000;
-                targetLog.Append("Detected Since: ").Append(targetLastDetected).Append(" s\n");
-
-                targetLog.Append("Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append("\n");
+                targetLog.Append("Target Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append("\n");
 
                 double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
-                targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
+                targetLog.Append("Target Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
 
-                double targetRadius = Vector3D.Distance(targetInfo.BoundingBox.Min, targetInfo.BoundingBox.Max);
-                targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
+                //double targetRadius = Vector3D.Distance(targetInfo.BoundingBox.Min, targetInfo.BoundingBox.Max);
+                //targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
 
                 string targX = targetInfo.Position.X.ToString("0.00");
                 string targY = targetInfo.Position.Y.ToString("0.00");
