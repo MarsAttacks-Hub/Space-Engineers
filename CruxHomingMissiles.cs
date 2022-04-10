@@ -33,7 +33,7 @@ namespace IngameScript
         readonly string backwardThrustersName = "Bkw";
         readonly string upwardThrustersName = "Upw";
         readonly string downwardThrustersName = "Dnw";
-        readonly string debugPanelName = "[M]1 Debug Panel";
+        //readonly string debugPanelName = "[M]1 Debug Panel";
 
         readonly string antennaTag = "[MISSILE]";
         readonly string platformTag = "[RELAY]";
@@ -68,8 +68,9 @@ namespace IngameScript
         readonly double gatlingProjectileInitialSpeed = 400d;
         readonly double gatlingProjectileAccelleration = 0d;
         readonly double gatlingProjectileMaxSpeed = 380d;
+        readonly double gunsMaxRange = 1000d;
         readonly double PNGain = 3d;
-        readonly int writeDelay = 10;
+        //readonly int writeDelay = 10;
 
         const double brakingAngleTolerance = 10; //degrees
         const double rad2deg = 180 / Math.PI;
@@ -113,7 +114,8 @@ namespace IngameScript
         double missileThrust = 0d;
         double prevYaw = 0d;
         double prevPitch = 0d;
-        int writeCount = 0;
+        //int writeCount = 0;
+
         Vector3D platformPosition;
         MatrixD platformMatrix;
         Vector3D prevPosition = new Vector3D();
@@ -142,21 +144,21 @@ namespace IngameScript
 
         IMyRadioAntenna ANTENNA;
         IMyShipController CONTROLLER;
-        IMyTextPanel DEBUG;
+        //IMyTextPanel DEBUG;
 
         public IMyUnicastListener UNICASTLISTENER;
         public IMyBroadcastListener BROADCASTLISTENER;
 
-        public StringBuilder uniSenderLog = new StringBuilder("");
-        public StringBuilder uniListenerLog = new StringBuilder("");
-        public StringBuilder broadListenerLog = new StringBuilder("");
-        public StringBuilder initLaunchLog = new StringBuilder("");
-        public StringBuilder initLostLog = new StringBuilder("");
-        public StringBuilder initBeamLog = new StringBuilder("");
-        public StringBuilder initUpdateLog = new StringBuilder("");
-        public StringBuilder initThrustersLog = new StringBuilder("");
-        public StringBuilder antennaRadiusLog = new StringBuilder("");
-        public StringBuilder guidanceLog = new StringBuilder("");
+        //public StringBuilder uniSenderLog = new StringBuilder("");
+        //public StringBuilder uniListenerLog = new StringBuilder("");
+        //public StringBuilder broadListenerLog = new StringBuilder("");
+        //public StringBuilder initLaunchLog = new StringBuilder("");
+        //public StringBuilder initLostLog = new StringBuilder("");
+        //public StringBuilder initBeamLog = new StringBuilder("");
+        //public StringBuilder initUpdateLog = new StringBuilder("");
+        //public StringBuilder initThrustersLog = new StringBuilder("");
+        //public StringBuilder antennaRadiusLog = new StringBuilder("");
+        //public StringBuilder guidanceLog = new StringBuilder("");
 
         PID yawController;
         PID pitchController;
@@ -297,13 +299,12 @@ namespace IngameScript
 
                     SendUnicastMessage();
                 }
-
-                if (writeCount == writeDelay)
-                {
-                    WriteDebug();
-                    writeCount = 0;
-                }
-                writeCount++;
+                //if (writeCount == writeDelay)
+                //{
+                //WriteDebug();
+                //writeCount = 0;
+                //}
+                //writeCount++;
             }
         }
 
@@ -311,9 +312,8 @@ namespace IngameScript
         {
             if (UNICASTLISTENER.HasPendingMessage)
             {
-                uniListenerLog.Clear();
-                uniListenerLog.Append("Unicast Listener has message...\n");
-
+                //uniListenerLog.Clear();
+                //uniListenerLog.Append("Unicast Listener has message...\n");
                 while (UNICASTLISTENER.HasPendingMessage)
                 {
                     var msg = UNICASTLISTENER.AcceptMessage();
@@ -342,8 +342,7 @@ namespace IngameScript
 
                             targetVelocity = tup2.Item1;
                             targetPosition = tup2.Item2;
-
-                            uniListenerLog.Append("command: " + command + "\n");
+                            //uniListenerLog.Append("command: " + command + "\n");
                         }
                     }
                 }
@@ -351,9 +350,8 @@ namespace IngameScript
             //else 
             if (BROADCASTLISTENER.HasPendingMessage)
             {
-                broadListenerLog.Clear();
-                broadListenerLog.Append("Broadcast Listener has message...\n");
-
+                //broadListenerLog.Clear();
+                //broadListenerLog.Append("Broadcast Listener has message...\n");
                 while (BROADCASTLISTENER.HasPendingMessage)
                 {
                     var msg = BROADCASTLISTENER.AcceptMessage();
@@ -386,9 +384,8 @@ namespace IngameScript
 
                                 targetVelocity = tup2.Item1;
                                 targetPosition = tup2.Item2;
-
-                                broadListenerLog.Append("cmd.Equals(commandLaunch) && !launched \n");
-                                broadListenerLog.Append("command: " + command + "\n");
+                                //broadListenerLog.Append("cmd.Equals(commandLaunch) && !launched \n");
+                                //broadListenerLog.Append("command: " + command + "\n");
                             }
                             //else 
                             if (myId == Me.EntityId)
@@ -399,9 +396,8 @@ namespace IngameScript
 
                                 targetVelocity = tup2.Item1;
                                 targetPosition = tup2.Item2;
-
-                                broadListenerLog.Append("myId: " + myId + "equal to Me.EntityId: " + Me.EntityId + "\n");
-                                broadListenerLog.Append("command: " + command + "\n");
+                                //broadListenerLog.Append("myId: " + myId + "equal to Me.EntityId: " + Me.EntityId + "\n");
+                                //broadListenerLog.Append("command: " + command + "\n");
                             }
                         }
                     }
@@ -437,16 +433,15 @@ namespace IngameScript
 
             bool messageSent = IGC.SendUnicastMessage(platFormId, platformTag, immArray.ToImmutable());
 
-            WriteUniSenderLog(messageSent);
+            //WriteUniSenderLog(messageSent);
 
             return messageSent;
         }
 
         void InitiateLaunch()
         {
-            ClearInitLog();
-            initLaunchLog.Append("Initiate Launch \n");
-
+            //ClearInitLog();
+            //initLaunchLog.Append("Initiate Launch \n");
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             UpdateGlobalTimeStep();
             SendUnicastMessage();
@@ -468,8 +463,7 @@ namespace IngameScript
             tooBelow = true;
 
             status = statusLaunched;
-
-            initLaunchLog.Append("status: " + status + "\n");
+            //initLaunchLog.Append("status: " + status + "\n");
         }
 
         void InitiateUpdate()
@@ -477,7 +471,7 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             UpdateGlobalTimeStep();
 
-            //CalculateBaseAcceleration();
+            CalculateAcceleration();
             currentTick = 1;
 
             if (missileType == 1)
@@ -502,9 +496,8 @@ namespace IngameScript
             tooBelow = true;
 
             status = statusCruising;
-
-            ClearInitLog();
-            initUpdateLog.Append("Initiate Update, status: " + status + "\n");
+            //ClearInitLog();
+            //initUpdateLog.Append("Initiate Update, status: " + status + "\n");
         }
 
         void InitiateLost()
@@ -530,9 +523,8 @@ namespace IngameScript
             tooBelow = true;
 
             status = statusLost;
-
-            ClearInitLog();
-            initLostLog.Append("Initiate Lost, status: " + status + "\n");
+            //ClearInitLog();
+            //initLostLog.Append("Initiate Lost, status: " + status + "\n");
         }
 
         void InitiateBeamRide()
@@ -554,9 +546,8 @@ namespace IngameScript
             tooBelow = true;
 
             status = statusCruising;
-
-            ClearInitLog();
-            initBeamLog.Append("Initiate BeamRide, status: " + status + "\n");
+            //ClearInitLog();
+            //initBeamLog.Append("Initiate BeamRide, status: " + status + "\n");
         }
 
         void InitiateThrusters()
@@ -579,14 +570,12 @@ namespace IngameScript
                 if (countStartThrusters > startThrustersDelay) { startThrusters = true; }
                 countStartThrusters++;
             }
-
-            WriteThrustersLog(startThrusters, startThrustersOnce, startTargeting);
+            //WriteThrustersLog(startThrusters, startThrustersOnce, startTargeting);
         }
 
         void ManageMissileType()
         {
-            guidanceLog.Clear();
-
+            //guidanceLog.Clear();
             if (missileType == 0)//kinetic
             {
                 double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
@@ -595,22 +584,19 @@ namespace IngameScript
                 //if (distanceShip2Target <= spiralStart + spiralSafe)
                 if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
                 {
-                    guidanceLog.Append("kinetic, MissileGuidance \n");
-
+                    //guidanceLog.Append("kinetic, MissileGuidance \n");
                     MissileGuidance();
                 }
                 else
                 {
                     if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
                     {
-                        guidanceLog.Append("kinetic, SpiralGuidance \n");
-
+                        //guidanceLog.Append("kinetic, SpiralGuidance \n");
                         SpiralGuidance();
                     }
                     else
                     {
-                        guidanceLog.Append("kinetic, MissileGuidance \n");
-
+                        //guidanceLog.Append("kinetic, MissileGuidance \n");
                         MissileGuidance();
                     }
                 }
@@ -627,30 +613,26 @@ namespace IngameScript
                 //if (distanceShip2Target <= spiralStart + spiralSafe)
                 if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
                 {
-                    guidanceLog.Append("explosive, MissileGuidance \n");
-
+                    //guidanceLog.Append("explosive, MissileGuidance \n");
                     MissileGuidance();
                 }
                 else
                 {
                     if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
                     {
-                        guidanceLog.Append("explosive, SpiralGuidance \n");
-
+                        //guidanceLog.Append("explosive, SpiralGuidance \n");
                         SpiralGuidance();
                     }
                     else
                     {
-                        guidanceLog.Append("explosive, MissileGuidance \n");
-
+                        //guidanceLog.Append("explosive, MissileGuidance \n");
                         MissileGuidance();
                     }
                 }
             }
             else if (missileType == 2)//drone
             {
-                guidanceLog.Append("drone, LockOnTarget - ManageDrone \n");
-
+                //guidanceLog.Append("drone, LockOnTarget - ManageDrone \n");
                 LockOnTarget();
 
                 ManageDrone();
@@ -851,20 +833,28 @@ namespace IngameScript
             }
 
             Vector3D aimDirection;
-            switch (weaponType)
+            double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+            if (distanceFromTarget > gunsMaxRange)
             {
-                case 0://none
-                    aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-                    break;
-                case 1://rockets
-                    aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, (Vector3D)targetVelocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), CONTROLLER.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
-                    break;
-                case 2://gatlings
-                    aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
-                    break;
-                default:
-                    aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-                    break;
+                aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+            }
+            else
+            {
+                switch (weaponType)
+                {
+                    case 0://none
+                        aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                        break;
+                    case 1://rockets
+                        aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, (Vector3D)targetVelocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), CONTROLLER.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+                        break;
+                    case 2://gatlings
+                        aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
+                        break;
+                    default:
+                        aimDirection = ComputeInterceptPoint(targetPos, (Vector3D)targetVelocity - CONTROLLER.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                        break;
+                }
             }
 
             aimDirection -= refWorldMatrix.Translation;
@@ -1315,24 +1305,36 @@ namespace IngameScript
                 if (block is IMyBatteryBlock) { (block as IMyBatteryBlock).ChargeMode = ChargeMode.Discharge; }
             }
             foreach (IMyShipMergeBlock item in MERGES) { item.Enabled = false; }
-            foreach (IMyShipConnector item in CONNECTORS) { item.Disconnect(); item.Enabled = false; }//TODO
+            foreach (IMyShipConnector item in CONNECTORS) { item.Disconnect(); item.Enabled = false; }
             foreach (IMyThrust item in ALLTHRUSTERS) { item.Enabled = true; }
         }
 
         void CalculateBaseAcceleration()
         {
-            //missileMass = CONTROLLER.CalculateShipMass().TotalMass;
             missileMass = 0;
             missileThrust = 0;
 
-            foreach (IMyTerminalBlock block in TBLOCKS)//TODO add armor blocks Mass and inventories mass
+            float totalMass = CONTROLLER.CalculateShipMass().TotalMass;
+            foreach (IMyTerminalBlock block in TBLOCKS)
             {
                 missileMass += block.Mass;
             }
 
             foreach (IMyThrust item in THRUSTERS)
             {
-                //item.Enabled = true;
+                missileThrust += (double)item.MaxThrust;
+            }
+
+            missileAccel = missileThrust / missileMass;
+        }
+
+        void CalculateAcceleration()
+        {
+            missileMass = CONTROLLER.CalculateShipMass().TotalMass;
+            missileThrust = 0;
+
+            foreach (IMyThrust item in THRUSTERS)
+            {
                 missileThrust += (double)item.MaxThrust;
             }
 
@@ -1388,8 +1390,7 @@ namespace IngameScript
         {
             var distance = Vector3.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
             ANTENNA.Radius = distance + 100;
-
-            WriteAntennaRangeLog(ANTENNA.Radius);
+            //WriteAntennaRangeLog(ANTENNA.Radius);
         }
 
         void ManageDrone()
@@ -1523,53 +1524,53 @@ namespace IngameScript
 
         void WriteDebug()
         {
-            if (DEBUG != null)
-            {
-                StringBuilder text = new StringBuilder("");
-                text.Append(uniListenerLog);
-                text.Append(broadListenerLog);
-                text.Append(initLaunchLog);
-                text.Append(initUpdateLog);
-                text.Append(initLostLog);
-                text.Append(initBeamLog);
-                text.Append(initThrustersLog);
-                text.Append(uniSenderLog);
-                text.Append(antennaRadiusLog);
-                text.Append(guidanceLog);
-                DEBUG.WriteText(text);
-            }
+            //if (DEBUG != null)
+            //{
+            //StringBuilder text = new StringBuilder("");
+            //text.Append(uniListenerLog);
+            //text.Append(broadListenerLog);
+            //text.Append(initLaunchLog);
+            //text.Append(initUpdateLog);
+            //text.Append(initLostLog);
+            //text.Append(initBeamLog);
+            //text.Append(initThrustersLog);
+            //text.Append(uniSenderLog);
+            //text.Append(antennaRadiusLog);
+            //text.Append(guidanceLog);
+            //DEBUG.WriteText(text);
+            //}
         }
 
         void WriteAntennaRangeLog(float antennaRadius)
         {
-            if (writeCount == writeDelay)
-            {
-                antennaRadiusLog.Clear();
-                antennaRadiusLog.Append("Antenna Radius: " + antennaRadius + "\n");
-            }
+            //if (writeCount == writeDelay)
+            //{
+            //antennaRadiusLog.Clear();
+            //antennaRadiusLog.Append("Antenna Radius: " + antennaRadius + "\n");
+            //}
         }
 
         void WriteUniSenderLog(bool messageSent)
         {
-            if (writeCount == writeDelay)
-            {
-                uniSenderLog.Clear();
-                uniSenderLog.Append("Unicast Message Sent: " + messageSent + "\n");
-            }
+            //if (writeCount == writeDelay)
+            //{
+            //uniSenderLog.Clear();
+            //uniSenderLog.Append("Unicast Message Sent: " + messageSent + "\n");
+            //}
         }
 
         void WriteThrustersLog(bool startThrusters, bool startThrustersOnce, bool startTargeting)
         {
-            initThrustersLog.Clear();
-            initThrustersLog.Append("Thrusters, startThrusters:" + startThrusters + ", startThrustersOnce:" + startThrustersOnce + ", startTargeting:" + startTargeting + "\n");
+            //initThrustersLog.Clear();
+            //initThrustersLog.Append("Thrusters, startThrusters:" + startThrusters + ", startThrustersOnce:" + startThrustersOnce + ", startTargeting:" + startTargeting + "\n");
         }
 
         void ClearInitLog()
         {
-            initLaunchLog.Clear();
-            initUpdateLog.Clear();
-            initLostLog.Clear();
-            initBeamLog.Clear();
+            //initLaunchLog.Clear();
+            //initUpdateLog.Clear();
+            //initLostLog.Clear();
+            //initBeamLog.Clear();
         }
 
         void GetAntenna()
@@ -1614,7 +1615,7 @@ namespace IngameScript
 
             CONTROLLER = CONTROLLERS[0];
 
-            DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
         void InitPIDControllers(IMyTerminalBlock block)
