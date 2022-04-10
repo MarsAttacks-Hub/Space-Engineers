@@ -54,21 +54,21 @@ namespace IngameScript
         readonly int startTargetingDelay = 100;
         readonly float spiralStart = 1000f; // distance to target at which missile starts to spiral
         readonly float spiralSafe = 200f; // safe distance from ship at which missile starts to spiral
-        readonly double missileSpinRPM = 0; //this specifies how fast the missile will spin when flying(only in space)
-        readonly double spiralDegrees = 15; // radius of the spiral pattern
-        readonly double timeMaxSpiral = 3; // time it takes the missile to complete a full spiral cycle
-        readonly double navConstant = 5; //Recommended value is 3-5 Higher values make the missile compensate faster but can lead to more overshoot/instability
-        readonly double navAccelConstant = 0;
-        readonly double rocketProjectileForwardOffset = 4;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
-        readonly double rocketProjectileInitialSpeed = 100;
-        readonly double rocketProjectileAccelleration = 600;
-        readonly double rocketProjectileMaxSpeed = 180;
-        readonly double rocketProjectileMaxRange = 800;
-        readonly double gatlingProjectileForwardOffset = 0;
-        readonly double gatlingProjectileInitialSpeed = 400;
-        readonly double gatlingProjectileAccelleration = 0;
-        readonly double gatlingProjectileMaxSpeed = 380;
-        readonly double PNGain = 3;
+        readonly double missileSpinRPM = 0d; //this specifies how fast the missile will spin when flying(only in space)
+        readonly double spiralDegrees = 15d; // radius of the spiral pattern
+        readonly double timeMaxSpiral = 3d; // time it takes the missile to complete a full spiral cycle
+        readonly double navConstant = 5d; //Recommended value is 3-5 Higher values make the missile compensate faster but can lead to more overshoot/instability
+        readonly double navAccelConstant = 0d;
+        readonly double rocketProjectileForwardOffset = 4d;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
+        readonly double rocketProjectileInitialSpeed = 100d;
+        readonly double rocketProjectileAccelleration = 600d;
+        readonly double rocketProjectileMaxSpeed = 180d;
+        readonly double rocketProjectileMaxRange = 800d;
+        readonly double gatlingProjectileForwardOffset = 0d;
+        readonly double gatlingProjectileInitialSpeed = 400d;
+        readonly double gatlingProjectileAccelleration = 0d;
+        readonly double gatlingProjectileMaxSpeed = 380d;
+        readonly double PNGain = 3d;
         readonly int writeDelay = 10;
 
         const double brakingAngleTolerance = 10; //degrees
@@ -79,13 +79,13 @@ namespace IngameScript
         const double secondsPerUpdate = 1.0 / updatesPerSecond;
         const double gyroSlowdownAngle = Math.PI / 36;
 
-        bool useSpiral = false;
-        double fuseDistance = 7;
+        bool useSpiral = true;
+        double fuseDistance = 7d;
         bool hasPassed = false;
-        double timeSpiral = 0;
+        double timeSpiral = 0d;
         float globalTimestep = 1.0f / 60.0f;
         int currentTick = 1;
-        double maxSpeed = 99;
+        double maxSpeed = 99d;
         bool isLargeGrid = false;
         string status = "";
         bool launched = false;
@@ -108,11 +108,11 @@ namespace IngameScript
         bool rightAltitude = true;
         bool tooAbove = true;
         bool tooBelow = true;
-        double missileAccel = 10;
-        double missileMass = 0;
-        double missileThrust = 0;
-        double prevYaw = 0;
-        double prevPitch = 0;
+        double missileAccel = 10d;
+        double missileMass = 0d;
+        double missileThrust = 0d;
+        double prevYaw = 0d;
+        double prevPitch = 0d;
         int writeCount = 0;
         Vector3D platformPosition;
         MatrixD platformMatrix;

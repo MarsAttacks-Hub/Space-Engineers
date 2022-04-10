@@ -75,17 +75,18 @@ namespace IngameScript
         readonly int autoMissilesDelay = 91;
         readonly int writeDelay = 10;
         readonly bool creative = true;
-        readonly double initialLockDistance = 5000;
-        readonly double rocketProjectileForwardOffset = 4;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
-        readonly double rocketProjectileInitialSpeed = 100;
-        readonly double rocketProjectileAccelleration = 600;
-        readonly double rocketProjectileMaxSpeed = 200;
-        readonly double rocketProjectileMaxRange = 800;
-        readonly double gatlingProjectileForwardOffset = 0;
-        readonly double gatlingProjectileInitialSpeed = 400;
-        readonly double gatlingProjectileAccelleration = 0;
-        readonly double gatlingProjectileMaxSpeed = 400;
-        readonly double gatlingProjectileMaxRange = 1000;
+        readonly double initialLockDistance = 5000d;
+        readonly double rocketProjectileForwardOffset = 4d;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
+        readonly double rocketProjectileInitialSpeed = 100d;
+        readonly double rocketProjectileAccelleration = 600d;
+        readonly double rocketProjectileMaxSpeed = 200d;
+        readonly double rocketProjectileMaxRange = 800d;
+        readonly double gatlingProjectileForwardOffset = 0d;
+        readonly double gatlingProjectileInitialSpeed = 400d;
+        readonly double gatlingProjectileAccelleration = 0d;
+        readonly double gatlingProjectileMaxSpeed = 400d;
+        readonly double gatlingProjectileMaxRange = 1000d;
+        readonly double gunsMaxRange = 1000d;
         readonly Random random = new Random();
         readonly int fudgeAttempts = 8;
 
@@ -151,7 +152,6 @@ namespace IngameScript
 
         public Dictionary<long, string> MissileIDs = new Dictionary<long, string>();
         public List<double> LostMissileIDs = new List<double>();
-
         public Dictionary<long, MyTuple<double, double, string>> missilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
 
         public StringBuilder targetLog = new StringBuilder("");
@@ -229,10 +229,7 @@ namespace IngameScript
                     return;
                 }
 
-                if (!doOnce)//things to run once when a enemy is detected
-                {
-                    ActivateTargeter();
-                }
+                ActivateTargeter();//things to run once when a enemy is detected
 
                 DeactivateOtherScriptsGyros();
 
@@ -739,7 +736,7 @@ namespace IngameScript
             }
             Vector3D aimDirection;
             double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-            if (distanceFromTarget > gatlingProjectileMaxRange)
+            if (distanceFromTarget > gunsMaxRange)
             {
                 aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
             }
@@ -974,18 +971,18 @@ namespace IngameScript
 
         void ReadMessages()
         {
+            missileLog.Clear();
             if (MissileIDs.Count() > 0)
             {
-                missileLog.Clear();
                 missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
-                foreach (var inf in missilesInfo)
+            }
+            foreach (var inf in missilesInfo)
+            {
+                missileLog.Append("Command: ").Append(inf.Value.Item3).Append(", Missile ID: ").Append(inf.Key.ToString()).Append("\n");
+                missileLog.Append("Missile Speed: ").Append(inf.Value.Item2.ToString("0.00")).Append("\n");
+                if (inf.Value.Item3.Contains(commandUpdate) || inf.Value.Item3.Contains(commandSpiral))
                 {
-                    missileLog.Append("Command: ").Append(inf.Value.Item3).Append(", Missile ID: ").Append(inf.Key.ToString()).Append("\n");
-                    missileLog.Append("Missile Speed: ").Append(inf.Value.Item2.ToString()).Append("\n");
-                    if (inf.Value.Item3.Contains(commandUpdate) || inf.Value.Item3.Contains(commandSpiral))
-                    {
-                        missileLog.Append("Dist. From Target: ").Append(inf.Value.Item1.ToString("0.00")).Append("\n");
-                    }
+                    missileLog.Append("Dist. From Target: ").Append(inf.Value.Item1.ToString("0.00")).Append("\n");
                 }
             }
         }
@@ -1157,24 +1154,27 @@ namespace IngameScript
 
         void ActivateTargeter()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
-
-            TurnAlarmOn();
-
-            doOnce = true;
-
-            if (MAGNETICDRIVEPB != null)
+            if (!doOnce)//things to run once when a enemy is detected
             {
-                if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                Runtime.UpdateFrequency = UpdateFrequency.Update1;
+
+                TurnAlarmOn();
+
+                doOnce = true;
+
+                if (MAGNETICDRIVEPB != null)
                 {
-                    MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                    if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                    {
+                        MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                    }
                 }
-            }
-            if (MANAGERPB != null)
-            {
-                if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                if (MANAGERPB != null)
                 {
-                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                    if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                    {
+                        sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                    }
                 }
             }
         }
