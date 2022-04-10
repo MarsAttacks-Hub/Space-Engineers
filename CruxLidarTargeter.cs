@@ -152,7 +152,7 @@ namespace IngameScript
         public Dictionary<long, string> MissileIDs = new Dictionary<long, string>();
         public List<double> LostMissileIDs = new List<double>();
 
-        public List<MyTuple<long, double, double, string>> missilesInfo = new List<MyTuple<long, double, double, string>>();
+        public Dictionary<long, MyTuple<double, double, string>> missilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
 
         public StringBuilder targetLog = new StringBuilder("");
         public StringBuilder missileLog = new StringBuilder("");
@@ -936,9 +936,7 @@ namespace IngameScript
             if (UNILISTENER.HasPendingMessage)
             {
                 Dictionary<long, string> tempMissileIDs = new Dictionary<long, string>();
-                List<MyTuple<long, double, double, string>> tempMissilesInfo = new List<MyTuple<long, double, double, string>>();
-                missilesInfo.Clear();
-
+                Dictionary<long, MyTuple<double, double, string>> tempMissilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
                 while (UNILISTENER.HasPendingMessage)
                 {
                     var igcMessage = UNILISTENER.AcceptMessage();
@@ -951,17 +949,15 @@ namespace IngameScript
 
                         received = true;
 
-                        var tup = MyTuple.Create(missileId, data[0].Item4, data[0].Item3, data[0].Item1);
-                        missilesInfo.Add(tup);
-                        //tempMissilesInfo.Add(tup);
+                        var tup = MyTuple.Create(data[0].Item4, data[0].Item3, data[0].Item1);
+                        tempMissilesInfo.Add(missileId, tup);
 
                         tempMissileIDs.Add(missileId, data[0].Item1);
                     }
                 }
 
-                //missilesInfo = tempMissilesInfo.Concat(missilesInfo.Where(entry => tempMissilesInfo.GetEnumerator().Current.Item1 != entry.Item1)).ToList();
-
                 //eliminate duplicates by preferring entries from the first dictionary
+                missilesInfo = tempMissilesInfo.Concat(missilesInfo.Where(kvp => !tempMissilesInfo.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 MissileIDs = tempMissileIDs.Concat(MissileIDs.Where(kvp => !tempMissileIDs.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
 
@@ -984,11 +980,11 @@ namespace IngameScript
                 missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
                 foreach (var inf in missilesInfo)
                 {
-                    missileLog.Append("Command: ").Append(inf.Item4).Append(", Missile ID: ").Append(inf.Item1.ToString()).Append("\n");
-                    missileLog.Append("Missile Speed: ").Append(inf.Item3.ToString()).Append("\n");
-                    if (inf.Item4.Contains(commandUpdate) || inf.Item4.Contains(commandSpiral))
+                    missileLog.Append("Command: ").Append(inf.Value.Item3).Append(", Missile ID: ").Append(inf.Key.ToString()).Append("\n");
+                    missileLog.Append("Missile Speed: ").Append(inf.Value.Item2.ToString()).Append("\n");
+                    if (inf.Value.Item3.Contains(commandUpdate) || inf.Value.Item3.Contains(commandSpiral))
                     {
-                        missileLog.Append("Dist. From Target: ").Append(inf.Item2.ToString("0.00")).Append("\n");
+                        missileLog.Append("Dist. From Target: ").Append(inf.Value.Item1.ToString("0.00")).Append("\n");
                     }
                 }
             }
@@ -1066,6 +1062,24 @@ namespace IngameScript
             }
             messageIdLog.Append(" \n");
 
+            Dictionary<long, MyTuple<double, double, string>> tempMissilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
+            foreach (var entry in missilesInfo)
+            {
+                bool found = false;
+                foreach (var id in LostMissileIDs)
+                {
+                    if (entry.Key == id)
+                    {
+                        found = true;
+                    }
+                }
+                if (!found)
+                {
+                    tempMissilesInfo.Add(entry.Key, entry.Value);
+                }
+            }
+
+            missilesInfo = tempMissilesInfo;
             MissileIDs = TempMissileIDs;
         }
 
@@ -1110,6 +1124,7 @@ namespace IngameScript
                 }
             }
             MissileIDs.Clear();
+            missilesInfo.Clear();
 
             if (MAGNETICDRIVEPB != null)
             {
