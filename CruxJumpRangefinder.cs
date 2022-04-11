@@ -23,6 +23,7 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
+        //TODO add controller autopilot
 
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string cockpitsName = "[CRX] Controller Cockpit";

@@ -23,7 +23,6 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
-        
         readonly string solarsName = "[CRX] Solar";
         readonly string turbinesName = "[CRX] Wind Turbine";
         readonly string batteriesName = "[CRX] Battery";
@@ -49,6 +48,7 @@ namespace IngameScript
         readonly string mainContainerName = "Main";
         readonly string gatlingTurretsName = "[CRX] Turret Gatling";
         readonly string missileTurretsName = "[CRX] Turret Missile";
+        readonly string connectorsName = "[CRX] Connector";
         readonly string shipPrefix = "[CRX] ";
 
         const string argSunchaseToggle = "SunchaseToggle";
@@ -71,7 +71,7 @@ namespace IngameScript
         readonly int lcdNameColumns = 25;
         readonly float solarPanelMaxRatio = 1;  // multiplier for modded panels
         readonly double minSpeed = 0.1;
-        
+
         bool controlDampeners = true;
         bool sunChaserPaused = true;
         float shipSize = .16f;  //.04f  small blocks
@@ -122,8 +122,11 @@ namespace IngameScript
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> ORESURFACES = new List<IMyTextSurface>();
-
-        public IMyInventory MAINIVENTORY;
+        public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
+        public List<IMyShipConnector> CONNECTORS = new List<IMyShipConnector>();
+        public List<IMyInventory> CONNECTORSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> REACTORSINVENTORIES = new List<IMyInventory>();
 
         readonly MyIni myIni = new MyIni();
 
@@ -245,31 +248,27 @@ namespace IngameScript
 
         readonly List<string> componentBlueprints = new List<string>()
         {
-            "Missile200mm",
-            "NATO_5p56x45mmMagazine",
-            "NATO_25x184mmMagazine",
             "BulletproofGlass",
-            "Canvas",
-            "ComputerComponent",
-            "ConstructionComponent",
-            "DetectorComponent",
+            "Computer",
+            "Construction",
+            "Detector",
             "Display",
-            "ExplosivesComponent",
-            "GirderComponent",
-            "GravityGeneratorComponent",
+            "Explosives",
+            "Girder",
+            "GravityGenerator",
             "InteriorPlate",
             "LargeTube",
-            "MedicalComponent",
+            "Medical",
             "MetalGrid",
-            "MotorComponent",
+            "Motor",
             "PowerCell",
-            "RadioCommunicationComponent",
-            "ReactorComponent",
+            "RadioCommunication",
+            "Reactor",
             "SmallTube",
             "SolarCell",
             "SteelPlate",
             "Superconductor",
-            "ThrustComponent"
+            "Thrust"
         };
 
         readonly List<string> oreList = new List<string>
@@ -312,15 +311,6 @@ namespace IngameScript
             else
             {
                 shipSize = .04f;
-            }
-
-            foreach (IMyCargoContainer block in CONTAINERS)
-            {
-                if (block.CustomName.Contains(mainContainerName))
-                {
-                    MAINIVENTORY = block.GetInventory(0);
-                    break;
-                }
             }
 
             foreach (IMyCockpit cockpit in COCKPITS)
@@ -388,20 +378,39 @@ namespace IngameScript
             if (ticks == 1)
             {
                 MoveProductionOutputsToMainInventory();
+                MoveItemsFromConnectors();
+            }
+            else if (ticks == 5)
+            {
                 CompactInventory();
+                CompactMainCargos();//TODO
             }
             else if (ticks == 10)
             {
+                FillHidrogenGenerators();
+                FillReactors();
+            }
+            else if (ticks == 15)
+            {
                 BalanceAmmo();
-                BalanceIce();
-                BalanceUranium();
             }
             else if (ticks == 20)
             {
+                BalanceIce();
+            }
+            else if (ticks == 25)
+            {
+                BalanceUranium();
+            }
+            else if (ticks == 30)
+            {
                 AutoAssemblers();
+            }
+            else if (ticks == 35)
+            {
                 AutoRefineries();
             }
-            else if (ticks >= 30)
+            else if (ticks >= 40)
             {
                 ReadInventoryInfos();
                 WriteInventoryInfo();
@@ -1183,9 +1192,13 @@ namespace IngameScript
                 block.OutputInventory.GetItems(items);
                 foreach (MyInventoryItem item in items)
                 {
-                    if (block.OutputInventory.CanTransferItemTo(MAINIVENTORY, item.Type) && MAINIVENTORY.CanItemsBeAdded(item.Amount, item.Type))
+                    foreach (IMyInventory cargoInv in CARGOINVENTORIES)
                     {
-                        block.OutputInventory.TransferItemTo(MAINIVENTORY, item);
+                        if (block.OutputInventory.CanTransferItemTo(cargoInv, item.Type) && cargoInv.CanItemsBeAdded(item.Amount, item.Type))
+                        {
+                            block.OutputInventory.TransferItemTo(cargoInv, item);
+                            break;
+                        }
                     }
                 }
             }
@@ -1195,9 +1208,13 @@ namespace IngameScript
                 block.OutputInventory.GetItems(items);
                 foreach (MyInventoryItem item in items)
                 {
-                    if (block.OutputInventory.CanTransferItemTo(MAINIVENTORY, item.Type) && MAINIVENTORY.CanItemsBeAdded(item.Amount, item.Type))
+                    foreach (IMyInventory cargoInv in CARGOINVENTORIES)
                     {
-                        block.OutputInventory.TransferItemTo(MAINIVENTORY, item);
+                        if (block.OutputInventory.CanTransferItemTo(cargoInv, item.Type) && cargoInv.CanItemsBeAdded(item.Amount, item.Type))
+                        {
+                            block.OutputInventory.TransferItemTo(cargoInv, item);
+                            break;
+                        }
                     }
                 }
             }
@@ -1463,48 +1480,51 @@ namespace IngameScript
 
         void AutoAssemblers()
         {
-            List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
-            MAINIVENTORY.GetItems(cargoItems);
-            foreach (var element in componentsQuota)
+            foreach (IMyInventory mainInv in CARGOINVENTORIES)
             {
-                string component = element.Key;
-                int componentAmountRequired = element.Value;
-                int tempIndex = componentsQuota.Keys.ToList().IndexOf(component);
-                string componentBpSubtype = componentBlueprints[tempIndex];
-                MyDefinitionId blueprintDef = MyDefinitionId.Parse("MyObjectBuilder_BlueprintDefinition/" + componentBpSubtype);
+                List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
+                mainInv.GetItems(cargoItems);
+                foreach (var element in componentsQuota)
+                {
+                    string component = element.Key;
+                    int componentAmountRequired = element.Value;
+                    int tempIndex = componentsQuota.Keys.ToList().IndexOf(component);
+                    string componentBpSubtype = componentBlueprints[tempIndex];
+                    MyDefinitionId blueprintDef = MyDefinitionId.Parse("MyObjectBuilder_BlueprintDefinition/" + componentBpSubtype);
 
-                bool enoughOfThisComponent = false;
-                foreach (MyInventoryItem item in cargoItems)
-                {
-                    string itemType = item.Type.ToString();
-                    if (itemType.Contains(component))
+                    bool enoughOfThisComponent = false;
+                    foreach (MyInventoryItem item in cargoItems)
                     {
-                        if (item.Amount > componentAmountRequired) // First look if we have enough of the component already
+                        string itemType = item.Type.ToString();
+                        if (itemType.Contains(component))
                         {
-                            enoughOfThisComponent = true;
-                            break; // Enough of this component, go to next
-                        }
-                        else { componentAmountRequired -= (int)item.Amount; }// Not enough of this component : modify production target
-                        break; // We found the component so we can stop the loop on items
-                    }
-                }
-                if (enoughOfThisComponent) continue;
-                foreach (IMyAssembler assembler in ASSEMBLERS)// Now check if the component is already in assembler queue, or add it
-                {
-                    List<MyProductionItem> AssemblerQueue = new List<MyProductionItem>();
-                    assembler.GetQueue(AssemblerQueue);
-                    int nAlreadyQueued = 0;
-                    foreach (MyProductionItem prodItem in AssemblerQueue)
-                    {
-                        if (prodItem.BlueprintId == blueprintDef)
-                        {
-                            nAlreadyQueued += (int)prodItem.Amount;
+                            if (item.Amount > componentAmountRequired) // First look if we have enough of the component already
+                            {
+                                enoughOfThisComponent = true;
+                                break; // Enough of this component, go to next
+                            }
+                            else { componentAmountRequired -= (int)item.Amount; }// Not enough of this component : modify production target
+                            break; // We found the component so we can stop the loop on items
                         }
                     }
-                    int amountWeShouldAddToQueue = componentAmountRequired - nAlreadyQueued;
-                    if (amountWeShouldAddToQueue > 0)
+                    if (enoughOfThisComponent) continue;
+                    foreach (IMyAssembler assembler in ASSEMBLERS)// Now check if the component is already in assembler queue, or add it
                     {
-                        assembler.AddQueueItem(blueprintDef, (MyFixedPoint)amountWeShouldAddToQueue);
+                        List<MyProductionItem> AssemblerQueue = new List<MyProductionItem>();
+                        assembler.GetQueue(AssemblerQueue);
+                        int nAlreadyQueued = 0;
+                        foreach (MyProductionItem prodItem in AssemblerQueue)
+                        {
+                            if (prodItem.BlueprintId == blueprintDef)
+                            {
+                                nAlreadyQueued += (int)prodItem.Amount;
+                            }
+                        }
+                        int amountWeShouldAddToQueue = componentAmountRequired - nAlreadyQueued;
+                        if (amountWeShouldAddToQueue > 0)
+                        {
+                            assembler.AddQueueItem(blueprintDef, (MyFixedPoint)amountWeShouldAddToQueue);
+                        }
                     }
                 }
             }
@@ -1512,96 +1532,222 @@ namespace IngameScript
 
         void AutoRefineries()
         {
-            List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
-            MAINIVENTORY.GetItems(cargoItems);
-
-            foreach (IMyRefinery refinery in REFINERIES)
+            foreach (IMyInventory mainInv in CARGOINVENTORIES)
             {
-                IMyInventory blockInventory = refinery.GetInventory(0);
-                foreach (MyInventoryItem item in cargoItems)// Send scrap and stone to refineries
+                List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
+                mainInv.GetItems(cargoItems);
+
+                foreach (IMyRefinery refinery in REFINERIES)
                 {
-                    string itemType = item.Type.ToString();
-                    if (itemType.Contains("Scrap") || (itemType.Contains("Stone") && itemType.Contains("Ore")))
+                    IMyInventory blockInventory = refinery.GetInventory(0);
+                    foreach (MyInventoryItem item in cargoItems)// Send scrap and stone to refineries
                     {
-                        MAINIVENTORY.TransferItemTo(blockInventory
-                                            , cargoItems.IndexOf(item)
-                                            , 0
-                                            , true
-                                            , Math.Min((int)item.Amount, 1000));
-                        cargoItems.Clear();
-                        MAINIVENTORY.GetItems(cargoItems);
-                        break;
+                        string itemType = item.Type.ToString();
+                        if (itemType.Contains("Scrap") || (itemType.Contains("Stone") && itemType.Contains("Ore")))
+                        {
+                            mainInv.TransferItemTo(blockInventory
+                                                , cargoItems.IndexOf(item)
+                                                , 0
+                                                , true
+                                                , Math.Min((int)item.Amount, 1000));
+                            cargoItems.Clear();
+                            mainInv.GetItems(cargoItems);
+                            break;
+                        }
                     }
-                }
 
-                if (refinery.BlockDefinition.ToString().Contains("Furnace"))
-                {
-                    continue;
-                }
-
-                List<MyInventoryItem> ingredients = new List<MyInventoryItem>();
-                blockInventory.GetItems(ingredients);
-                if (ingredients.Count > 0)// Also do not do what follows if the refinery is working on scrap or stone
-                {
-                    if (ingredients[0].Type.ToString().Contains("Scrap") ||
-                        ingredients[0].Type.ToString().Contains("Stone"))
+                    if (refinery.BlockDefinition.ToString().Contains("Furnace"))
                     {
                         continue;
                     }
-                }
 
-                foreach (string ore in oreList)
-                {
-                    bool jobDone = false;
-                    bool enoughOfThisIngot = false;
-                    foreach (var item in cargoItems)
-                    {
-                        string itemType = item.Type.ToString();
-                        if (itemType.Contains(ore) && itemType.Contains("Ingot") && item.Amount > 10) // Make sure we have at least 10 of each ingot in cargo 
-                        {
-                            enoughOfThisIngot = true;
-                            break; // Enough of this ore, go to next ore
-                        }
-                    }
-                    if (enoughOfThisIngot) continue; // Stop here if this ingot is already being produced
-
-                    ingredients.Clear();
+                    List<MyInventoryItem> ingredients = new List<MyInventoryItem>();
                     blockInventory.GetItems(ingredients);
-                    if (ingredients.Count > 0 && ingredients[0].Type.ToString().Contains(ore)) { break; }
-
-                    foreach (MyInventoryItem item in ingredients)// Maybe there is ore in the refinery but not 1st rank
+                    if (ingredients.Count > 0)// Also do not do what follows if the refinery is working on scrap or stone
                     {
-                        string itemType = item.Type.ToString();
-                        if (itemType.Contains(ore) && itemType.Contains("Ore"))// Now move this ore to 1st rank
+                        if (ingredients[0].Type.ToString().Contains("Scrap") ||
+                            ingredients[0].Type.ToString().Contains("Stone"))
                         {
-                            blockInventory.TransferItemTo(blockInventory
-                                        , ingredients.IndexOf(item)
-                                        , 0
-                                        , true
-                                        , item.Amount);
-                            jobDone = true;
-                            break;
+                            continue;
                         }
                     }
-                    if (jobDone) break;
 
-                    foreach (MyInventoryItem item in cargoItems)// Check if we have the ore to produce this ingot
+                    foreach (string ore in oreList)
                     {
-                        string itemType = item.Type.ToString();
-                        if (itemType.Contains(ore) && itemType.Contains("Ore") && item.Amount > 1)// Now move this ore to refinery for ingots
+                        bool jobDone = false;
+                        bool enoughOfThisIngot = false;
+                        foreach (var item in cargoItems)
                         {
-                            MAINIVENTORY.TransferItemTo(blockInventory
-                                        , cargoItems.IndexOf(item)
-                                        , 0
-                                        , true
-                                        , Math.Min((int)(item.Amount - 1), 1000));
-                            jobDone = true;
-                            break;
+                            string itemType = item.Type.ToString();
+                            if (itemType.Contains(ore) && itemType.Contains("Ingot") && item.Amount > 10) // Make sure we have at least 10 of each ingot in cargo 
+                            {
+                                enoughOfThisIngot = true;
+                                break; // Enough of this ore, go to next ore
+                            }
                         }
+                        if (enoughOfThisIngot) continue; // Stop here if this ingot is already being produced
+
+                        ingredients.Clear();
+                        blockInventory.GetItems(ingredients);
+                        if (ingredients.Count > 0 && ingredients[0].Type.ToString().Contains(ore)) { break; }
+
+                        foreach (MyInventoryItem item in ingredients)// Maybe there is ore in the refinery but not 1st rank
+                        {
+                            string itemType = item.Type.ToString();
+                            if (itemType.Contains(ore) && itemType.Contains("Ore"))// Now move this ore to 1st rank
+                            {
+                                blockInventory.TransferItemTo(blockInventory
+                                            , ingredients.IndexOf(item)
+                                            , 0
+                                            , true
+                                            , item.Amount);
+                                jobDone = true;
+                                break;
+                            }
+                        }
+                        if (jobDone) break;
+
+                        foreach (MyInventoryItem item in cargoItems)// Check if we have the ore to produce this ingot
+                        {
+                            string itemType = item.Type.ToString();
+                            if (itemType.Contains(ore) && itemType.Contains("Ore") && item.Amount > 1)// Now move this ore to refinery for ingots
+                            {
+                                mainInv.TransferItemTo(blockInventory
+                                            , cargoItems.IndexOf(item)
+                                            , 0
+                                            , true
+                                            , Math.Min((int)(item.Amount - 1), 1000));
+                                jobDone = true;
+                                break;
+                            }
+                        }
+                        if (jobDone) break;
                     }
-                    if (jobDone) break;
+                    cargoItems.Clear();
                 }
-                cargoItems.Clear();
+            }
+        }
+
+        IMyCargoContainer GetMainEmptyCargo()
+        {
+            //float margin = 0.1f;
+            IMyCargoContainer mainCargo = null;
+            int cargoIndex = 1000;
+            foreach (IMyCargoContainer cargo in CONTAINERS)
+            {
+                int cargoNum = int.Parse(cargo.CustomName.Replace(containersName, "").Trim());
+                if (cargoNum < cargoIndex)
+                {
+                    for (int i = 0; i < cargo.InventoryCount; i++)
+                    {
+                        IMyInventory inv = cargo.GetInventory(i);
+                        if (!inv.IsFull) // || ((float)inv.CurrentVolume < ((float)inv.MaxVolume - margin)))
+                        {
+                            cargoIndex = cargoNum;
+                            mainCargo = cargo;
+                            break;
+                        }
+                    }
+                }
+            }
+            return mainCargo;
+        }
+
+        void CompactMainCargos()
+        {
+            //float margin = 0.1f;
+            IMyCargoContainer mainCargo = GetMainEmptyCargo();
+            if (mainCargo != null)
+            {
+                List<IMyInventory> CONTAINERSINVENTORIES = new List<IMyInventory>();
+                CONTAINERSINVENTORIES.AddRange(CONTAINERS.Where(block => block.CustomName != mainCargo.CustomName).SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+
+                foreach (IMyInventory inventory in CONTAINERSINVENTORIES)
+                {
+                    List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
+                    inventory.GetItems(cargoItems);
+                    foreach (MyInventoryItem item in cargoItems)
+                    {
+                        bool transferred = false;
+                        for (int i = 0; i < mainCargo.InventoryCount; i++)
+                        {
+                            IMyInventory maninInv = mainCargo.GetInventory(i);
+                            if (!maninInv.IsFull) // || ((float)maninInv.CurrentVolume > ((float)maninInv.MaxVolume - margin)))
+                            {
+                                MyFixedPoint amount = maninInv.MaxVolume - maninInv.CurrentVolume;
+                                transferred = inventory.TransferItemTo(maninInv, cargoItems.IndexOf(item), 0, true, amount);
+                                break;
+                            }
+                        }
+                        if (transferred)
+                        {
+                            //cargoItems.Clear();//TODO
+                            //inventory.GetItems(cargoItems);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        void FillReactors()
+        {
+            foreach (IMyInventory reInv in REACTORSINVENTORIES)
+            {
+                foreach (IMyInventory cargoInv in CARGOINVENTORIES)
+                {
+                    MyInventoryItem? itemFound = cargoInv.FindItem(uraniumIngot);
+                    if (itemFound.HasValue)
+                    {
+                        MyFixedPoint availableVolume = reInv.MaxVolume - reInv.CurrentVolume;
+                        //MyFixedPoint itemAmount = cargoInv.GetItemAmount(iceOre);
+                        if (cargoInv.CanTransferItemTo(reInv, uraniumIngot))
+                        {
+                            cargoInv.TransferItemTo(reInv, itemFound.Value, availableVolume);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        void FillHidrogenGenerators()
+        {
+            foreach (IMyInventory gasInv in GASINVENTORIES)
+            {
+                foreach (IMyInventory cargoInv in CARGOINVENTORIES)
+                {
+                    MyInventoryItem? itemFound = cargoInv.FindItem(iceOre);
+                    if (itemFound.HasValue)
+                    {
+                        MyFixedPoint availableVolume = gasInv.MaxVolume - gasInv.CurrentVolume;
+                        //MyFixedPoint itemAmount = cargoInv.GetItemAmount(iceOre);
+                        if (cargoInv.CanTransferItemTo(gasInv, iceOre))
+                        {
+                            cargoInv.TransferItemTo(gasInv, itemFound.Value, availableVolume);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        void MoveItemsFromConnectors()
+        {
+            foreach (IMyInventory connInv in CONNECTORSINVENTORIES)
+            {
+                List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
+                connInv.GetItems(cargoItems);
+                foreach (MyInventoryItem item in cargoItems)
+                {
+                    foreach (IMyInventory cargoInv in CARGOINVENTORIES)
+                    {
+                        if (connInv.CanTransferItemTo(cargoInv, item.Type) && cargoInv.CanItemsBeAdded(item.Amount, item.Type))
+                        {
+                            connInv.TransferItemTo(cargoInv, item);
+                        }
+                    }
+                }
             }
         }
 
@@ -1621,6 +1767,8 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyGasGenerator>(GASGENERATORS, block => block.CustomName.Contains(gasGeneratorsName));
             REACTORS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyReactor>(REACTORS, block => block.CustomName.Contains(reactorsName));
+            REACTORSINVENTORIES.Clear();
+            REACTORSINVENTORIES.AddRange(REACTORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             GYROS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyGyro>(GYROS, block => block.CustomName.Contains(gyrosName));
             CONTROLLERS.Clear();
@@ -1647,6 +1795,14 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, block => block.CustomName.Contains(cockpitsName));
             LCDSSTATUS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(LCDSSTATUS, block => block.CustomName.Contains(lcdStatusName));
+            GASINVENTORIES.Clear();
+            GASINVENTORIES.AddRange(GASGENERATORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            CARGOINVENTORIES.Clear();
+            GASINVENTORIES.AddRange(CONTAINERS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            CONNECTORS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(CONNECTORS, block => block.CustomName.Contains(connectorsName));
+            CONNECTORSINVENTORIES.Clear();
+            CONNECTORSINVENTORIES.AddRange(CONNECTORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             POWERSURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdPowerName));
@@ -1754,7 +1910,6 @@ namespace IngameScript
                 {MyItemType.MakeIngot("Missile200mm"),0}
             };
         }
-
 
     }
 }
