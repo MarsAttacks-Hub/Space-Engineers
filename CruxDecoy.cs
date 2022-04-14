@@ -23,7 +23,6 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
-
         readonly string ProjectorsDecoyName = "Decoy";
         readonly string ProjectorsBombName = "Bomb";
         readonly string GravGensName = "Decoy";
@@ -205,7 +204,6 @@ namespace IngameScript
             WELDERS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipWelder>(WELDERS, block => block.CustomName.Contains(WeldersName));
         }
-
 
     }
 }

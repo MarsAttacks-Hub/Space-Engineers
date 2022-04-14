@@ -1299,7 +1299,7 @@ namespace IngameScript
                         {
                             TransferItems(availableVolume, inventory, iceOre);
                         }
-                        if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                        if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                         {
                             loaded++;
                         }
@@ -1335,7 +1335,7 @@ namespace IngameScript
                                     {
                                         TransferItems(availableVolume, inventory, iceOre);
                                     }
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                     {
                                         loaded++;
                                     }
@@ -1347,7 +1347,7 @@ namespace IngameScript
                                     {
                                         TransferItems(availableVolume, inventory, gatlingAmmo);
                                     }
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                     {
                                         loaded++;
                                     }
@@ -1372,7 +1372,7 @@ namespace IngameScript
                                     {
                                         TransferItems(availableVolume, inventory, iceOre);
                                     }
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                     {
                                         loaded++;
                                     }
@@ -1385,7 +1385,7 @@ namespace IngameScript
                                         TransferItems(availableVolume, inventory, gatlingAmmo);
                                     }
 
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                     {
                                         loaded++;
                                     }
@@ -1407,7 +1407,7 @@ namespace IngameScript
                                 {
                                     TransferItems(availableVolume, inventory, iceOre);
                                 }
-                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                 {
                                     loaded++;
                                 }
@@ -1427,7 +1427,7 @@ namespace IngameScript
                                 {
                                     TransferItems(availableVolume, inventory, gatlingAmmo);
                                 }
-                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                 {
                                     loaded++;
                                 }
@@ -1451,7 +1451,7 @@ namespace IngameScript
                                 {
                                     TransferItems(availableVolume, inventory, missileAmmo);
                                 }
-                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))
+                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
                                 {
                                     loaded++;
                                 }

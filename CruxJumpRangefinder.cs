@@ -23,8 +23,6 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
-        //TODO add controller autopilot
-
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
         readonly string jumpersName = "[CRX] Jump";
@@ -47,6 +45,7 @@ namespace IngameScript
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
+        const string argAutopilot = "ToggleAutopilot";//TODO
 
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
@@ -185,6 +184,10 @@ namespace IngameScript
                 //if (MDOn) { Echo("Magnetic drive turned ON"); } else { Echo("Magnetic drive failed to turn ON"); }
             }
 
+            if (!REMOTE.IsAutoPilotEnabled)
+            {
+                REMOTE.SetAutoPilotEnabled(true);
+            }
             ReadLidarInfos();
             ReadJumpersInfos();
 
@@ -209,6 +212,7 @@ namespace IngameScript
                 case argIncreaseJump: IncreaseJumpDistance(); break;
                 case argDecreaseJump: DecreaseJumpDistance(); break;
                 case argAimTarget: if (!Vector3D.IsZero(targetPosition)) { aimTarget = true; Runtime.UpdateFrequency = UpdateFrequency.Update1; }; break;
+                case argAutopilot: if (REMOTE.IsAutoPilotEnabled) { REMOTE.SetAutoPilotEnabled(false); } else { if (targetPosition != null) { REMOTE.SetAutoPilotEnabled(true); } }; break;
             }
         }
 
@@ -245,9 +249,10 @@ namespace IngameScript
                 }
                 if (TARGET.Type == MyDetectedEntityType.Planet)
                 {
-                    Vector3D hitPosition = (Vector3D)TARGET.HitPosition;
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
                     Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * planetAtmosphereRange;
-                    Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
@@ -282,21 +287,24 @@ namespace IngameScript
                 }
                 else if (TARGET.Type == MyDetectedEntityType.Asteroid)
                 {
-                    Vector3D hitPosition = (Vector3D)TARGET.HitPosition;
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
+                    Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * friendlySafeDistance;
+                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
 
                     REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(hitPosition, "Asteroid");
+                    REMOTE.AddWaypoint(safeJumpPosition, "Asteroid");
 
-                    double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
+                    double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0d && distance != 0d)
                     {
                         JUMPERS[0].SetValueFloat("JumpDistance", (float)(distance / maxDistance * 100d));
                     }
 
-                    targetPosition = hitPosition;
+                    targetPosition = safeJumpPosition;
 
-                    string safeJumpGps = $"GPS:Asteroid:{Math.Round(hitPosition.X)}:{Math.Round(hitPosition.Y)}:{Math.Round(hitPosition.Z)}";
+                    string safeJumpGps = $"GPS:Asteroid:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
                     targetLog.Append(safeJumpGps).Append("\n");
 
                     targetLog.Append("Dist.: ").Append(distance.ToString("0.0")).Append("\n");
@@ -306,9 +314,10 @@ namespace IngameScript
                 }
                 else if (IsNotFriendly(TARGET.Relationship))
                 {
-                    Vector3D hitPosition = (Vector3D)TARGET.HitPosition;
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
                     Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * enemySafeDistance;
-                    Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
@@ -335,9 +344,10 @@ namespace IngameScript
                 }
                 else
                 {
-                    Vector3D hitPosition = (Vector3D)TARGET.HitPosition;
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
                     Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * friendlySafeDistance;
-                    Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);

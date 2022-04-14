@@ -37,7 +37,6 @@ namespace IngameScript
         readonly string lcdInventoryName = "[CRX] LCD Inventory";
         readonly string lcdStatusName = "[CRX] LCD Manager Status";
         readonly string lcdComponentsName = "[CRX] LCD Components";
-        readonly string lcdOreName = "[CRX] LCD Ores";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
         readonly string hThrustersName = "[CRX] HThruster";
         readonly string iThrustersName = "[CRX] IonThruster";
@@ -45,11 +44,13 @@ namespace IngameScript
         readonly string refineriesName = "[CRX] Refinery";
         readonly string assemblersName = "[CRX] Assembler";
         readonly string containersName = "[CRX] Cargo";
-        readonly string mainContainerName = "Main";
         readonly string gatlingTurretsName = "[CRX] Turret Gatling";
         readonly string missileTurretsName = "[CRX] Turret Missile";
         readonly string connectorsName = "[CRX] Connector";
         readonly string shipPrefix = "[CRX] ";
+        readonly string launchersName = "[CRX] Rocket";
+        readonly string gatlingsName = "[CRX] Gatling";
+        readonly string debugPanelName = "[CRX] Debug Lidar";
 
         const string argSunchaseToggle = "SunchaseToggle";
         const string argSunchaseOn = "SunchaseOn";
@@ -61,6 +62,7 @@ namespace IngameScript
         const string argBalance = "Balance";
         const string argAutoProduction = "AutoProduction";
         const string argInventoryInfos = "InventoryInfos";
+        const string argFill = "Refill";
 
         readonly string sectionTag = "ManagerSettings";
         readonly string cockpitPowerSurfaceKey = "cockpitPowerSurface";
@@ -98,35 +100,43 @@ namespace IngameScript
         float registeredhEngMaxOutput;
         double uraniumKg;
 
+        public List<IMyTerminalBlock> TERMINALS = new List<IMyTerminalBlock>();
+        public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
+        public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
+        public List<IMyGyro> GYROS = new List<IMyGyro>();
+        public List<IMyThrust> THRUSTERS = new List<IMyThrust>();
         public List<IMySolarPanel> SOLARS = new List<IMySolarPanel>();
         public List<IMyPowerProducer> TURBINES = new List<IMyPowerProducer>();
         public List<IMyBatteryBlock> BATTERIES = new List<IMyBatteryBlock>();
         public List<IMyGasTank> HTANKS = new List<IMyGasTank>();
-        public List<IMyPowerProducer> HENGINES = new List<IMyPowerProducer>();
-        public List<IMyGasGenerator> GASGENERATORS = new List<IMyGasGenerator>();
-        public List<IMyReactor> REACTORS = new List<IMyReactor>();
-        public List<IMyGyro> GYROS = new List<IMyGyro>();
-        public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
-        public List<IMyThrust> THRUSTERS = new List<IMyThrust>();
-        public List<IMyTerminalBlock> TERMINALS = new List<IMyTerminalBlock>();
-        public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
-        public List<IMyTerminalBlock> BLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
-        public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
-        public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
         public List<IMyRefinery> REFINERIES = new List<IMyRefinery>();
         public List<IMyAssembler> ASSEMBLERS = new List<IMyAssembler>();
         public List<IMyLargeGatlingTurret> GATLINGTURRETS = new List<IMyLargeGatlingTurret>();
+        public List<IMyInventory> GATLINGTURRETSINVENTORIES = new List<IMyInventory>();
         public List<IMyLargeMissileTurret> MISSILETURRETS = new List<IMyLargeMissileTurret>();
+        public List<IMyInventory> MISSILETURRETSINVENTORIES = new List<IMyInventory>();
+        public List<IMySmallGatlingGun> GATLINGS = new List<IMySmallGatlingGun>();
+        public List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
+        public List<IMySmallMissileLauncher> LAUNCHERS = new List<IMySmallMissileLauncher>();
+        public List<IMyInventory> LAUNCHERSINVENTORIES = new List<IMyInventory>();
+        public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
+        public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
+        public List<IMyShipConnector> CONNECTORS = new List<IMyShipConnector>();
+        public List<IMyInventory> CONNECTORSINVENTORIES = new List<IMyInventory>();
+        public List<IMyReactor> REACTORS = new List<IMyReactor>();
+        public List<IMyInventory> REACTORSINVENTORIES = new List<IMyInventory>();
+        public List<IMyPowerProducer> HENGINES = new List<IMyPowerProducer>();
+        public List<IMyInventory> HINVENTORIES = new List<IMyInventory>();
+        public List<IMyGasGenerator> GASGENERATORS = new List<IMyGasGenerator>();
+        public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
+        public List<IMyTerminalBlock> BLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
+        public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
         public List<IMyTextPanel> LCDSSTATUS = new List<IMyTextPanel>();
         public List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
-        public List<IMyTextSurface> ORESURFACES = new List<IMyTextSurface>();
-        public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
-        public List<IMyShipConnector> CONNECTORS = new List<IMyShipConnector>();
-        public List<IMyInventory> CONNECTORSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> REACTORSINVENTORIES = new List<IMyInventory>();
+
+        IMyTextPanel DEBUG;
 
         readonly MyIni myIni = new MyIni();
 
@@ -150,6 +160,7 @@ namespace IngameScript
         public StringBuilder assemblersInputLog = new StringBuilder("");
         public StringBuilder inventoriesPercentLog = new StringBuilder("");
         public StringBuilder powerLog = new StringBuilder("");
+        public StringBuilder debugLog = new StringBuilder("");
 
         public Dictionary<MyDefinitionId, int> oresDict = new Dictionary<MyDefinitionId, int>(MyDefinitionId.Comparer)
         {
@@ -187,88 +198,63 @@ namespace IngameScript
         {
             {MyItemType.MakeComponent("BulletproofGlass"),0},
             {MyItemType.MakeComponent("Canvas"),0},
-            {MyItemType.MakeComponent("Computer"),0},
-            {MyItemType.MakeComponent("Construction"),0},
-            {MyItemType.MakeComponent("Detector"),0},
+            {MyItemType.MakeComponent("ComputerComponent"),0},
+            {MyItemType.MakeComponent("ConstructionComponent"),0},
+            {MyItemType.MakeComponent("DetectorComponent"),0},
             {MyItemType.MakeComponent("Display"),0},
-            {MyItemType.MakeComponent("Explosives"),0},
-            {MyItemType.MakeComponent("Girder"),0},
-            {MyItemType.MakeComponent("GravityGenerator"),0},
+            {MyItemType.MakeComponent("ExplosivesComponent"),0},
+            {MyItemType.MakeComponent("GirderComponent"),0},
+            {MyItemType.MakeComponent("GravityGeneratorComponent"),0},
             {MyItemType.MakeComponent("InteriorPlate"),0},
             {MyItemType.MakeComponent("LargeTube"),0},
-            {MyItemType.MakeComponent("Medical"),0},
+            {MyItemType.MakeComponent("MedicalComponent"),0},
             {MyItemType.MakeComponent("MetalGrid"),0},
-            {MyItemType.MakeComponent("Motor"),0},
+            {MyItemType.MakeComponent("MotorComponent"),0},
             {MyItemType.MakeComponent("PowerCell"),0},
-            {MyItemType.MakeComponent("RadioCommunication"),0},
-            {MyItemType.MakeComponent("Reactor"),0},
+            {MyItemType.MakeComponent("RadioCommunicationComponent"),0},
+            {MyItemType.MakeComponent("ReactorComponent"),0},
             {MyItemType.MakeComponent("SmallTube"),0},
             {MyItemType.MakeComponent("SolarCell"),0},
             {MyItemType.MakeComponent("SteelPlate"),0},
             {MyItemType.MakeComponent("Superconductor"),0},
-            {MyItemType.MakeComponent("Thrust"),0},
+            {MyItemType.MakeComponent("ThrustComponent"),0},
             {MyItemType.MakeComponent("ZoneChip"),0}
         };
 
         public Dictionary<MyDefinitionId, int> ammosDict = new Dictionary<MyDefinitionId, int>(MyDefinitionId.Comparer)
         {
-            {MyItemType.MakeIngot("NATO_25x184mm"),0},
-            {MyItemType.MakeIngot("NATO_5p56x45mm"),0},
-            {MyItemType.MakeIngot("Missile200mm"),0}
+            {MyItemType.MakeAmmo("NATO_25x184mm"),0},
+            {MyItemType.MakeAmmo("NATO_5p56x45mm"),0},
+            {MyItemType.MakeAmmo("Missile200mm"),0}
         };
 
-        readonly Dictionary<string, int> componentsQuota = new Dictionary<string, int>()
+        readonly Dictionary<string, MyTuple<string, int>> componentsSubIdIdQuota = new Dictionary<string, MyTuple<string, int>>()
         {
-            {"Missile",         20} ,
-            {"NATO_5",          100} ,
-            {"NATO_25",         100} ,
-            {"Glass",           100} ,
-            {"Canvas",          4} ,
-            {"Computer",        500} ,
-            {"Construction",    1000} ,
-            {"Detector",        10} ,
-            {"Display",         200} ,
-            {"Explosives",      10} ,
-            {"Girder",          500} ,
-            {"Gravity",         10} ,
-            {"Interior",        1000} ,
-            {"LargeTube",       100} ,
-            {"Medical",         20} ,
-            {"MetalGrid",       500} ,
-            {"Motor",           1000} ,
-            {"PowerCell",       100} ,
-            {"Radio",           10} ,
-            {"Reactor",         100} ,
-            {"SmallTube",       500} ,
-            {"SolarCell",       100} ,
-            {"SteelPlate",      2000} ,
-            {"Superconduct",    100} ,
-            {"Thrust",          100}
-        };
-
-        readonly List<string> componentBlueprints = new List<string>()
-        {
-            "BulletproofGlass",
-            "Computer",
-            "Construction",
-            "Detector",
-            "Display",
-            "Explosives",
-            "Girder",
-            "GravityGenerator",
-            "InteriorPlate",
-            "LargeTube",
-            "Medical",
-            "MetalGrid",
-            "Motor",
-            "PowerCell",
-            "RadioCommunication",
-            "Reactor",
-            "SmallTube",
-            "SolarCell",
-            "SteelPlate",
-            "Superconductor",
-            "Thrust"
+            //{ "Missile",        MyTuple.Create("Missile200mm",                  20) },
+            //{ "NATO_5",         MyTuple.Create("",                              100) },
+            //{ "NATO_25",        MyTuple.Create("NATO_25x184mmMagazine",         100) },
+            { "Glass",          MyTuple.Create("BulletproofGlass",              100) },
+            //{ "Canvas",         MyTuple.Create("Canvas",                        4) },
+            { "Computer",       MyTuple.Create("ComputerComponent",             500) },
+            { "Construction",   MyTuple.Create("ConstructionComponent",         1000) },
+            { "Detector",       MyTuple.Create("DetectorComponent",             10) },
+            { "Display",        MyTuple.Create("Display",                       200) },
+            { "Explosives",     MyTuple.Create("ExplosivesComponent",           10) },
+            { "Girder",         MyTuple.Create("GirderComponent",               500) },
+            { "Gravity",        MyTuple.Create("GravityGeneratorComponent",     10) },
+            { "Interior",       MyTuple.Create("InteriorPlate",                 1000) },
+            { "LargeTube",      MyTuple.Create("LargeTube",                     100) },
+            { "Medical",        MyTuple.Create("MedicalComponent",              20) },
+            { "MetalGrid",      MyTuple.Create("MetalGrid",                     500) },
+            { "Motor",          MyTuple.Create("MotorComponent",                1000) },
+            { "PowerCell",      MyTuple.Create("PowerCell",                     100) },
+            { "Radio",          MyTuple.Create("RadioCommunicationComponent",   10) },
+            { "Reactor",        MyTuple.Create("ReactorComponent",              100) },
+            { "SmallTube",      MyTuple.Create("SmallTube",                     500) },
+            { "SolarCell",      MyTuple.Create("SolarCell",                     100) },
+            { "SteelPlate",     MyTuple.Create("SteelPlate",                    2000) },
+            { "Superconduct",   MyTuple.Create("Superconductor",                100) },
+            { "Thrust",         MyTuple.Create("ThrustComponent",               100) }
         };
 
         readonly List<string> oreList = new List<string>
@@ -330,30 +316,35 @@ namespace IngameScript
 
         void Main(string argument)
         {
+            Echo($"TERMINALS:{TERMINALS.Count}");
+            Echo($"CONTROLLERS:{CONTROLLERS.Count}");
+            Echo($"COCKPITS:{COCKPITS.Count}");
+            Echo($"GYROS:{GYROS.Count}");
+            Echo($"THRUSTERS:{THRUSTERS.Count}");
             Echo($"SOLARS:{SOLARS.Count}");
             Echo($"TURBINES:{TURBINES.Count}");
             Echo($"BATTERIES:{BATTERIES.Count}");
             Echo($"HTANKS:{HTANKS.Count}");
-            Echo($"HENGINES:{HENGINES.Count}");
-            Echo($"GASGENERATORS:{GASGENERATORS.Count}");
-            Echo($"REACTORS:{REACTORS.Count}");
-            Echo($"GYROS:{GYROS.Count}");
-            Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-            Echo($"THRUSTERS:{THRUSTERS.Count}");
-            Echo($"COCKPITS:{COCKPITS.Count}");
             Echo($"REFINERIES:{REFINERIES.Count}");
             Echo($"ASSEMBLERS:{ASSEMBLERS.Count}");
-            Echo($"CONTAINERS:{CONTAINERS.Count}");
             Echo($"GATLINGTURRETS:{GATLINGTURRETS.Count}");
             Echo($"MISSILETURRETS:{MISSILETURRETS.Count}");
+            Echo($"CONTAINERS:{CONTAINERS.Count}");
+            Echo($"CARGOINVENTORIES:{CARGOINVENTORIES.Count}");
+            Echo($"CONNECTORS:{CONNECTORS.Count}");
+            Echo($"CONNECTORSINVENTORIES:{CONNECTORSINVENTORIES.Count}");
+            Echo($"REACTORS:{REACTORS.Count}");
+            Echo($"REACTORSINVENTORIES:{REACTORSINVENTORIES.Count}");
+            Echo($"HENGINES:{HENGINES.Count}");
+            Echo($"HINVENTORIES:{HINVENTORIES.Count}");
+            Echo($"GASGENERATORS:{GASGENERATORS.Count}");
+            Echo($"GASINVENTORIES:{GASINVENTORIES.Count}");
+            Echo($"BLOCKSWITHINVENTORY:{BLOCKSWITHINVENTORY.Count}");
+            Echo($"INVENTORIES:{INVENTORIES.Count}");
             Echo($"LCDSSTATUS:{LCDSSTATUS.Count}");
             Echo($"POWERSURFACES:{POWERSURFACES.Count}");
             Echo($"INVENTORYSURFACES:{INVENTORYSURFACES.Count}");
             Echo($"COMPONENTSURFACES:{COMPONENTSURFACES.Count}");
-            Echo($"ORESURFACES:{ORESURFACES.Count}");
-            Echo($"TERMINALS:{TERMINALS.Count}");
-            Echo($"BLOCKSWITHINVENTORY:{BLOCKSWITHINVENTORY.Count}");
-            Echo($"INVENTORIES:{INVENTORIES.Count}");
 
             if (!string.IsNullOrEmpty(argument))
             {
@@ -377,45 +368,59 @@ namespace IngameScript
 
             if (ticks == 1)
             {
+                debugLog.Clear();
+
                 MoveProductionOutputsToMainInventory();
                 MoveItemsFromConnectors();
             }
             else if (ticks == 5)
             {
                 CompactInventory();
-                CompactMainCargos();//TODO
+                CompactMainCargos();
             }
             else if (ticks == 10)
             {
-                FillHidrogenGenerators();
-                FillReactors();
+                FillFromCargo(GASINVENTORIES, "Ice");
+                FillFromCargo(REACTORSINVENTORIES, "Uranium");
             }
             else if (ticks == 15)
             {
-                BalanceAmmo();
+                FillFromCargo(GATLINGSINVENTORIES, "NATO_25x184mm");
+                FillFromCargo(GATLINGTURRETSINVENTORIES, "NATO_25x184mm");
             }
             else if (ticks == 20)
             {
-                BalanceIce();
+                FillFromCargo(LAUNCHERSINVENTORIES, "Missile200mm");
+                FillFromCargo(MISSILETURRETSINVENTORIES, "Missile200mm");
             }
             else if (ticks == 25)
             {
-                BalanceUranium();
+                BalanceGatlingTurretsAmmo();
+                BalanceMissileTurretsAmmo();
             }
             else if (ticks == 30)
             {
-                AutoAssemblers();
+                BalanceGatlingsAmmo();
+                BalanceMissileLaunchersAmmo();
             }
             else if (ticks == 35)
             {
+                BalanceHidrogenGeneratorsIce();
+                BalanceReactorsUranium();
+            }
+            else if (ticks == 40)
+            {
+                AutoAssemblers();
                 AutoRefineries();
             }
-            else if (ticks >= 40)
+            else if (ticks >= 45)
             {
                 ReadInventoryInfos();
                 WriteInventoryInfo();
-                WriteOreComponentsInfo();
+                WriteComponentsInfo();
                 ticks = 0;
+
+                if (DEBUG != null) { DEBUG.WriteText(debugLog); }
             }
             ticks++;
         }
@@ -447,11 +452,50 @@ namespace IngameScript
                     break;
                 case argDeadMan: controlDampeners = !controlDampeners; break;
                 case argSetup: Setup(); break;
-                case argTogglePB: togglePB = !togglePB; if (togglePB) { foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 255, 255); }; Runtime.UpdateFrequency = UpdateFrequency.Update10; } else { foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 0, 0); }; Runtime.UpdateFrequency = UpdateFrequency.None; } break;
-                case argCompactInventories: MoveProductionOutputsToMainInventory(); CompactInventory(); break;
-                case argBalance: BalanceAmmo(); BalanceUranium(); BalanceIce(); break;
-                case argAutoProduction: AutoAssemblers(); AutoRefineries(); break;
-                case argInventoryInfos: ReadInventoryInfos(); WriteInventoryInfo(); WriteOreComponentsInfo(); break;
+                case argTogglePB:
+                    togglePB = !togglePB;
+                    if (togglePB)
+                    {
+                        foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 255, 255); };
+                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                    }
+                    else
+                    {
+                        foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 0, 0); };
+                        Runtime.UpdateFrequency = UpdateFrequency.None;
+                    }
+                    break;
+                case argCompactInventories:
+                    MoveProductionOutputsToMainInventory();
+                    MoveItemsFromConnectors();
+                    CompactInventory();
+                    CompactMainCargos();
+                    break;
+                case argBalance:
+                    BalanceGatlingTurretsAmmo();
+                    BalanceMissileTurretsAmmo();
+                    BalanceGatlingsAmmo();
+                    BalanceMissileLaunchersAmmo();
+                    BalanceHidrogenGeneratorsIce();
+                    BalanceReactorsUranium();
+                    break;
+                case argAutoProduction:
+                    AutoAssemblers();
+                    AutoRefineries();
+                    break;
+                case argInventoryInfos:
+                    ReadInventoryInfos();
+                    WriteInventoryInfo();
+                    WriteComponentsInfo();
+                    break;
+                case argFill:
+                    FillFromCargo(GASINVENTORIES, "Ice");
+                    FillFromCargo(REACTORSINVENTORIES, "Uranium");
+                    FillFromCargo(GATLINGSINVENTORIES, "NATO_25x184mm");
+                    FillFromCargo(GATLINGTURRETSINVENTORIES, "NATO_25x184mm");
+                    FillFromCargo(LAUNCHERSINVENTORIES, "Missile200mm");
+                    FillFromCargo(MISSILETURRETSINVENTORIES, "Missile200mm");
+                    break;
             }
         }
 
@@ -886,7 +930,6 @@ namespace IngameScript
         void ReadPowerInfos()
         {
             powerLog.Clear();
-
             powerLog.Append("Status: ").Append(powerStatus).Append("\n");
             if (sunChaserPaused)
             {
@@ -920,6 +963,7 @@ namespace IngameScript
 
         void ReadInventoryInfos()
         {
+            //debugLog.Append("ReadInventoryInfos, tick: " + ticks + "\n");
             ReadInventoriesFillPercent(BLOCKSWITHINVENTORY);
             ReadAllItems(INVENTORIES);
             ReadAssemblersItems(ASSEMBLERS);
@@ -932,7 +976,6 @@ namespace IngameScript
             ResetIngotDict();
             ResetOresDict();
             ResetAmmosDict();
-
             foreach (IMyInventory inventory in inventories)
             {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
@@ -977,33 +1020,63 @@ namespace IngameScript
             oresLog.Clear();
             ingotsLog.Clear();
             componentsLog.Clear();
+            int count = 0;
             foreach (KeyValuePair<MyDefinitionId, int> entry in ammosDict)
             {
-                ammosLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                ammosLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                count++;
+                if (count > 3)
+                {
+                    ammosLog.Append("\n");
+                    count = 0;
+                }
             }
+            ammosLog.Append("\n");
+            count = 0;
             foreach (KeyValuePair<MyDefinitionId, int> entry in oresDict)
             {
-                oresLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                oresLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                count++;
+                if (count > 3)
+                {
+                    oresLog.Append("\n");
+                    count = 0;
+                }
             }
+            oresLog.Append("\n");
+            count = 0;
             foreach (KeyValuePair<MyDefinitionId, int> entry in ingotsDict)
             {
-                ingotsLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                ingotsLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                count++;
+                if (count > 3)
+                {
+                    ingotsLog.Append("\n");
+                    count = 0;
+                }
             }
+            ingotsLog.Append("\n");
+            count = 0;
             foreach (KeyValuePair<MyDefinitionId, int> entry in componentsDict)
             {
-                componentsLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                componentsLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                count++;
+                if (count > 3)
+                {
+                    componentsLog.Append("\n");
+                    count = 0;
+                }
             }
+            componentsLog.Append("\n");
         }
 
         void ReadRefineriesItems(List<IMyRefinery> refineries)
         {
             refineriesInputLog.Clear();
-
             foreach (IMyRefinery block in refineries)
             {
                 ResetIngotDict();
                 ResetOresDict();
-
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 block.InputInventory.GetItems(items);
                 foreach (MyInventoryItem item in items)
@@ -1025,35 +1098,46 @@ namespace IngameScript
                         }
                     }
                 }
-
-                refineriesInputLog.Append(block.CustomName.Replace(shipPrefix, "")).Append(" Input\n");
+                refineriesInputLog.Append(block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
+                int count = 2;
                 foreach (KeyValuePair<MyDefinitionId, int> entry in oresDict)
                 {
                     if (entry.Value != 0)
                     {
-                        refineriesInputLog.Append($"{entry.Key.SubtypeId} Ore: ").Append($"{entry.Value}\n");
+                        refineriesInputLog.Append($"{entry.Key.SubtypeId} Ore: ").Append($"{entry.Value}, ");
+                        count++;
+                        if (count > 4)
+                        {
+                            refineriesInputLog.Append("\n");
+                            count = 0;
+                        }
                     }
                 }
                 foreach (KeyValuePair<MyDefinitionId, int> entry in ingotsDict)
                 {
                     if (entry.Value != 0)
                     {
-                        refineriesInputLog.Append($"{entry.Key.SubtypeId} Ingot: ").Append($"{entry.Value}\n");
+                        refineriesInputLog.Append($"{entry.Key.SubtypeId} Ingot: ").Append($"{entry.Value}, ");
+                        count++;
+                        if (count > 4)
+                        {
+                            refineriesInputLog.Append("\n");
+                            count = 0;
+                        }
                     }
                 }
+                refineriesInputLog.Append("\n");
             }
         }
 
         void ReadAssemblersItems(List<IMyAssembler> assemblers)
         {
             assemblersInputLog.Clear();
-
             foreach (IMyAssembler block in assemblers)
             {
                 ResetComponentsDict();
                 ResetIngotDict();
                 ResetAmmosDict();
-
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 block.InputInventory.GetItems(items);
                 foreach (MyInventoryItem item in items)
@@ -1083,35 +1167,55 @@ namespace IngameScript
                         }
                     }
                 }
-
-                assemblersInputLog.Append(block.CustomName.Replace(shipPrefix, "")).Append(" Input\n");
+                assemblersInputLog.Append(block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
+                int count = 2;
                 foreach (KeyValuePair<MyDefinitionId, int> entry in ammosDict)
                 {
                     if (entry.Value != 0)
                     {
-                        assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                        assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                        count++;
+                        if (count > 4)
+                        {
+                            assemblersInputLog.Append("\n");
+                            count = 0;
+                        }
                     }
                 }
                 foreach (KeyValuePair<MyDefinitionId, int> entry in componentsDict)
                 {
                     if (entry.Value != 0)
                     {
-                        assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                        assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                        count++;
+                        if (count > 4)
+                        {
+                            assemblersInputLog.Append("\n");
+                            count = 0;
+                        }
                     }
                 }
                 foreach (KeyValuePair<MyDefinitionId, int> entry in ingotsDict)
                 {
                     if (entry.Value != 0)
                     {
-                        assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}\n");
+                        assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{entry.Value}, ");
+                        count++;
+                        if (count > 4)
+                        {
+                            assemblersInputLog.Append("\n");
+                            count = 0;
+                        }
                     }
                 }
+                assemblersInputLog.Append("\n");
             }
         }
 
         void ReadInventoriesFillPercent(List<IMyTerminalBlock> blocksWithInventory)
         {
             inventoriesPercentLog.Clear();
+            int count = 0;
             foreach (IMyTerminalBlock block in blocksWithInventory)
             {
                 if (!(block is IMyShipWelder) && !(block is IMyShipDrill) && !(block is IMyShipGrinder)
@@ -1120,6 +1224,7 @@ namespace IngameScript
                 {
                     List<IMyInventory> inventories = new List<IMyInventory>();
                     inventories.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
+
                     foreach (IMyInventory inventory in inventories)
                     {
                         double inventoriesPercent = 0;
@@ -1135,7 +1240,13 @@ namespace IngameScript
                             blockName.Substring(0, lcdNameColumns - 1);
                         }
 
-                        inventoriesPercentLog.Append($"{blockName}: ").Append($"{inventoriesPercent}%\n");
+                        inventoriesPercentLog.Append(blockName + ": " + inventoriesPercent.ToString("0.0") + "% ");
+                    }
+                    count++;
+                    if (count > 2)
+                    {
+                        inventoriesPercentLog.Append("\n");
+                        count = 0;
                     }
                 }
             }
@@ -1158,27 +1269,24 @@ namespace IngameScript
                 StringBuilder text = new StringBuilder();
                 text.Append(refineriesInputLog.ToString());
                 text.Append(assemblersInputLog.ToString());
+                text.Append("INVENTORIES: \n");
                 text.Append(inventoriesPercentLog.ToString());
                 surface.WriteText(text);
             }
         }
 
-        void WriteOreComponentsInfo()
+        void WriteComponentsInfo()
         {
-            foreach (IMyTextSurface surface in ORESURFACES)
+            foreach (IMyTextSurface surface in COMPONENTSURFACES)
             {
                 StringBuilder text = new StringBuilder();
                 text.Append("ORE: \n");
                 text.Append(oresLog.ToString());
-                text.Append("INGOTS: \n");
+                text.Append("\nINGOTS: \n");
                 text.Append(ingotsLog.ToString());
-                surface.WriteText(text);
-            }
-
-            foreach (IMyTextSurface surface in COMPONENTSURFACES)
-            {
-                StringBuilder text = new StringBuilder();
+                text.Append("\nAMMO: \n");
                 text.Append(ammosLog.ToString());
+                text.Append("\nCOMPONENTS: \n");
                 text.Append(componentsLog.ToString());
                 surface.WriteText(text);
             }
@@ -1186,6 +1294,8 @@ namespace IngameScript
 
         void MoveProductionOutputsToMainInventory()
         {
+            //debugLog.Append("MoveProductionOutputsToMainInventory, tick: " + ticks + "\n");
+
             foreach (IMyRefinery block in REFINERIES)
             {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
@@ -1222,6 +1332,8 @@ namespace IngameScript
 
         void CompactInventory()
         {
+            //debugLog.Append("CompactInventory, tick: " + ticks + "\n");
+
             foreach (var inventory in INVENTORIES)
             {
                 for (var i = inventory.ItemCount - 1; i > 0; i--)
@@ -1231,8 +1343,10 @@ namespace IngameScript
             }
         }
 
-        void BalanceUranium()
+        void BalanceReactorsUranium()
         {
+            //debugLog.Append("BalanceUranium, tick: " + ticks + "\n");
+
             List<IMyInventory> reactorsInventories = new List<IMyInventory>();
             int totUranium = 0;
             foreach (IMyReactor block in REACTORS)
@@ -1273,27 +1387,25 @@ namespace IngameScript
             }
         }
 
-        void BalanceIce()
+        void BalanceHidrogenGeneratorsIce()
         {
+            //debugLog.Append("BalanceIce, tick: " + ticks + "\n");
+
             List<IMyInventory> gasInventories = new List<IMyInventory>();
             int totIce = 0;
-
             foreach (IMyGasGenerator block in GASGENERATORS)
             {
                 gasInventories.Add(block.GetInventory());
                 totIce += block.GetInventory().GetItemAmount(iceOre).ToIntSafe();
             }
-
             int dividedAmount = 0;
             int k = 0;
             if (GASGENERATORS.Count > 0)
             {
-
                 dividedAmount = totIce / GASGENERATORS.Count;
                 gasInventories.Sort(CompareGasInventories);
                 List<IMyInventory> reversedInventories = new List<IMyInventory>(gasInventories);
                 reversedInventories.Reverse();
-
                 for (int i = 0; i < gasInventories.Count && k < reversedInventories.Count - i;)
                 {
                     int currentAmount = gasInventories[i].GetItemAmount(iceOre).ToIntSafe();
@@ -1316,75 +1428,20 @@ namespace IngameScript
                         i++;
                     }
                 }
-            }
-
-            gasInventories.Clear();
-            totIce = 0;
-            foreach (IMyPowerProducer block in HENGINES)
-            {
-                if (block.HasInventory)
-                {
-
-                    gasInventories.Add(block.GetInventory());
-
-                    totIce += block.GetInventory().GetItemAmount(iceOre).ToIntSafe();
-
-                }
-            }
-
-            dividedAmount = 0;
-            k = 0;
-            if (HENGINES.Count > 0)
-            {
-
-                dividedAmount = totIce / HENGINES.Count;
-                gasInventories.Sort(CompareGasInventories);
-                List<IMyInventory> reversedInventories = new List<IMyInventory>(gasInventories);
-                reversedInventories.Reverse();
-
-                for (int i = 0; i < gasInventories.Count && k < reversedInventories.Count - i;)
-                {
-                    int currentAmount = gasInventories[i].GetItemAmount(iceOre).ToIntSafe();
-                    int availableAmount = reversedInventories[k].GetItemAmount(iceOre).ToIntSafe();
-                    if (currentAmount < dividedAmount + 1)
-                    {
-                        if (availableAmount <= 2 * dividedAmount + 1 - currentAmount)
-                        {
-                            gasInventories[i].TransferItemFrom(reversedInventories[k], reversedInventories[k].FindItem(iceOre) ?? default(MyInventoryItem), availableAmount - dividedAmount);
-                            k++;
-                        }
-                        else
-                        {
-                            gasInventories[i].TransferItemFrom(reversedInventories[k], reversedInventories[k].FindItem(iceOre) ?? default(MyInventoryItem), dividedAmount + 1 - currentAmount);
-                            i++;
-                        }
-                    }
-                    else
-                    {
-                        i++;
-                    }
-                }
-
             }
         }
 
-        void BalanceAmmo()
+        void BalanceGatlingTurretsAmmo()
         {
+            //debugLog.Append("BalanceGatlingTurretsAmmo, tick: " + ticks + "\n");
+
             List<IMyInventory> gatlingInventories = new List<IMyInventory>();
-            List<IMyInventory> missileInventories = new List<IMyInventory>();
             int totGatlingAmmo = 0;
-            int totMissileAmmo = 0;
             foreach (IMyLargeGatlingTurret gatlingsTurret in GATLINGTURRETS)
             {
                 gatlingInventories.Add(gatlingsTurret.GetInventory());
                 totGatlingAmmo += gatlingsTurret.GetInventory().GetItemAmount(gatlingAmmo).ToIntSafe();
             }
-            foreach (IMyLargeMissileTurret missileTurret in MISSILETURRETS)
-            {
-                missileInventories.Add(missileTurret.GetInventory());
-                totMissileAmmo += missileTurret.GetInventory().GetItemAmount(missileAmmo).ToIntSafe();
-            }
-
             int dividedAmmoAmount = 0;
             int k = 0;
             if (GATLINGTURRETS.Count > 0)
@@ -1416,12 +1473,112 @@ namespace IngameScript
                     }
                 }
             }
+        }
 
-            dividedAmmoAmount = 0;
-            k = 0;
+        void BalanceGatlingsAmmo()
+        {
+            //debugLog.Append("BalanceGatlingTurretsAmmo, tick: " + ticks + "\n");
+
+            List<IMyInventory> gatlingInventories = new List<IMyInventory>();
+            int totGatlingAmmo = 0;
+            foreach (IMySmallGatlingGun gatlingsTurret in GATLINGS)
+            {
+                gatlingInventories.Add(gatlingsTurret.GetInventory());
+                totGatlingAmmo += gatlingsTurret.GetInventory().GetItemAmount(gatlingAmmo).ToIntSafe();
+            }
+            int dividedAmmoAmount = 0;
+            int k = 0;
+            if (GATLINGS.Count > 0)
+            {
+                dividedAmmoAmount = totGatlingAmmo / GATLINGS.Count;
+                gatlingInventories.Sort(CompareGatlingsInventories);
+                List<IMyInventory> reversedInventories = new List<IMyInventory>(gatlingInventories);
+                reversedInventories.Reverse();
+                for (int i = 0; i < gatlingInventories.Count && k < reversedInventories.Count - i;)
+                {
+                    int currentAmmoAmount = gatlingInventories[i].GetItemAmount(gatlingAmmo).ToIntSafe();
+                    int availableAmmoAmount = reversedInventories[k].GetItemAmount(gatlingAmmo).ToIntSafe();
+                    if (currentAmmoAmount < dividedAmmoAmount + 1)
+                    {
+                        if (availableAmmoAmount <= 2 * dividedAmmoAmount + 1 - currentAmmoAmount)
+                        {
+                            gatlingInventories[i].TransferItemFrom(reversedInventories[k], reversedInventories[k].FindItem(gatlingAmmo) ?? default(MyInventoryItem), availableAmmoAmount - dividedAmmoAmount);
+                            k++;
+                        }
+                        else
+                        {
+                            gatlingInventories[i].TransferItemFrom(reversedInventories[k], reversedInventories[k].FindItem(gatlingAmmo) ?? default(MyInventoryItem), dividedAmmoAmount + 1 - currentAmmoAmount);
+                            i++;
+                        }
+                    }
+                    else
+                    {
+                        i++;
+                    }
+                }
+            }
+        }
+
+        void BalanceMissileTurretsAmmo()
+        {
+            //debugLog.Append("BalanceMissileTurretsAmmo, tick: " + ticks + "\n");
+
+            int totMissileAmmo = 0;
+            List<IMyInventory> missileInventories = new List<IMyInventory>();
+            foreach (IMyLargeMissileTurret missileTurret in MISSILETURRETS)
+            {
+                missileInventories.Add(missileTurret.GetInventory());
+                totMissileAmmo += missileTurret.GetInventory().GetItemAmount(missileAmmo).ToIntSafe();
+            }
+            int dividedAmmoAmount = 0;
+            int k = 0;
             if (MISSILETURRETS.Count > 0)
             {
                 dividedAmmoAmount = totMissileAmmo / MISSILETURRETS.Count;
+                missileInventories.Sort(CompareMissileInventories);
+                List<IMyInventory> reversedInventories = new List<IMyInventory>(missileInventories);
+                reversedInventories.Reverse();
+                for (int i = 0; i < missileInventories.Count && k < reversedInventories.Count - i;)
+                {
+                    int currentAmmoAmount = missileInventories[i].GetItemAmount(missileAmmo).ToIntSafe();
+                    int availableAmmoAmount = reversedInventories[k].GetItemAmount(missileAmmo).ToIntSafe();
+                    if (currentAmmoAmount < dividedAmmoAmount + 1)
+                    {
+                        if (availableAmmoAmount <= 2 * dividedAmmoAmount + 1 - currentAmmoAmount)
+                        {
+                            missileInventories[i].TransferItemFrom(reversedInventories[k], reversedInventories[k].FindItem(missileAmmo) ?? default(MyInventoryItem), availableAmmoAmount - dividedAmmoAmount);
+                            k++;
+                        }
+                        else
+                        {
+                            missileInventories[i].TransferItemFrom(reversedInventories[k], reversedInventories[k].FindItem(missileAmmo) ?? default(MyInventoryItem), dividedAmmoAmount + 1 - currentAmmoAmount);
+                            i++;
+                        }
+                    }
+                    else
+                    {
+                        i++;
+                    }
+                }
+            }
+        }
+
+        void BalanceMissileLaunchersAmmo()
+        {
+            //debugLog.Append("BalanceMissileLaunchersAmmo, tick: " + ticks + "\n");
+
+            int totMissileAmmo = 0;
+            List<IMyInventory> missileInventories = new List<IMyInventory>();
+            foreach (IMySmallMissileLauncher missileTurret in LAUNCHERS)
+            {
+                missileInventories.Add(missileTurret.GetInventory());
+                totMissileAmmo += missileTurret.GetInventory().GetItemAmount(missileAmmo).ToIntSafe();
+            }
+            int dividedAmmoAmount = 0;
+            int k = 0;
+            if (LAUNCHERS.Count > 0)
+            {
+                dividedAmmoAmount = totMissileAmmo / LAUNCHERS.Count;
                 missileInventories.Sort(CompareMissileInventories);
                 List<IMyInventory> reversedInventories = new List<IMyInventory>(missileInventories);
                 reversedInventories.Reverse();
@@ -1480,22 +1637,35 @@ namespace IngameScript
 
         void AutoAssemblers()
         {
+            //debugLog.Append("AutoAssemblers, tick: " + ticks + "\n");
+            //DEBUG.WriteText(debugLog);
+
             foreach (IMyInventory mainInv in CARGOINVENTORIES)
             {
                 List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
                 mainInv.GetItems(cargoItems);
-                foreach (var element in componentsQuota)
+                foreach (var element in componentsSubIdIdQuota)
                 {
+                    //debugLog.Append("element.Key: " + element.Key.ToString() + "\n");
+                    //DEBUG.WriteText(debugLog);
+
                     string component = element.Key;
-                    int componentAmountRequired = element.Value;
-                    int tempIndex = componentsQuota.Keys.ToList().IndexOf(component);
-                    string componentBpSubtype = componentBlueprints[tempIndex];
+                    int componentAmountRequired = element.Value.Item2;
+                    string componentBpSubtype = element.Value.Item1;
+
                     MyDefinitionId blueprintDef = MyDefinitionId.Parse("MyObjectBuilder_BlueprintDefinition/" + componentBpSubtype);
+
+                    //debugLog.Append(", blueprintDef.TypeId: " + blueprintDef.TypeId.ToString() + ", blueprintDef.SubtypeId: " + blueprintDef.SubtypeId.ToString() + "\n");
+                    //DEBUG.WriteText(debugLog);
 
                     bool enoughOfThisComponent = false;
                     foreach (MyInventoryItem item in cargoItems)
                     {
                         string itemType = item.Type.ToString();
+
+                        //debugLog.Append("item.Type: " + item.Type.ToString() + "\n");
+                        //DEBUG.WriteText(debugLog);
+
                         if (itemType.Contains(component))
                         {
                             if (item.Amount > componentAmountRequired) // First look if we have enough of the component already
@@ -1503,7 +1673,10 @@ namespace IngameScript
                                 enoughOfThisComponent = true;
                                 break; // Enough of this component, go to next
                             }
-                            else { componentAmountRequired -= (int)item.Amount; }// Not enough of this component : modify production target
+                            else
+                            {
+                                componentAmountRequired -= (int)item.Amount;// Not enough of this component : modify production target
+                            }
                             break; // We found the component so we can stop the loop on items
                         }
                     }
@@ -1515,6 +1688,9 @@ namespace IngameScript
                         int nAlreadyQueued = 0;
                         foreach (MyProductionItem prodItem in AssemblerQueue)
                         {
+                            //debugLog.Append("prodItem.BlueprintId: " + prodItem.BlueprintId.ToString() + ", blueprintDef: " + blueprintDef.ToString() + "\n");
+                            //DEBUG.WriteText(debugLog);
+
                             if (prodItem.BlueprintId == blueprintDef)
                             {
                                 nAlreadyQueued += (int)prodItem.Amount;
@@ -1532,6 +1708,8 @@ namespace IngameScript
 
         void AutoRefineries()
         {
+            //debugLog.Append("AutoRefineries, tick: " + ticks + "\n");
+
             foreach (IMyInventory mainInv in CARGOINVENTORIES)
             {
                 List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
@@ -1628,123 +1806,142 @@ namespace IngameScript
             }
         }
 
-        IMyCargoContainer GetMainEmptyCargo()
+        void CompactMainCargos()
         {
-            //float margin = 0.1f;
+            //debugLog.Append("CompactMainCargos, tick: " + ticks + "\n");
+
             IMyCargoContainer mainCargo = null;
             int cargoIndex = 1000;
             foreach (IMyCargoContainer cargo in CONTAINERS)
             {
-                int cargoNum = int.Parse(cargo.CustomName.Replace(containersName, "").Trim());
-                if (cargoNum < cargoIndex)
+                int cargoNum;
+                bool parsed = int.TryParse(cargo.CustomName.Replace(containersName, "").Trim(), out cargoNum);
+                if (parsed && cargoNum < cargoIndex)
                 {
                     for (int i = 0; i < cargo.InventoryCount; i++)
                     {
                         IMyInventory inv = cargo.GetInventory(i);
-                        if (!inv.IsFull) // || ((float)inv.CurrentVolume < ((float)inv.MaxVolume - margin)))
+                        double currentVol = (double)cargo.GetInventory(i).CurrentVolume;
+                        double maxVol = (double)cargo.GetInventory(i).MaxVolume;
+                        double inventoriesPercent = 0;
+                        if (currentVol != 0 && maxVol != 0)
+                        {
+                            inventoriesPercent = currentVol / maxVol * 100d;
+                        }
+                        if (!inv.IsFull && inventoriesPercent < 99d)
                         {
                             cargoIndex = cargoNum;
                             mainCargo = cargo;
-                            break;
                         }
                     }
                 }
             }
-            return mainCargo;
-        }
-
-        void CompactMainCargos()
-        {
-            //float margin = 0.1f;
-            IMyCargoContainer mainCargo = GetMainEmptyCargo();
             if (mainCargo != null)
             {
-                List<IMyInventory> CONTAINERSINVENTORIES = new List<IMyInventory>();
-                CONTAINERSINVENTORIES.AddRange(CONTAINERS.Where(block => block.CustomName != mainCargo.CustomName).SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-
-                foreach (IMyInventory inventory in CONTAINERSINVENTORIES)
+                List<IMyCargoContainer> EMPTYCARGOS = new List<IMyCargoContainer>();
+                foreach (IMyCargoContainer cargo in CONTAINERS)
                 {
-                    List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
-                    inventory.GetItems(cargoItems);
-                    foreach (MyInventoryItem item in cargoItems)
+                    int cargoNum;
+                    bool parsed = int.TryParse(cargo.CustomName.Replace(containersName, "").Trim(), out cargoNum);
+                    if (parsed && cargoNum > cargoIndex)
                     {
-                        bool transferred = false;
-                        for (int i = 0; i < mainCargo.InventoryCount; i++)
+                        EMPTYCARGOS.Add(cargo);
+                    }
+                }
+                List<IMyInventory> CONTAINERSINVENTORIES = new List<IMyInventory>();
+                CONTAINERSINVENTORIES.AddRange(EMPTYCARGOS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+                List<IMyInventory> MAININVENTORIES = new List<IMyInventory>();
+                for (int i = 0; i < mainCargo.InventoryCount; i++)
+                {
+                    MAININVENTORIES.Add(mainCargo.GetInventory(i));
+                }
+                foreach (IMyInventory cargoInv in CONTAINERSINVENTORIES)
+                {
+                    List<MyInventoryItem> items = new List<MyInventoryItem>();
+                    cargoInv.GetItems(items);
+                    foreach (MyInventoryItem item in items)
+                    {
+                        foreach (IMyInventory mainInv in MAININVENTORIES)
                         {
-                            IMyInventory maninInv = mainCargo.GetInventory(i);
-                            if (!maninInv.IsFull) // || ((float)maninInv.CurrentVolume > ((float)maninInv.MaxVolume - margin)))
+                            bool transferred = false;
+                            if (cargoInv.CanTransferItemTo(mainInv, item.Type) && mainInv.CanItemsBeAdded(item.Amount, item.Type))
                             {
-                                MyFixedPoint amount = maninInv.MaxVolume - maninInv.CurrentVolume;
-                                transferred = inventory.TransferItemTo(maninInv, cargoItems.IndexOf(item), 0, true, amount);
-                                break;
+                                transferred = cargoInv.TransferItemTo(mainInv, item);
+                            }
+                            if (!transferred)
+                            {
+                                MyFixedPoint amount = mainInv.MaxVolume - mainInv.CurrentVolume;
+                                transferred = cargoInv.TransferItemTo(mainInv, item, amount);
+                            }
+                            if (!transferred)
+                            {
+                                cargoInv.TransferItemTo(mainInv, item, item.Amount);
                             }
                         }
-                        if (transferred)
-                        {
-                            //cargoItems.Clear();//TODO
-                            //inventory.GetItems(cargoItems);
-                            break;
-                        }
                     }
                 }
             }
         }
 
-        void FillReactors()
+        void FillFromCargo(List<IMyInventory> inventories, String itemToFind)
         {
-            foreach (IMyInventory reInv in REACTORSINVENTORIES)
+            //debugLog.Append("FillFromCargo, tick: " + ticks + "\n");
+
+            foreach (IMyInventory cargoInv in CARGOINVENTORIES)
             {
-                foreach (IMyInventory cargoInv in CARGOINVENTORIES)
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                cargoInv.GetItems(items);
+                foreach (MyInventoryItem item in items)
                 {
-                    MyInventoryItem? itemFound = cargoInv.FindItem(uraniumIngot);
-                    if (itemFound.HasValue)
+                    if (item.Type.SubtypeId.ToString().Contains(itemToFind))
                     {
-                        MyFixedPoint availableVolume = reInv.MaxVolume - reInv.CurrentVolume;
-                        //MyFixedPoint itemAmount = cargoInv.GetItemAmount(iceOre);
-                        if (cargoInv.CanTransferItemTo(reInv, uraniumIngot))
+                        foreach (IMyInventory inv in inventories)
                         {
-                            cargoInv.TransferItemTo(reInv, itemFound.Value, availableVolume);
-                            break;
+                            bool transferred = false;
+                            if (cargoInv.CanTransferItemTo(inv, item.Type) && inv.CanItemsBeAdded(item.Amount, item.Type))
+                            {
+                                transferred = cargoInv.TransferItemTo(inv, item);
+                            }
+                            if (!transferred)
+                            {
+                                MyFixedPoint amount = inv.MaxVolume - inv.CurrentVolume;
+                                transferred = cargoInv.TransferItemTo(inv, item, amount);
+                            }
+                            if (!transferred)
+                            {
+                                cargoInv.TransferItemTo(inv, item, item.Amount);
+                            }
                         }
                     }
                 }
             }
         }
 
-        void FillHidrogenGenerators()
+        void MoveItemsFromConnectors()//TODO move if connector is not expelling
         {
-            foreach (IMyInventory gasInv in GASINVENTORIES)
-            {
-                foreach (IMyInventory cargoInv in CARGOINVENTORIES)
-                {
-                    MyInventoryItem? itemFound = cargoInv.FindItem(iceOre);
-                    if (itemFound.HasValue)
-                    {
-                        MyFixedPoint availableVolume = gasInv.MaxVolume - gasInv.CurrentVolume;
-                        //MyFixedPoint itemAmount = cargoInv.GetItemAmount(iceOre);
-                        if (cargoInv.CanTransferItemTo(gasInv, iceOre))
-                        {
-                            cargoInv.TransferItemTo(gasInv, itemFound.Value, availableVolume);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+            //debugLog.Append("MoveItemsFromConnectors, tick: " + ticks + "\n");
 
-        void MoveItemsFromConnectors()
-        {
-            foreach (IMyInventory connInv in CONNECTORSINVENTORIES)
+            foreach (IMyInventory conInv in CONNECTORSINVENTORIES)
             {
-                List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
-                connInv.GetItems(cargoItems);
-                foreach (MyInventoryItem item in cargoItems)
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                conInv.GetItems(items);
+                foreach (MyInventoryItem item in items)
                 {
                     foreach (IMyInventory cargoInv in CARGOINVENTORIES)
                     {
-                        if (connInv.CanTransferItemTo(cargoInv, item.Type) && cargoInv.CanItemsBeAdded(item.Amount, item.Type))
+                        bool tranferred = false;
+                        if (conInv.CanTransferItemTo(cargoInv, item.Type) && cargoInv.CanItemsBeAdded(item.Amount, item.Type))
                         {
-                            connInv.TransferItemTo(cargoInv, item);
+                            tranferred = conInv.TransferItemTo(cargoInv, item);
+                        }
+                        if (!tranferred)
+                        {
+                            MyFixedPoint amount = cargoInv.MaxVolume - cargoInv.CurrentVolume;
+                            tranferred = conInv.TransferItemTo(cargoInv, item, amount);
+                        }
+                        if (!tranferred)
+                        {
+                            conInv.TransferItemTo(cargoInv, item, item.Amount);
                         }
                     }
                 }
@@ -1753,6 +1950,17 @@ namespace IngameScript
 
         void GetBlocks()
         {
+            TERMINALS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(TERMINALS, block => block.CustomName.Contains(terminalsName) && !(block is IMyPowerProducer) && !(block is IMySolarPanel) && !(block is IMyBatteryBlock) && !(block is IMyReactor) && !block.CustomName.Contains(hThrustersName));
+            CONTROLLERS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyShipController>(CONTROLLERS, block => block.CustomName.Contains(controllersName));
+            COCKPITS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, block => block.CustomName.Contains(cockpitsName));
+            GYROS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyGyro>(GYROS, block => block.CustomName.Contains(gyrosName));
+            THRUSTERS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyThrust>(THRUSTERS, block => block.CustomName.Contains(hThrustersName) || block.CustomName.Contains(iThrustersName) || block.CustomName.Contains(aThrustersName));
+
             SOLARS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySolarPanel>(SOLARS, block => block.CustomName.Contains(solarsName));
             TURBINES.Clear();
@@ -1763,46 +1971,53 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyGasTank>(HTANKS, block => block.CustomName.Contains(hTanksName));
             HENGINES.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyPowerProducer>(HENGINES, block => block.CustomName.Contains(hEnginesName));
-            GASGENERATORS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyGasGenerator>(GASGENERATORS, block => block.CustomName.Contains(gasGeneratorsName));
-            REACTORS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyReactor>(REACTORS, block => block.CustomName.Contains(reactorsName));
-            REACTORSINVENTORIES.Clear();
-            REACTORSINVENTORIES.AddRange(REACTORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-            GYROS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyGyro>(GYROS, block => block.CustomName.Contains(gyrosName));
-            CONTROLLERS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipController>(CONTROLLERS, block => block.CustomName.Contains(controllersName));
-            TERMINALS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(TERMINALS, block => block.CustomName.Contains(terminalsName) && !(block is IMyPowerProducer) && !(block is IMySolarPanel) && !(block is IMyBatteryBlock) && !(block is IMyReactor) && !block.CustomName.Contains(hThrustersName));
-            THRUSTERS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyThrust>(THRUSTERS, block => block.CustomName.Contains(hThrustersName) || block.CustomName.Contains(iThrustersName) || block.CustomName.Contains(aThrustersName));
-            BLOCKSWITHINVENTORY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(shipPrefix)); //&& block.IsSameConstructAs(Me)
-            INVENTORIES.Clear();
-            INVENTORIES.AddRange(BLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+
             REFINERIES.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyRefinery>(REFINERIES, block => block.CustomName.Contains(refineriesName));
             ASSEMBLERS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyAssembler>(ASSEMBLERS, block => block.CustomName.Contains(assemblersName));
-            CONTAINERS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(CONTAINERS, block => block.CustomName.Contains(containersName));
+
             GATLINGTURRETS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyLargeGatlingTurret>(GATLINGTURRETS, block => block.CustomName.Contains(gatlingTurretsName));
+            GATLINGTURRETSINVENTORIES.Clear();
+            GATLINGTURRETSINVENTORIES.AddRange(GATLINGTURRETS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             MISSILETURRETS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyLargeMissileTurret>(MISSILETURRETS, block => block.CustomName.Contains(missileTurretsName));
-            COCKPITS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, block => block.CustomName.Contains(cockpitsName));
-            LCDSSTATUS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(LCDSSTATUS, block => block.CustomName.Contains(lcdStatusName));
-            GASINVENTORIES.Clear();
-            GASINVENTORIES.AddRange(GASGENERATORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            MISSILETURRETSINVENTORIES.Clear();
+            MISSILETURRETSINVENTORIES.AddRange(MISSILETURRETS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            GATLINGS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMySmallGatlingGun>(GATLINGS, block => block.CustomName.Contains(gatlingsName));
+            GATLINGSINVENTORIES.Clear();
+            GATLINGSINVENTORIES.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            LAUNCHERS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMySmallMissileLauncher>(LAUNCHERS, block => block.CustomName.Contains(launchersName));
+            LAUNCHERSINVENTORIES.Clear();
+            LAUNCHERSINVENTORIES.AddRange(LAUNCHERS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+
+            CONTAINERS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(CONTAINERS, block => block.CustomName.Contains(containersName));
             CARGOINVENTORIES.Clear();
-            GASINVENTORIES.AddRange(CONTAINERS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            CARGOINVENTORIES.AddRange(CONTAINERS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             CONNECTORS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(CONNECTORS, block => block.CustomName.Contains(connectorsName));
             CONNECTORSINVENTORIES.Clear();
             CONNECTORSINVENTORIES.AddRange(CONNECTORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+
+            GASGENERATORS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyGasGenerator>(GASGENERATORS, block => block.CustomName.Contains(gasGeneratorsName));
+            GASINVENTORIES.Clear();
+            GASINVENTORIES.AddRange(GASGENERATORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            REACTORS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyReactor>(REACTORS, block => block.CustomName.Contains(reactorsName));
+            REACTORSINVENTORIES.Clear();
+            REACTORSINVENTORIES.AddRange(REACTORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            BLOCKSWITHINVENTORY.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(shipPrefix)); //&& block.IsSameConstructAs(Me)
+            INVENTORIES.Clear();
+            INVENTORIES.AddRange(BLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+
+            LCDSSTATUS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(LCDSSTATUS, block => block.CustomName.Contains(lcdStatusName));
             POWERSURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdPowerName));
@@ -1824,13 +2039,8 @@ namespace IngameScript
             {
                 COMPONENTSURFACES.Add(panel as IMyTextSurface);
             }
-            ORESURFACES.Clear();
-            panels.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdOreName));
-            foreach (IMyTextPanel panel in panels)
-            {
-                ORESURFACES.Add(panel as IMyTextSurface);
-            }
+
+            DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
         void ResetOresDict()
@@ -1877,6 +2087,30 @@ namespace IngameScript
             {
                 {MyItemType.MakeComponent("BulletproofGlass"),0},
                 {MyItemType.MakeComponent("Canvas"),0},
+                {MyItemType.MakeComponent("ComputerComponent"),0},
+                {MyItemType.MakeComponent("ConstructionComponent"),0},
+                {MyItemType.MakeComponent("DetectorComponent"),0},
+                {MyItemType.MakeComponent("Display"),0},
+                {MyItemType.MakeComponent("ExplosivesComponent"),0},
+                {MyItemType.MakeComponent("GirderComponent"),0},
+                {MyItemType.MakeComponent("GravityGeneratorComponent"),0},
+                {MyItemType.MakeComponent("InteriorPlate"),0},
+                {MyItemType.MakeComponent("LargeTube"),0},
+                {MyItemType.MakeComponent("MedicalComponent"),0},
+                {MyItemType.MakeComponent("MetalGrid"),0},
+                {MyItemType.MakeComponent("MotorComponent"),0},
+                {MyItemType.MakeComponent("PowerCell"),0},
+                {MyItemType.MakeComponent("RadioCommunicationComponent"),0},
+                {MyItemType.MakeComponent("ReactorComponent"),0},
+                {MyItemType.MakeComponent("SmallTube"),0},
+                {MyItemType.MakeComponent("SolarCell"),0},
+                {MyItemType.MakeComponent("SteelPlate"),0},
+                {MyItemType.MakeComponent("Superconductor"),0},
+                {MyItemType.MakeComponent("ThrustComponent"),0},
+                {MyItemType.MakeComponent("ZoneChip"),0}
+
+                /*{MyItemType.MakeComponent("BulletproofGlass"),0},
+                {MyItemType.MakeComponent("Canvas"),0},
                 {MyItemType.MakeComponent("Computer"),0},
                 {MyItemType.MakeComponent("Construction"),0},
                 {MyItemType.MakeComponent("Detector"),0},
@@ -1897,7 +2131,7 @@ namespace IngameScript
                 {MyItemType.MakeComponent("SteelPlate"),0},
                 {MyItemType.MakeComponent("Superconductor"),0},
                 {MyItemType.MakeComponent("Thrust"),0},
-                {MyItemType.MakeComponent("ZoneChip"),0}
+                {MyItemType.MakeComponent("ZoneChip"),0}*/
             };
         }
 
@@ -1905,11 +2139,88 @@ namespace IngameScript
         {
             ammosDict = new Dictionary<MyDefinitionId, int>()
             {
-                {MyItemType.MakeIngot("NATO_25x184mm"),0},
-                {MyItemType.MakeIngot("NATO_5p56x45mm"),0},
-                {MyItemType.MakeIngot("Missile200mm"),0}
+                {MyItemType.MakeAmmo("NATO_25x184mm"),0},
+                {MyItemType.MakeAmmo("NATO_5p56x45mm"),0},
+                {MyItemType.MakeAmmo("Missile200mm"),0}
             };
         }
+
+        /*
+        MyObjectBuilder_BlueprintDefinition
+        "Missile200mm",
+        "NATO_25x184mmMagazine",
+        "BulletproofGlass",
+        "Canvas",
+        "CobaltOreToIngot",
+        "ComputerComponent",
+        "ConstructionComponent",
+        "Datapad",
+        "DetectorComponent",
+        "Display",
+        "AngleGrinder4",
+        "HandDrill4",
+        "Welder4",
+        "AngleGrinder2",
+        "HandDrill2",
+        "Welder2",
+        "ExplosivesComponent",
+        "GirderComponent",
+        "GoldOreToIngot",
+        "StoneOreToIngot_Deconstruction",
+        "GravityGeneratorComponent",
+        "AngleGrinder",
+        "HandDrill",
+        "HydrogenBottle",
+        "HydrogenBottlesRefill",
+        "StoneOreToIngot",
+        "StoneOreToIngotBasic",
+        "InteriorPlate",
+        "IronOreToIngot",
+        "ScrapIngotToIronIngot",
+        "ScrapToIronIngot",
+        "LargeTube",
+        "MagnesiumOreToIngot",
+        "MedicalComponent",
+        "MetalGrid",
+        "MotorComponent",
+        "AutomaticRifle",
+        "AutomaticRifleGun_Mag_20rd",
+        "UltimateAutomaticRifle",
+        "UltimateAutomaticRifleGun_Mag_30rd",
+        "RapidFireAutomaticRifle",
+        "RapidFireAutomaticRifleGun_Mag_50rd",
+        "PreciseAutomaticRifle",
+        "PreciseAutomaticRifleGun_Mag_5rd",
+        "NickelOreToIngot",
+        "IceToOxygen",
+        "OxygenBottle",
+        "OxygenBottlesRefill",
+        "PlatinumOreToIngot",
+        "PowerCell",
+        "AdvancedHandHeldLauncher",
+        "AngleGrinder3",
+        "HandDrill3",
+        "Welder3",
+        "RadioCommunicationComponent",
+        "ReactorComponent",
+        "BasicHandHeldLauncher",
+        "SemiAutoPistol",
+        "SemiAutoPistolMagazine",
+        "EliteAutoPistol",
+        "ElitePistolMagazine",
+        "FullAutoPistol",
+        "FullAutoPistolMagazine",
+        "SiliconOreToIngot",
+        "SilverOreToIngot",
+        "SmallTube",
+        "SolarCell",
+        "SteelPlate",
+        "Superconductor",
+        "ThrustComponent",
+        "UraniumOreToIngot",
+        "Welder",
+        "ZoneChip"
+        */
 
     }
 }
