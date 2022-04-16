@@ -22,6 +22,9 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO
+        //check if when locking target gatlings hit the target
+        //check if drones works
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
