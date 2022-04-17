@@ -22,6 +22,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO check if assemblers and refinery log return 
+        //if sunChasing turn screen color blue, black if off
 
         readonly string solarsName = "[CRX] Solar";
         readonly string turbinesName = "[CRX] Wind Turbine";

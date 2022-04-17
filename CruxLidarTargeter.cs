@@ -25,6 +25,7 @@ namespace IngameScript
         //TODO
         //check if when locking target gatlings hit the target
         //check if drones works
+        //filll only missile gas inventories all at once 
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
