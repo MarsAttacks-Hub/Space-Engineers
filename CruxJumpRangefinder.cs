@@ -45,7 +45,6 @@ namespace IngameScript
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
-        const string argAutopilot = "ToggleAutopilot";//TODO
 
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
@@ -120,6 +119,7 @@ namespace IngameScript
 
         void Main(string arg)
         {
+
             Echo($"REMOTES:{REMOTES.Count}");
             Echo($"COCKPITS:{COCKPITS.Count}");
             Echo($"JUMPERS:{JUMPERS.Count}");
@@ -184,10 +184,15 @@ namespace IngameScript
                 //if (MDOn) { Echo("Magnetic drive turned ON"); } else { Echo("Magnetic drive failed to turn ON"); }
             }
 
-            if (!REMOTE.IsAutoPilotEnabled)
+            if (REMOTE.IsAutoPilotEnabled && targetPosition != null)
             {
-                REMOTE.SetAutoPilotEnabled(true);
+                double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
+                if (dist < 150)
+                {
+                    REMOTE.SetAutoPilotEnabled(false);
+                }
             }
+
             ReadLidarInfos();
             ReadJumpersInfos();
 
@@ -212,7 +217,6 @@ namespace IngameScript
                 case argIncreaseJump: IncreaseJumpDistance(); break;
                 case argDecreaseJump: DecreaseJumpDistance(); break;
                 case argAimTarget: if (!Vector3D.IsZero(targetPosition)) { aimTarget = true; Runtime.UpdateFrequency = UpdateFrequency.Update1; }; break;
-                case argAutopilot: if (REMOTE.IsAutoPilotEnabled) { REMOTE.SetAutoPilotEnabled(false); } else { if (targetPosition != null) { REMOTE.SetAutoPilotEnabled(true); } }; break;
             }
         }
 
@@ -250,13 +254,11 @@ namespace IngameScript
                 if (TARGET.Type == MyDetectedEntityType.Planet)
                 {
                     Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * planetAtmosphereRange;
-                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
-                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * planetAtmosphereRange);
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
-
+                    
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0 && distance != 0)
@@ -288,9 +290,7 @@ namespace IngameScript
                 else if (TARGET.Type == MyDetectedEntityType.Asteroid)
                 {
                     Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * friendlySafeDistance;
-                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
-                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * friendlySafeDistance);
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, "Asteroid");
@@ -315,10 +315,8 @@ namespace IngameScript
                 else if (IsNotFriendly(TARGET.Relationship))
                 {
                     Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * enemySafeDistance;
-                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
-                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
-
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * enemySafeDistance);
+                    
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
 
@@ -345,9 +343,7 @@ namespace IngameScript
                 else
                 {
                     Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safetyOffset = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - hitPosition) * friendlySafeDistance;
-                    //Vector3D safeJumpPosition = hitPosition + safetyOffset;
-                    Vector3D safeJumpPosition = hitPosition - safetyOffset;
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * friendlySafeDistance);
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
@@ -381,27 +377,8 @@ namespace IngameScript
 
         public double GetMaxJumpDistance(IMyJumpDrive jumpDrive)
         {
-            string maxDist = jumpDrive.DetailedInfo.ToString().Split('\n')[6];
-            maxDist = maxDist.Split(':')[1];
-            double maxDistance = GetNum(maxDist);
+            double maxDistance = (double)jumpDrive.MaxJumpDistanceMeters;
             return maxDistance;
-        }
-
-        double GetNum(string input)
-        {
-            const string regExpr = @"(?<Num>[0-9.]+) (?<Unit>[a-zA-Z]+)";
-            var match = System.Text.RegularExpressions.Regex.Match(input, regExpr);
-            if (!match.Success) { throw new Exception("Input has an invalid format"); }
-            return double.Parse(match.Groups["Num"].Value) * UnitToDouble(match.Groups["Unit"].Value);
-        }
-
-        double UnitToDouble(string unit)
-        {
-            if (unit.ToLower().StartsWith("k"))
-            {
-                return 1000d;
-            }
-            return 1d;
         }
 
         void IncreaseJumpDistance()
@@ -446,22 +423,20 @@ namespace IngameScript
 
         void AimAtTarget()
         {
-            Vector3D aimDirection = REMOTE.GetPosition() - targetPosition;
-            //Vector3D aimDirectionLocal = Vector3D.TransformNormal(aimDirection, MatrixD.Transpose(REMOTE.WorldMatrix));
-
-            //Vector3D aimDirection = Vector3D.Normalize(REMOTE.GetPosition() - targetPosition);
+            Vector3D aimDirection = targetPosition - REMOTE.GetPosition();
 
             double yawAngle;
             double pitchAngle;
-            GetRotationAngles(aimDirection, REMOTE.WorldMatrix, out yawAngle, out pitchAngle);
+            double rollAngle;
+            GetRotationAnglesSimultaneous(aimDirection, REMOTE.WorldMatrix.Up, REMOTE.WorldMatrix, out pitchAngle,  out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle, globalTimestep);
             double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
-
-            ApplyGyroOverride(pitchSpeed, yawSpeed, 0);
+            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, REMOTE.WorldMatrix);
 
             Vector3D forwardVec = REMOTE.WorldMatrix.Forward;
-            double angle = GetAngleBetween(forwardVec, aimDirection);
+            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance)
             {
                 Runtime.UpdateFrequency = UpdateFrequency.Update10;
@@ -476,54 +451,72 @@ namespace IngameScript
             }
         }
 
-        void GetRotationAngles(Vector3D targetVector, MatrixD worldMatrix, out double yaw, out double pitch)
+        void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll)
         {
-            Vector3D localTargetVector = Vector3D.TransformNormal(targetVector, MatrixD.Transpose(worldMatrix));
-            Vector3D flattenedTargetVector = new Vector3D(0, localTargetVector.Y, localTargetVector.Z);
+            desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
 
-            pitch = GetAngleBetween(Vector3D.Forward, flattenedTargetVector) * Math.Sign(localTargetVector.Y); //up is positive
+            MatrixD transposedWm;
+            MatrixD.Transpose(ref worldMatrix, out transposedWm);
+            Vector3D.Rotate(ref desiredForwardVector, ref transposedWm, out desiredForwardVector);
+            Vector3D.Rotate(ref desiredUpVector, ref transposedWm, out desiredUpVector);
 
-            if (Math.Abs(pitch) < 1E-6 && localTargetVector.Z > 0)
+            Vector3D leftVector = Vector3D.Cross(desiredUpVector, desiredForwardVector);
+            Vector3D axis;
+            double angle;
+            if (Vector3D.IsZero(desiredUpVector) || Vector3D.IsZero(leftVector))
             {
-                pitch = Math.PI;
-            }
-            if (Vector3D.IsZero(flattenedTargetVector))
-            {
-                yaw = MathHelper.PiOver2 * Math.Sign(localTargetVector.X);
+                axis = new Vector3D(desiredForwardVector.Y, -desiredForwardVector.X, 0);
+                angle = Math.Acos(MathHelper.Clamp(-desiredForwardVector.Z, -1.0, 1.0));
             }
             else
             {
-                yaw = GetAngleBetween(localTargetVector, flattenedTargetVector) * Math.Sign(localTargetVector.X); //right is positive
+                leftVector = VectorMath.SafeNormalize(leftVector);
+                Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
+
+                // Create matrix
+                MatrixD targetMatrix = MatrixD.Zero;
+                targetMatrix.Forward = desiredForwardVector;
+                targetMatrix.Left = leftVector;
+                targetMatrix.Up = upVector;
+
+                axis = new Vector3D(targetMatrix.M23 - targetMatrix.M32,
+                                    targetMatrix.M31 - targetMatrix.M13,
+                                    targetMatrix.M12 - targetMatrix.M21);
+
+                double trace = targetMatrix.M11 + targetMatrix.M22 + targetMatrix.M33;
+                angle = Math.Acos(MathHelper.Clamp((trace - 1) * 0.5, -1, 1));
             }
+
+            if (Vector3D.IsZero(axis))
+            {
+                angle = desiredForwardVector.Z < 0 ? 0 : Math.PI;
+                yaw = angle;
+                pitch = 0;
+                roll = 0;
+                return;
+            }
+
+            axis = VectorMath.SafeNormalize(axis);
+            // Because gyros rotate about -X -Y -Z, we need to negate our angles
+            yaw = -axis.Y * angle;
+            pitch = -axis.X * angle;
+            roll = -axis.Z * angle;
         }
 
-        public static double GetAngleBetween(Vector3D a, Vector3D b)
+        void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed, List<IMyGyro> gyroList, MatrixD worldMatrix)
         {
-            if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-            {
-                return 0;
-            }
-            if (Vector3D.IsUnit(ref a) && Vector3D.IsUnit(ref b))
-            {
-                return Math.Acos(MathHelperD.Clamp(a.Dot(b), -1, 1));
-            }
-            return Math.Acos(MathHelperD.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
-        }
+            var rotationVec = new Vector3D(pitchSpeed, yawSpeed, rollSpeed);
+            var relativeRotationVec = Vector3D.TransformNormal(rotationVec, worldMatrix);
 
-        void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed)
-        {
-            Vector3D rotationVec = new Vector3D(-pitchSpeed, yawSpeed, rollSpeed); //because keen does some weird stuff with signs 
-            MatrixD refMatrix = REMOTE.WorldMatrix;
-            Vector3D relativeRotationVec = Vector3D.TransformNormal(rotationVec, refMatrix);
-
-            foreach (var gyro in GYROS)
+            foreach (var thisGyro in gyroList)
             {
-                Vector3D transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(gyro.WorldMatrix));
-
-                gyro.Pitch = (float)transformedRotationVec.X;
-                gyro.Yaw = (float)transformedRotationVec.Y;
-                gyro.Roll = (float)transformedRotationVec.Z;
-                gyro.GyroOverride = true;
+                if (thisGyro.Closed)
+                    continue;
+                var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(thisGyro.WorldMatrix));
+                thisGyro.Pitch = (float)transformedRotationVec.X;
+                thisGyro.Yaw = (float)transformedRotationVec.Y;
+                thisGyro.Roll = (float)transformedRotationVec.Z;
+                thisGyro.GyroOverride = true;
             }
         }
 
@@ -679,23 +672,10 @@ namespace IngameScript
                 _integralDecay = true;
             }
 
-            public double Filter(double input, int round_d_digits)
-            {
-                double roundedInput = Math.Round(input, round_d_digits);
-
-                _integralDecayRatio += (input / _timeStep);
-                _integralDecayRatio = (_upperBound > 0 && _integralDecayRatio > _upperBound ? _upperBound : _integralDecayRatio);
-                _integralDecayRatio = (_lowerBound < 0 && _integralDecayRatio < _lowerBound ? _lowerBound : _integralDecayRatio);
-
-                double derivative = (roundedInput - _lastError) * _timeStep;
-                _lastError = roundedInput;
-
-                return (_kP * input) + (_kI * _integralDecayRatio) + (_kD * derivative);
-            }
-
             public double Control(double error)
             {
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
+                //Compute derivative term
+                var errorDerivative = (error - _lastError) * _inverseTimeStep;
 
                 if (_firstRun)
                 {
@@ -703,27 +683,27 @@ namespace IngameScript
                     _firstRun = false;
                 }
 
-                if (!_integralDecay)//Compute integral term
+                //Compute integral term
+                if (!_integralDecay)
                 {
                     _errorSum += error * _timeStep;
 
-                    if (_errorSum > _upperBound)//Clamp integral term
-                    {
+                    //Clamp integral term
+                    if (_errorSum > _upperBound)
                         _errorSum = _upperBound;
-                    }
                     else if (_errorSum < _lowerBound)
-                    {
                         _errorSum = _lowerBound;
-                    }
                 }
                 else
                 {
                     _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
                 }
 
-                _lastError = error;//Store this error as last error
+                //Store this error as last error
+                _lastError = error;
 
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;//Construct output
+                //Construct output
+                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
                 return this.Value;
             }
 
@@ -742,6 +722,69 @@ namespace IngameScript
             }
         }
 
+        public static class VectorMath
+        {
+            public static Vector3D SafeNormalize(Vector3D a)
+            {
+                if (Vector3D.IsZero(a))
+                    return Vector3D.Zero;
 
+                if (Vector3D.IsUnit(ref a))
+                    return a;
+
+                return Vector3D.Normalize(a);
+            }
+
+            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) //reflect a over b
+            {
+                Vector3D project_a = Projection(a, b);
+                Vector3D reject_a = a - project_a;
+                return project_a - reject_a * rejectionFactor;
+            }
+
+            public static Vector3D Rejection(Vector3D a, Vector3D b) //reject a on b
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return Vector3D.Zero;
+
+                return a - a.Dot(b) / b.LengthSquared() * b;
+            }
+
+            public static Vector3D Projection(Vector3D a, Vector3D b)
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return Vector3D.Zero;
+
+                return a.Dot(b) / b.LengthSquared() * b;
+            }
+
+            public static double ScalarProjection(Vector3D a, Vector3D b)
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+
+                if (Vector3D.IsUnit(ref b))
+                    return a.Dot(b);
+
+                return a.Dot(b) / b.Length();
+            }
+
+            public static double AngleBetween(Vector3D a, Vector3D b) //returns radians
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+                else
+                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
+            }
+
+            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+                else
+                    return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
+            }
+        }
+        
     }
 }

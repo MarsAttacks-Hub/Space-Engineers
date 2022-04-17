@@ -21,8 +21,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-
-
+        
         readonly string rotorsName = "Rotor_MD_A";
         readonly string rotorsInvName = "Rotor_MD_B";
         readonly string plusXname = "Merge_MD-X";
@@ -32,9 +31,17 @@ namespace IngameScript
         readonly string minusYname = "Merge_MD-Z";
         readonly string minusZname = "Merge_MD-Y";
         readonly string thrustersName = "[CRX] HThruster";
+        readonly string upThrustersName = "UP";
+        readonly string downThrustersName = "DOWN";
+        readonly string leftThrustersName = "LEFT";
+        readonly string rightThrustersName = "RIGHT";
+        readonly string forwardThrustersName = "FORWARD";
+        readonly string backwardThrustersName = "BACKWARD";
         readonly string controllersName = "[CRX] Controller";
         readonly string gyrosName = "[CRX] Gyro";
         readonly string managerName = "[CRX] PB Manager";
+        readonly string remotesName = "[CRX] Controller Remote";
+        //readonly string debugPanelName = "[CRX] Debug";
 
         const string argSetup = "Setup";
         const string argIdleThrusters = "ToggleThrusters";
@@ -53,6 +60,7 @@ namespace IngameScript
         bool sunChaseOff = false;
         bool switchOnce = false;
         bool setOnce = false;
+        bool initAutoThrustOnce = true;
         bool hasVector = false;
         Vector3D lastForwardVector = Vector3D.Zero;
         Vector3D lastUpVector = Vector3D.Zero;
@@ -71,8 +79,25 @@ namespace IngameScript
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyThrust> THRUSTERS = new List<IMyThrust>();
-        IMyShipController CONTROLLER = null;
-        IMyProgrammableBlock MANAGERPB;
+        public List<IMyThrust> UPTHRUSTERS = new List<IMyThrust>();
+        public List<IMyThrust> DOWNTHRUSTERS = new List<IMyThrust>();
+        public List<IMyThrust> LEFTTHRUSTERS = new List<IMyThrust>();
+        public List<IMyThrust> RIGHTTHRUSTERS = new List<IMyThrust>();
+        public List<IMyThrust> FORWARDTHRUSTERS = new List<IMyThrust>();
+        public List<IMyThrust> BACKWARDTHRUSTERS = new List<IMyThrust>();
+        public IMyThrust UPTHRUST;
+        public IMyThrust DOWNTHRUST;
+        public IMyThrust LEFTTHRUST;
+        public IMyThrust RIGHTTHRUST;
+        public IMyThrust FORWARDTHRUST;
+        public IMyThrust BACKWARDTHRUST;
+        public IMyShipController CONTROLLER = null;
+        public IMyProgrammableBlock MANAGERPB;
+        public IMyRemoteControl REMOTE;
+        //public IMyTextPanel DEBUG;
+        //public StringBuilder debugLog = new StringBuilder("");
+        //int writeCount = 0;
+        //readonly int writeDelay = 10;
 
         Program()
         {
@@ -114,6 +139,9 @@ namespace IngameScript
             }
 
             bool isControlled = GetController();
+
+            //debugLog.Clear();
+
             if (!isControlled)
             {
                 if (!setOnce)
@@ -169,12 +197,29 @@ namespace IngameScript
             }
 
             SyncRotors();
-            MagneticDrive();
 
-            if (useGyrosToStabilize && CONTROLLER != null)
-            {
-                GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
+            if (REMOTE.IsAutoPilotEnabled)
+            {                
+                AutoMagneticDrive();
+
+                if (useGyrosToStabilize && REMOTE != null)
+                {
+                    GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
+                }
             }
+            else
+            {
+                initAutoThrustOnce = true;
+
+                MagneticDrive();
+
+                if (useGyrosToStabilize && CONTROLLER != null)
+                {
+                    GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
+                }
+            }
+
+            //if (writeCount == writeDelay) { DEBUG.WriteText(debugLog); writeCount = 0; } writeCount++;
         }
 
         void ProcessArgument(string argument)
@@ -219,6 +264,11 @@ namespace IngameScript
             {
                 controlled = true;
             }
+            if (REMOTE.IsAutoPilotEnabled)
+            {
+                //CONTROLLER = REMOTE;//TODO
+                controlled = true;
+            }
             return controlled;
         }
 
@@ -255,6 +305,70 @@ namespace IngameScript
                     rotor.TargetVelocityRad = (-targetVel + syncSpeed);
                 }
             }
+        }
+
+        IMyThrust AutopilotThrustInitializer(List<IMyThrust> thrusters)
+        {
+            IMyThrust thruster = null;
+            int i = 0;
+            foreach(IMyThrust thrust in thrusters)
+            {
+                if (i == 0)
+                {
+                    thruster = thrust;
+                    thrust.Enabled = true;
+                }
+                else
+                {
+                    thrust.Enabled = false;
+                }
+                i++;
+            }
+            return thruster;
+        }
+
+        void AutoMagneticDrive()
+        {
+            if (initAutoThrustOnce) { 
+                UPTHRUST = AutopilotThrustInitializer(UPTHRUSTERS);
+                DOWNTHRUST = AutopilotThrustInitializer(DOWNTHRUSTERS);
+                LEFTTHRUST = AutopilotThrustInitializer(LEFTTHRUSTERS);
+                RIGHTTHRUST = AutopilotThrustInitializer(RIGHTTHRUSTERS);
+                FORWARDTHRUST = AutopilotThrustInitializer(FORWARDTHRUSTERS);
+                BACKWARDTHRUST = AutopilotThrustInitializer(BACKWARDTHRUSTERS);
+
+                initAutoThrustOnce = false;
+            }
+
+            Vector3 dir = new Vector3();
+            if (FORWARDTHRUST.CurrentThrust > 0)
+            {
+                dir.X = 1;
+            }
+            else if (BACKWARDTHRUST.CurrentThrust > 0)
+            {
+                dir.X = -1;
+            }
+
+            if (UPTHRUST.CurrentThrust > 0)
+            {
+                dir.Y = 1;
+            }
+            else if (DOWNTHRUST.CurrentThrust > 0)
+            {
+                dir.Y = -1;
+            }
+
+            if (LEFTTHRUST.CurrentThrust > 0)
+            {
+                dir.Z = 1;
+            }
+            else if (RIGHTTHRUST.CurrentThrust > 0)
+            {
+                dir.Z = -1;
+            }
+
+            SetPow(dir);
         }
 
         void MagneticDrive()
@@ -417,7 +531,9 @@ namespace IngameScript
                     //block.GyroPower = 100f; //im assuming this is a percentage
                 }
                 else
+                {
                     block.GyroOverride = false;
+                }
             }
 
             lastForwardVector = reference.WorldMatrix.Forward;
@@ -515,8 +631,17 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains(minusZname));
             THRUSTERS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyThrust>(THRUSTERS, block => block.CustomName.Contains(thrustersName));
-
+            UPTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(upThrustersName)));
+            DOWNTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(downThrustersName)));
+            LEFTTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(leftThrustersName)));
+            RIGHTTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(rightThrustersName)));
+            FORWARDTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(forwardThrustersName)));
+            BACKWARDTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(backwardThrustersName)));
+            List<IMyRemoteControl> REMOTES = new List<IMyRemoteControl>();
+            GridTerminalSystem.GetBlocksOfType<IMyRemoteControl>(REMOTES, block => block.CustomName.Contains(remotesName));
+            REMOTE = REMOTES[0];
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
+            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
 
