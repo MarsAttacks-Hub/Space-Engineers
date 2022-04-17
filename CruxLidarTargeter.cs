@@ -48,7 +48,7 @@ namespace IngameScript
         readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
         readonly string managerName = "[CRX] PB Manager";
         readonly string cargoName = "[CRX] Cargo";
-        //readonly string debugPanelName = "[CRX] Debug Lidar";
+        //readonly string debugPanelName = "[CRX] Debug";
 
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";

@@ -33,7 +33,7 @@ namespace IngameScript
         readonly string backwardThrustersName = "Bkw";
         readonly string upwardThrustersName = "Upw";
         readonly string downwardThrustersName = "Dnw";
-        //readonly string debugPanelName = "[M]1 Debug Panel";
+        //readonly string debugPanelName = "[M]1 Debug";
 
         readonly string antennaTag = "[MISSILE]";
         readonly string platformTag = "[RELAY]";

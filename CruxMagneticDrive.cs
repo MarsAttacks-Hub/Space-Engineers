@@ -343,11 +343,11 @@ namespace IngameScript
             Vector3 dir = new Vector3();
             if (FORWARDTHRUST.CurrentThrust > 0)
             {
-                dir.X = 1;
+                dir.Z = -1;
             }
             else if (BACKWARDTHRUST.CurrentThrust > 0)
             {
-                dir.X = -1;
+                dir.Z = 1;
             }
 
             if (UPTHRUST.CurrentThrust > 0)
@@ -361,11 +361,11 @@ namespace IngameScript
 
             if (LEFTTHRUST.CurrentThrust > 0)
             {
-                dir.Z = 1;
+                dir.X = -1;
             }
             else if (RIGHTTHRUST.CurrentThrust > 0)
             {
-                dir.Z = -1;
+                dir.X = 1;
             }
 
             SetPow(dir);
@@ -380,7 +380,7 @@ namespace IngameScript
             dir = Vector3.Transform(dir, mtrx);
             if (dir.X != 0 || dir.Y != 0 || dir.Z != 0)
             {
-                //Debug(" X: " + dir.X + "\n Y: " + dir.Y + "\n Z: " + dir.Z + "\n");
+                //debugLog.Append("dir X: " + dir.X + "\ndir Y: " + dir.Y + "\ndir Z: " + dir.Z + "\n\n");
                 dir /= dir.Length();
                 if (idleThrusters)
                 {

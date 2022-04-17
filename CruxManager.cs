@@ -52,7 +52,7 @@ namespace IngameScript
         readonly string shipPrefix = "[CRX] ";
         readonly string launchersName = "[CRX] Rocket";
         readonly string gatlingsName = "[CRX] Gatling";
-        //readonly string debugPanelName = "[CRX] Debug Lidar";
+        //readonly string debugPanelName = "[CRX] Debug";
 
         const string argSunchaseToggle = "SunchaseToggle";
         const string argSunchaseOn = "SunchaseOn";
