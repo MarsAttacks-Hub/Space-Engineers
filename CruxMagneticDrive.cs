@@ -41,22 +41,30 @@ namespace IngameScript
         readonly string gyrosName = "[CRX] Gyro";
         readonly string managerName = "[CRX] PB Manager";
         readonly string remotesName = "[CRX] Controller Remote";
+        readonly string cockpitName = "[CRX] Controller Cockpit";
+        readonly string deadManPanelName = "[CRX] LCD DeadMan Toggle";
+        readonly string idleThrusterPanelName = "[CRX] LCD IdleThrusters Toggle";
         //readonly string debugPanelName = "[CRX] Debug";
 
         const string argSetup = "Setup";
-        const string argIdleThrusters = "ToggleThrusters";
+        const string argIdleThrusters = "ToggleIdleThrusters";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
+        const string argDeadMan = "DeadMan";
 
+        bool controlDampeners = true;
         bool useGyrosToStabilize = true;    //If the script will override gyros to try and combat torque
         readonly bool useRoll = true;
-        bool idleThrusters = true;
+        bool idleThrusters = false;
         readonly float maxSpeed = 105f;
         readonly float minSpeed = 5f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
-
+        readonly int writeDelay = 100;
+        
+        int writeCount = 0;
+        bool deadManOnce = false;
         bool sunChaseOff = false;
         bool switchOnce = false;
         bool setOnce = false;
@@ -92,12 +100,14 @@ namespace IngameScript
         public IMyThrust FORWARDTHRUST;
         public IMyThrust BACKWARDTHRUST;
         public IMyShipController CONTROLLER = null;
+        public IMyShipController COCKPIT;
         public IMyProgrammableBlock MANAGERPB;
         public IMyRemoteControl REMOTE;
+        public IMyTextPanel LCDDEADMAN;
+        public IMyTextPanel LCDIDLETHRUSTERS;
         //public IMyTextPanel DEBUG;
         //public StringBuilder debugLog = new StringBuilder("");
-        //int writeCount = 0;
-        //readonly int writeDelay = 10;
+        
 
         Program()
         {
@@ -209,8 +219,12 @@ namespace IngameScript
             }
             else
             {
-                initAutoThrustOnce = true;
+                if (!initAutoThrustOnce) {
+                    foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
 
+                    initAutoThrustOnce = true;
+                }
+                
                 MagneticDrive();
 
                 if (useGyrosToStabilize && CONTROLLER != null)
@@ -219,7 +233,29 @@ namespace IngameScript
                 }
             }
 
-            //if (writeCount == writeDelay) { DEBUG.WriteText(debugLog); writeCount = 0; } writeCount++;
+            if (writeCount == writeDelay) 
+            { 
+                //DEBUG.WriteText(debugLog);
+                if (controlDampeners) 
+                { 
+                    DeadMan();
+                    LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
+                }
+                else
+                {
+                    LCDDEADMAN.BackgroundColor = new Color(0, 0, 0);
+                }
+                if (idleThrusters) 
+                { 
+                    LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255);
+                }
+                else
+                {
+                    LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0);
+                }
+                writeCount = 0; 
+            } 
+            writeCount++;
         }
 
         void ProcessArgument(string argument)
@@ -227,7 +263,14 @@ namespace IngameScript
             switch (argument)
             {
                 case argSetup: Setup(); break;
-                case argIdleThrusters: idleThrusters = !idleThrusters; break;
+                case argIdleThrusters: 
+                    idleThrusters = !idleThrusters; 
+                    if (idleThrusters) {
+                        LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255);
+                    } else {
+                        LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0);
+                    }
+                    break;
                 case argGyroStabilizeOn:
                     useGyrosToStabilize = true;
                     Me.CustomData = "GyroStabilize=true";
@@ -235,6 +278,14 @@ namespace IngameScript
                 case argGyroStabilizeOff:
                     useGyrosToStabilize = false;
                     Me.CustomData = "GyroStabilize=false";
+                    break;
+                case argDeadMan: 
+                    controlDampeners = !controlDampeners; 
+                    if (controlDampeners) {
+                        LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
+                    } else {
+                        LCDDEADMAN.BackgroundColor = new Color(0, 0, 0);
+                    }
                     break;
             }
         }
@@ -249,9 +300,10 @@ namespace IngameScript
             {
                 foreach (IMyShipController block in CONTROLLERS)
                 {
-                    if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters)
+                    if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters && !(block is IMyRemoteControl))
                     {
                         CONTROLLER = block;
+                        COCKPIT = CONTROLLER;
                     }
                 }
             }
@@ -266,7 +318,14 @@ namespace IngameScript
             }
             if (REMOTE.IsAutoPilotEnabled)
             {
-                //CONTROLLER = REMOTE;//TODO
+                CONTROLLER = COCKPIT;
+                controlled = true;
+            }
+            Vector3D velocityVec = COCKPIT.GetShipVelocities().LinearVelocity;
+            double speed = velocityVec.Length();
+            if (speed > 1)
+            {
+                CONTROLLER = COCKPIT;
                 controlled = true;
             }
             return controlled;
@@ -382,30 +441,24 @@ namespace IngameScript
             {
                 //debugLog.Append("dir X: " + dir.X + "\ndir Y: " + dir.Y + "\ndir Z: " + dir.Z + "\n\n");
                 dir /= dir.Length();
-                if (idleThrusters)
+                if (!switchOnce)
                 {
-                    if (!switchOnce)
+                    foreach (IMyThrust thrust in THRUSTERS)
                     {
-                        foreach (IMyThrust thrust in THRUSTERS)
-                        {
-                            thrust.Enabled = false;
-                        }
-                        switchOnce = true;
+                        thrust.Enabled = false;
                     }
+                    switchOnce = true;
                 }
             }
             else
             {
-                if (idleThrusters)
+                if (switchOnce)
                 {
-                    if (switchOnce)
+                    foreach (IMyThrust thrust in THRUSTERS)
                     {
-                        foreach (IMyThrust thrust in THRUSTERS)
-                        {
-                            thrust.Enabled = true;
-                        }
-                        switchOnce = false;
+                        thrust.Enabled = true;
                     }
+                    switchOnce = false;
                 }
             }
             if (!CONTROLLER.DampenersOverride && dir.LengthSquared() == 0)
@@ -607,6 +660,54 @@ namespace IngameScript
             return Math.Acos(MathHelperD.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
         }
 
+        bool IsPiloted() {
+            bool isPiloted = false;
+            foreach (IMyShipController block in CONTROLLERS) {
+                if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters) {
+                    isPiloted = true;
+                    break;
+                }
+                if (block is IMyRemoteControl) {
+                    if ((block as IMyRemoteControl).IsAutoPilotEnabled) {
+                        isPiloted = true;
+                        break;
+                    }
+                }
+            }
+            return isPiloted;
+        }
+
+        void DeadMan() {
+            bool undercontrol = IsPiloted();
+            if (!undercontrol) {
+                IMyShipController cntrllr = null;
+                foreach (IMyShipController block in CONTROLLERS) {
+                    if (block.CanControlShip) {
+                        cntrllr = block;
+                        break;
+                    }
+                }
+                if (cntrllr != null) {
+                    double speed = cntrllr.GetShipSpeed();
+                    if (speed > minSpeed) {
+                        foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
+                        cntrllr.DampenersOverride = true;
+                    } else {
+                        if (!deadManOnce) {
+                            if (idleThrusters)
+                            { foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; } }
+                            deadManOnce = true;
+                        }
+                    }
+                }
+            } else {
+                if (deadManOnce) {
+                    foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
+                    deadManOnce = false;
+                }
+            }
+        }
+
         void GetBlocks()
         {
             ROTORS.Clear();
@@ -640,7 +741,12 @@ namespace IngameScript
             List<IMyRemoteControl> REMOTES = new List<IMyRemoteControl>();
             GridTerminalSystem.GetBlocksOfType<IMyRemoteControl>(REMOTES, block => block.CustomName.Contains(remotesName));
             REMOTE = REMOTES[0];
+            List<IMyShipController> COCKPITS = new List<IMyShipController>();
+            GridTerminalSystem.GetBlocksOfType<IMyShipController>(COCKPITS, block => block.CustomName.Contains(cockpitName));
+            COCKPIT = COCKPITS[0];
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
+            LCDDEADMAN = GridTerminalSystem.GetBlockWithName(deadManPanelName) as IMyTextPanel;
+            LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
             //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 

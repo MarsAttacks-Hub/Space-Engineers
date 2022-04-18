@@ -23,6 +23,8 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
+        //TODO update whip's methods
+
         readonly string antennaName = "A [M]1";
         readonly string missileTag = "[M]1";
         readonly string rocketsName = "Rocket";

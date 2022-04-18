@@ -23,7 +23,6 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         //TODO check if assemblers and refinery log return 
-        //if sunChasing turn screen color blue, black if off
 
         readonly string solarsName = "[CRX] Solar";
         readonly string turbinesName = "[CRX] Wind Turbine";
@@ -52,19 +51,14 @@ namespace IngameScript
         readonly string shipPrefix = "[CRX] ";
         readonly string launchersName = "[CRX] Rocket";
         readonly string gatlingsName = "[CRX] Gatling";
+        readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
         //readonly string debugPanelName = "[CRX] Debug";
 
-        const string argSunchaseToggle = "SunchaseToggle";
+        const string argSunChaserToggle = "SunChaserToggle";
         const string argSunchaseOn = "SunchaseOn";
         const string argSunchaseOff = "SunchaseOff";
-        const string argDeadMan = "DeadMan";
         const string argSetup = "Setup";
         const string argTogglePB = "TogglePB";
-        const string argCompactInventories = "CompactInventories";
-        const string argBalance = "Balance";
-        const string argAutoProduction = "AutoProduction";
-        const string argInventoryInfos = "InventoryInfos";
-        const string argFill = "Refill";
 
         readonly string sectionTag = "ManagerSettings";
         readonly string cockpitPowerSurfaceKey = "cockpitPowerSurface";
@@ -73,9 +67,7 @@ namespace IngameScript
         readonly bool findTheLight = false; // Search for the Sun in the shadows
         readonly double tankThresold = 20;
         readonly float solarPanelMaxRatio = 1;  // multiplier for modded panels
-        readonly double minSpeed = 0.1;
 
-        bool controlDampeners = true;
         bool sunChaserPaused = true;
         float shipSize = .16f;  //.04f  small blocks
         float maxPwr;
@@ -86,7 +78,6 @@ namespace IngameScript
         int next;
         string powerStatus;
         int firstRun = 1;
-        bool doOnce = false;
         bool togglePB = false;
         int ticks = 0;
 
@@ -137,6 +128,7 @@ namespace IngameScript
         public List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
+        public IMyTextPanel LCDSUNCHASER;
         //IMyTextPanel DEBUG;
         readonly MyIni myIni = new MyIni();
 
@@ -360,8 +352,13 @@ namespace IngameScript
 
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
 
-            if (!sunChaserPaused) { Me.CustomData = "GyroStabilize=true"; }
-            else { Me.CustomData = "GyroStabilize=false"; }
+            if (!sunChaserPaused) { 
+                LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
+                Me.CustomData = "GyroStabilize=true"; 
+            } else { 
+                LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
+                Me.CustomData = "GyroStabilize=false"; 
+            }
         }
 
         void Main(string argument) {
@@ -395,8 +392,6 @@ namespace IngameScript
             if (!string.IsNullOrEmpty(argument)) { ProcessArgument(argument); }
 
             if (!IsInGravity() && !sunChaserPaused) { SunChase(); }
-
-            if (controlDampeners) { DeadMan(); }
 
             CalcPower();
             PowerManager();
@@ -445,25 +440,28 @@ namespace IngameScript
 
         void ProcessArgument(string argument) {
             switch (argument) {
-                case argSunchaseToggle:
+                case argSunChaserToggle:
                     sunChaserPaused = !sunChaserPaused;
                     if (!sunChaserPaused) {
+                        LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
                         Me.CustomData = "GyroStabilize=true";
                     } else {
+                        LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
                         foreach (IMyGyro block in GYROS) { block.GyroOverride = false; };
                         Me.CustomData = "GyroStabilize=false";
                     }
                     break;
                 case argSunchaseOff:
                     sunChaserPaused = true;
+                    LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
                     foreach (IMyGyro block in GYROS) { block.GyroOverride = false; };
                     Me.CustomData = "GyroStabilize=false";
                     break;
                 case argSunchaseOn:
                     sunChaserPaused = false;
+                    LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
                     Me.CustomData = "GyroStabilize=true";
                     break;
-                case argDeadMan: controlDampeners = !controlDampeners; break;
                 case argSetup: Setup(); break;
                 case argTogglePB:
                     togglePB = !togglePB;
@@ -474,38 +472,6 @@ namespace IngameScript
                         foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 0, 0); };
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
-                    break;
-                case argCompactInventories:
-                    MoveProductionOutputsToMainInventory();
-                    MoveItemsIntoCargo(CONNECTORSINVENTORIES);
-                    CompactInventory();
-                    CompactMainCargos();
-                    break;
-                case argBalance:
-                    BalanceGatlingTurretsAmmo();
-                    BalanceMissileTurretsAmmo();
-                    BalanceGatlingsAmmo();
-                    BalanceMissileLaunchersAmmo();
-                    BalanceHidrogenGeneratorsIce();
-                    BalanceReactorsUranium();
-                    break;
-                case argAutoProduction:
-                    ReadAllItems(CARGOINVENTORIES);
-                    AutoAssemblers();
-                    AutoRefineries();
-                    break;
-                case argInventoryInfos:
-                    ReadInventoryInfos();
-                    WriteInventoryInfo();
-                    WriteComponentsInfo();
-                    break;
-                case argFill:
-                    FillFromCargo(GASINVENTORIES, "Ice");
-                    FillFromCargo(REACTORSINVENTORIES, "Uranium");
-                    FillFromCargo(GATLINGSINVENTORIES, "NATO_25x184mm");
-                    FillFromCargo(GATLINGTURRETSINVENTORIES, "NATO_25x184mm");
-                    FillFromCargo(LAUNCHERSINVENTORIES, "Missile200mm");
-                    FillFromCargo(MISSILETURRETSINVENTORIES, "Missile200mm");
                     break;
             }
         }
@@ -653,36 +619,6 @@ namespace IngameScript
             return isPiloted;
         }
 
-        void DeadMan() {
-            bool undercontrol = IsPiloted();
-            if (!undercontrol) {
-                IMyShipController cntrllr = null;
-                foreach (IMyShipController block in CONTROLLERS) {
-                    if (block.CanControlShip) {
-                        cntrllr = block;
-                        break;
-                    }
-                }
-                if (cntrllr != null) {
-                    double speed = cntrllr.GetShipSpeed();
-                    if (speed > minSpeed) {
-                        foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
-                        cntrllr.DampenersOverride = true;
-                    } else {
-                        if (!doOnce) {
-                            foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; }
-                            doOnce = true;
-                        }
-                    }
-                }
-            } else {
-                if (doOnce) {
-                    foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
-                    doOnce = false;
-                }
-            }
-        }
-
         bool IsInGravity() {
             IMyShipController cntrllr = CONTROLLERS[0];
             Vector3D grav = cntrllr.GetNaturalGravity();
@@ -783,10 +719,13 @@ namespace IngameScript
         void ReadPowerInfos() {
             powerLog.Clear();
             powerLog.Append("Status: ").Append(powerStatus).Append("\n");
-            if (sunChaserPaused) { powerLog.Append("SunChase OFF\n"); }
-            else { powerLog.Append("SunChase ON\n"); }
-            if (controlDampeners) { powerLog.Append("DeadMan ON\n"); }
-            else { powerLog.Append("DeadMan OFF\n"); }
+            if (sunChaserPaused) { 
+                LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
+                powerLog.Append("SunChase OFF\n"); 
+            } else { 
+                LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
+                powerLog.Append("SunChase ON\n"); 
+            }
             powerLog.Append("Current Input: ").Append(terminalCurrentInput.ToString("0.00")).Append("\n");
             powerLog.Append("Max Req. Input: ").Append(terminalMaxRequiredInput.ToString("0.00")).Append("\n");
             powerLog.Append("Solar Power: ").Append(solarMaxOutput.ToString("0.00")).Append("\n");
@@ -1618,6 +1557,7 @@ namespace IngameScript
             panels.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdComponentsName));
             foreach (IMyTextPanel panel in panels) { COMPONENTSURFACES.Add(panel as IMyTextSurface); }
+            LCDSUNCHASER = GridTerminalSystem.GetBlockWithName(sunChaserPanelName) as IMyTextPanel;
             //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 

@@ -22,7 +22,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO
+
+        //TODO update whip's methods
         //check if when locking target gatlings hit the target
         //check if drones works
         //filll only missile gas inventories all at once 
