@@ -52,18 +52,24 @@ namespace IngameScript
         const string argGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
         const string argDeadMan = "DeadMan";
+        const string argMagneticDrive = "ToggleMagneticDrive";
 
+        bool magneticDrive = true;
         bool controlDampeners = true;
         bool useGyrosToStabilize = true;    //If the script will override gyros to try and combat torque
         readonly bool useRoll = true;
         bool idleThrusters = false;
         readonly float maxSpeed = 105f;
         readonly float minSpeed = 5f;
+        readonly float deadManMinSpeed = 0.1f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
-        readonly int writeDelay = 100;
-        
-        int writeCount = 0;
+        readonly int tickDelay = 100;
+        //readonly int writeDelay = 100;
+
+        //int writeCount = 0;
+        int tickCount = 0;
+        bool magneticDriveManOnce = true;
         bool deadManOnce = false;
         bool sunChaseOff = false;
         bool switchOnce = false;
@@ -147,115 +153,114 @@ namespace IngameScript
             {
                 ProcessArgument(argument);
             }
-
-            bool isControlled = GetController();
-
             //debugLog.Clear();
-
-            if (!isControlled)
+            if (magneticDrive)
             {
-                if (!setOnce)
+                if (magneticDriveManOnce)
                 {
-                    SetPow(Vector3D.Zero);
-                    foreach (IMyMotorStator block in ROTORS)
-                    {
-                        block.TargetVelocityRPM = 0;
-                        //block.RotorLock = true;
-                        block.Enabled = false;
-                    }
-                    foreach (IMyMotorStator block in ROTORSINV)
-                    {
-                        block.TargetVelocityRPM = 0;
-                        //block.RotorLock = true;
-                        block.Enabled = false;
-                    }
-                    Runtime.UpdateFrequency = UpdateFrequency.Update10;
-                    setOnce = true;
+                    InitMagneticDrive();
+                    magneticDriveManOnce = false;
                 }
-                return;
+
+                bool isControlled = GetController();
+
+                if (!isControlled)
+                {
+                    if (!setOnce)
+                    {
+                        IdleMagneticDrive();
+                        setOnce = true;
+                    }
+                }
+                else
+                {
+                    if (setOnce)
+                    {
+                        InitMagneticDrive();
+                        setOnce = false;
+                    }
+                    if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                    {
+                        sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                    }
+
+                    SyncRotors();
+
+                    if (REMOTE.IsAutoPilotEnabled)
+                    {                
+                        AutoMagneticDrive();
+                        GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
+                    }
+                    else
+                    {
+                        if (!initAutoThrustOnce) {
+                            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+                            initAutoThrustOnce = true;
+                        }
+                        
+                        MagneticDrive();
+                        GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
+                    }
+                }
             }
             else
             {
-                if (setOnce)
+                if (!magneticDriveManOnce)
                 {
-                    foreach (IMyMotorStator block in ROTORS)
-                    {
-                        //block.RotorLock = false;
-                        block.Enabled = true;
-                    }
-                    foreach (IMyMotorStator block in ROTORSINV)
-                    {
-                        //block.RotorLock = false;
-                        block.Enabled = true;
-                    }
-                    Runtime.UpdateFrequency = UpdateFrequency.Update1;
-                    setOnce = false;
-
-                    if (MANAGERPB != null)
-                    {
-                        if (MANAGERPB.CustomData.Contains("SunChaser=true"))
-                        {
-                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                        }
-                    }
+                    IdleMagneticDrive();
+                    magneticDriveManOnce = true;
                 }
+                if (tickCount == tickDelay) 
+                { 
+                    if (controlDampeners) 
+                    { 
+                        DeadMan();
+                        LCDDEADMAN.BackgroundColor = new Color(0, 255, 255); 
+                    }
+                    else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
+                    if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); }
+                    else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
 
-                if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                    tickCount = 0; 
+                } 
+                tickCount++;
+            }
+            //if (writeCount == writeDelay)  { DEBUG.WriteText(debugLog); writeCount = 0; } writeCount++;
+        }
+
+        void InitMagneticDrive()
+        {
+            foreach (IMyMotorStator block in ROTORS) { block.Enabled = true; }
+            foreach (IMyMotorStator block in ROTORSINV) { block.Enabled = true; }
+            if (MANAGERPB != null)
+            {
+                if (MANAGERPB.CustomData.Contains("SunChaser=true"))
                 {
                     sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                 }
             }
+            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+        }
 
-            SyncRotors();
-
-            if (REMOTE.IsAutoPilotEnabled)
-            {                
-                AutoMagneticDrive();
-
-                if (useGyrosToStabilize && REMOTE != null)
-                {
-                    GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
-                }
-            }
-            else
+        void IdleMagneticDrive()
+        {
+            SetPow(Vector3D.Zero);
+            foreach (IMyMotorStator block in ROTORS)
             {
-                if (!initAutoThrustOnce) {
-                    foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-
-                    initAutoThrustOnce = true;
-                }
-                
-                MagneticDrive();
-
-                if (useGyrosToStabilize && CONTROLLER != null)
-                {
-                    GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
-                }
+                block.TargetVelocityRPM = 0;
+                block.Enabled = false;
             }
-
-            if (writeCount == writeDelay) 
+            foreach (IMyMotorStator block in ROTORSINV)
+            {
+                block.TargetVelocityRPM = 0;
+                block.Enabled = false;
+            }
+            if (idleThrusters) 
             { 
-                //DEBUG.WriteText(debugLog);
-                if (controlDampeners) 
-                { 
-                    DeadMan();
-                    LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
-                }
-                else
-                {
-                    LCDDEADMAN.BackgroundColor = new Color(0, 0, 0);
-                }
-                if (idleThrusters) 
-                { 
-                    LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255);
-                }
-                else
-                {
-                    LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0);
-                }
-                writeCount = 0; 
-            } 
-            writeCount++;
+                foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
+            }
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
 
         void ProcessArgument(string argument)
@@ -264,10 +269,12 @@ namespace IngameScript
             {
                 case argSetup: Setup(); break;
                 case argIdleThrusters: 
-                    idleThrusters = !idleThrusters; 
+                    idleThrusters = !idleThrusters;
                     if (idleThrusters) {
+                        foreach(IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
                         LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255);
                     } else {
+                        foreach(IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                         LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0);
                     }
                     break;
@@ -286,6 +293,9 @@ namespace IngameScript
                     } else {
                         LCDDEADMAN.BackgroundColor = new Color(0, 0, 0);
                     }
+                    break;
+                case argMagneticDrive:
+                    magneticDrive = !magneticDrive;
                     break;
             }
         }
@@ -311,23 +321,36 @@ namespace IngameScript
             if (CONTROLLER == null)
             {
                 controlled = false;
+
+                IMyShipController controller = null;
+                foreach (IMyShipController contr in CONTROLLERS)
+                {
+                    if (contr.IsFunctional && contr.CanControlShip && contr.ControlThrusters && !(contr is IMyRemoteControl))
+                    {
+                        controller = contr;
+                    }
+                }
+                if (REMOTE.IsAutoPilotEnabled)
+                {
+                    CONTROLLER = controller;
+                    controlled = true;
+                }
+                else
+                {
+                    Vector3D velocityVec = controller.GetShipVelocities().LinearVelocity;
+                    double speed = velocityVec.Length();
+                    if (speed > 1)
+                    {
+                        CONTROLLER = controller;
+                        controlled = true;
+                    }
+                }
             }
             else
             {
                 controlled = true;
             }
-            if (REMOTE.IsAutoPilotEnabled)
-            {
-                CONTROLLER = COCKPIT;
-                controlled = true;
-            }
-            Vector3D velocityVec = COCKPIT.GetShipVelocities().LinearVelocity;
-            double speed = velocityVec.Length();
-            if (speed > 1)
-            {
-                CONTROLLER = COCKPIT;
-                controlled = true;
-            }
+
             return controlled;
         }
 
@@ -545,52 +568,55 @@ namespace IngameScript
 
         void GyroStabilize(bool overrideOn, IMyShipController reference, Vector2 mouseInput, float rollInput)
         {
-            if (!hasVector)
+            if (useGyrosToStabilize)
             {
-                hasVector = true;
+                if (!hasVector)
+                {
+                    hasVector = true;
+                    lastForwardVector = reference.WorldMatrix.Forward;
+                    lastUpVector = reference.WorldMatrix.Up;
+                }
+
+                double pitchAngle, yawAngle, rollAngle;
+                if (!useRoll) { lastUpVector = Vector3D.Zero; };
+                GetRotationAngles(lastForwardVector, lastUpVector, reference.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
+
+                var updatesPerSecond = 10;
+                var timeMaxCycle = 1 / updatesPerSecond;
+
+                var localAngularDeviation = new Vector3D(-pitchAngle, yawAngle, rollAngle);
+                var worldAngularDeviation = Vector3D.TransformNormal(localAngularDeviation, reference.WorldMatrix);
+                var worldAngularVelocity = worldAngularDeviation / timeMaxCycle;
+
+                var localMouseInput = new Vector3(mouseInput.X, mouseInput.Y, rollInput);
+
+                if (!Vector3D.IsZero(localMouseInput, 1E-3))
+                {
+                    overrideOn = false;
+                }
+
+                foreach (var block in GYROS)
+                {
+                    if (overrideOn)
+                    {
+                        var gyroAngularVelocity = Vector3D.TransformNormal(worldAngularVelocity, MatrixD.Transpose(block.WorldMatrix));
+                        gyroAngularVelocity *= updatesPerSecond / 60.0;
+
+                        block.Pitch = (float)Math.Round(gyroAngularVelocity.X, 2);
+                        block.Yaw = (float)Math.Round(gyroAngularVelocity.Y, 2);
+                        block.Roll = (float)Math.Round(gyroAngularVelocity.Z, 2);
+                        block.GyroOverride = true;
+                        //block.GyroPower = 100f; //im assuming this is a percentage
+                    }
+                    else
+                    {
+                        block.GyroOverride = false;
+                    }
+                }
+
                 lastForwardVector = reference.WorldMatrix.Forward;
                 lastUpVector = reference.WorldMatrix.Up;
             }
-
-            double pitchAngle, yawAngle, rollAngle;
-            if (!useRoll) { lastUpVector = Vector3D.Zero; };
-            GetRotationAngles(lastForwardVector, lastUpVector, reference.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
-
-            var updatesPerSecond = 10;
-            var timeMaxCycle = 1 / updatesPerSecond;
-
-            var localAngularDeviation = new Vector3D(-pitchAngle, yawAngle, rollAngle);
-            var worldAngularDeviation = Vector3D.TransformNormal(localAngularDeviation, reference.WorldMatrix);
-            var worldAngularVelocity = worldAngularDeviation / timeMaxCycle;
-
-            var localMouseInput = new Vector3(mouseInput.X, mouseInput.Y, rollInput);
-
-            if (!Vector3D.IsZero(localMouseInput, 1E-3))
-            {
-                overrideOn = false;
-            }
-
-            foreach (var block in GYROS)
-            {
-                if (overrideOn)
-                {
-                    var gyroAngularVelocity = Vector3D.TransformNormal(worldAngularVelocity, MatrixD.Transpose(block.WorldMatrix));
-                    gyroAngularVelocity *= updatesPerSecond / 60.0;
-
-                    block.Pitch = (float)Math.Round(gyroAngularVelocity.X, 2);
-                    block.Yaw = (float)Math.Round(gyroAngularVelocity.Y, 2);
-                    block.Roll = (float)Math.Round(gyroAngularVelocity.Z, 2);
-                    block.GyroOverride = true;
-                    //block.GyroPower = 100f; //im assuming this is a percentage
-                }
-                else
-                {
-                    block.GyroOverride = false;
-                }
-            }
-
-            lastForwardVector = reference.WorldMatrix.Forward;
-            lastUpVector = reference.WorldMatrix.Up;
         }
 
         static void GetRotationAngles(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double yaw, out double pitch, out double roll)
@@ -689,7 +715,7 @@ namespace IngameScript
                 }
                 if (cntrllr != null) {
                     double speed = cntrllr.GetShipSpeed();
-                    if (speed > minSpeed) {
+                    if (speed > deadManMinSpeed) {
                         foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
                         cntrllr.DampenersOverride = true;
                     } else {
