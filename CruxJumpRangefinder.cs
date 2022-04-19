@@ -425,10 +425,13 @@ namespace IngameScript
         {
             Vector3D aimDirection = targetPosition - REMOTE.GetPosition();
 
+            Vector3D UpVector;
+            if (Vector3D.IsZero(REMOTE.GetNaturalGravity())) { UpVector = REMOTE.WorldMatrix.Up; }
+            else { UpVector = -REMOTE.GetNaturalGravity(); }
             double yawAngle;
             double pitchAngle;
             double rollAngle;
-            GetRotationAnglesSimultaneous(aimDirection, REMOTE.WorldMatrix.Up, REMOTE.WorldMatrix, out pitchAngle,  out yawAngle, out rollAngle);
+            GetRotationAnglesSimultaneous(aimDirection, UpVector, REMOTE.WorldMatrix, out pitchAngle,  out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle, globalTimestep);
             double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);

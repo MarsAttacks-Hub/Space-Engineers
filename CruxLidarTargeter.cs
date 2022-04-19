@@ -23,10 +23,8 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
-        //TODO update whip's methods
+        //TODO 
         //check if when locking target gatlings hit the target
-        //check if drones works
-        //filll only missile gas inventories all at once 
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -80,12 +78,13 @@ namespace IngameScript
         readonly int autoMissilesDelay = 91;
         readonly int writeDelay = 10;
         readonly bool creative = false;
+        readonly bool isCappedSpeed = true;
         readonly double initialLockDistance = 5000d;
         readonly double rocketProjectileForwardOffset = 4d;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
-        readonly double rocketProjectileInitialSpeed = 100d;
-        readonly double rocketProjectileAccelleration = 600d;
-        readonly double rocketProjectileMaxSpeed = 200d;
-        readonly double rocketProjectileMaxRange = 800d;
+        readonly double rocketProjectileInitialSpeed = 100d;//400;
+        readonly double rocketProjectileAccelleration = 600d;//0;
+        readonly double rocketProjectileMaxSpeed = 200d;//400;
+        readonly double rocketProjectileMaxRange = 800d;//850;
         readonly double gatlingProjectileForwardOffset = 0d;
         readonly double gatlingProjectileInitialSpeed = 400d;
         readonly double gatlingProjectileAccelleration = 0d;
@@ -111,7 +110,7 @@ namespace IngameScript
         bool fudgeVectorSwitch = false;
         double fudgeFactor = 5;
 
-        Vector3 prevTargetVelocity = Vector3.Zero;
+        //Vector3 prevTargetVelocity = Vector3.Zero;
         Vector3D targetPosition;
         string targetName = null;
         double targetDiameter;
@@ -149,7 +148,7 @@ namespace IngameScript
 
         readonly MyIni myIni = new MyIni();
 
-        readonly MyItemType missileAmmo = MyItemType.MakeAmmo("Missile200mm");
+        //readonly MyItemType missileAmmo = MyItemType.MakeAmmo("Missile200mm");
         readonly MyItemType gatlingAmmo = MyItemType.MakeAmmo("NATO_25x184mm");
         readonly MyItemType iceOre = MyItemType.MakeOre("Ice");
 
@@ -159,10 +158,8 @@ namespace IngameScript
 
         public StringBuilder targetLog = new StringBuilder("");
         public StringBuilder missileLog = new StringBuilder("");
-        //public StringBuilder LidarLog = new StringBuilder("");
-        //public StringBuilder AntennaLog = new StringBuilder("");
-        //public StringBuilder messageIdLog = new StringBuilder("");
-        //public StringBuilder loadLog = new StringBuilder("");
+        //public StringBuilder debugLog = new StringBuilder("");
+
 
         PID yawController;
         PID pitchController;
@@ -247,7 +244,6 @@ namespace IngameScript
 
                 if (targetFound && currentTick == ticksScanDelay)// send message to missiles every some ticks
                 {
-                    //AntennaLog.Clear();
                     foreach (var id in MissileIDs)
                     {
                         SendMissileUnicastMessage(commandUpdate, id.Key);
@@ -264,15 +260,14 @@ namespace IngameScript
                     }
                 }
 
-                LockOnTarget(CONTROLLER);
+                LockOnTarget(LIDARS[0]);//TODO REF
 
                 CalculateTicks(targetFound);
-
-                prevTargetVelocity = targetInfo.Velocity;
 
                 ManageGuns();
 
                 ReadTargetInfo();
+                //prevTargetVelocity = targetInfo.Velocity;
             }
             else
             {
@@ -304,7 +299,6 @@ namespace IngameScript
             if (writeCount == writeDelay)
             {
                 WriteInfo();
-                //WriteDebug();
                 writeCount = 0;
             }
             writeCount++;
@@ -457,7 +451,6 @@ namespace IngameScript
 
         bool AcquireTarget()
         {
-            //LidarLog.Clear();
             bool targetFound = false;
             if (targetName == null) // case argLock
             {
@@ -479,7 +472,6 @@ namespace IngameScript
             {
                 if (currentTick == ticksScanDelay) // if target is not lost scan every some ticks
                 {
-                    //LidarLog.Clear();
                     targetFound = ScanDelayedTarget();
                     if (!targetFound)
                     {
@@ -527,7 +519,6 @@ namespace IngameScript
                     }
                 }
             }
-            //LidarLog.Append("ScanTarget, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -565,7 +556,6 @@ namespace IngameScript
                     }
                 }
             }
-            //LidarLog.Append("ScanTargetCenter, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -594,7 +584,6 @@ namespace IngameScript
                     }
                 }
             }
-            //LidarLog.Append("ScanDelayedTarget, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -633,7 +622,6 @@ namespace IngameScript
             {
                 fudgeFactor = 5;
             }
-            //LidarLog.Append("ScanFudgeTarget, targetFound: " + targetFound + "\n");
             return targetFound;
         }
 
@@ -716,206 +704,197 @@ namespace IngameScript
             return false;
         }
 
-        void LockOnTarget(IMyShipController REF)
+        void LockOnTarget(IMyTerminalBlock REF)
         {
             MatrixD refWorldMatrix = REF.WorldMatrix;
             float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             Vector3D targetPos = targetPosition + (targetInfo.Velocity * elapsedTime);
-            Vector3D targetAccel = Vector3D.Zero;
-            if ((!Vector3D.IsZero(targetInfo.Velocity) || !Vector3D.IsZero(prevTargetVelocity)) && !Vector3D.IsZero(targetInfo.Velocity - prevTargetVelocity))
-            {
-                targetAccel = (targetInfo.Velocity - prevTargetVelocity) / elapsedTime;
-            }
+            //Vector3D targetAccel = Vector3D.Zero; if ((!Vector3D.IsZero(targetInfo.Velocity) || !Vector3D.IsZero(prevTargetVelocity)) && !Vector3D.IsZero(targetInfo.Velocity - prevTargetVelocity)) { targetAccel = (targetInfo.Velocity - prevTargetVelocity) / elapsedTime; }
+            Vector3D targetVel;
+            if (isCappedSpeed) { targetVel = targetInfo.Velocity; }
+            else { targetVel = targetInfo.Velocity - CONTROLLER.GetShipVelocities().LinearVelocity; }
+            double projectileForwardOffset;
+            if (weaponType == 1) { projectileForwardOffset = rocketProjectileForwardOffset; } 
+            else { projectileForwardOffset = gatlingProjectileForwardOffset; }
+            Vector3D projectileLocation = (projectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * projectileForwardOffset));
+            Vector3D shipDirection = CONTROLLER.GetShipVelocities().LinearVelocity;
             Vector3D aimDirection;
-            double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+            double distanceFromTarget = Vector3D.Distance(targetPosition, REF.GetPosition());
             if (distanceFromTarget > gunsMaxRange)
             {
-                aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, 9999, 9999, 9999, 9999);
             }
             else
             {
                 switch (weaponType)
                 {
                     case 0://none
-                        aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, 9999, 9999, 9999, 9999);
                         break;
                     case 1://rockets
-                        aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetInfo.Velocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
                         break;
                     case 2://gatlings
-                        aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
+                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed, gatlingProjectileMaxRange);
                         break;
                     default:
-                        aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, 9999, 9999, 9999, 9999);
                         break;
                 }
             }
             aimDirection -= refWorldMatrix.Translation;
 
-            double yawAngle, pitchAngle;
-            GetRotationAngles(aimDirection, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle);
+            Vector3D UpVector;
+            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; }
+            else { UpVector = -CONTROLLER.GetNaturalGravity(); }
+            double yawAngle, pitchAngle, rollAngle;
+            GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle, globalTimestep);
             double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
+            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
 
-            ApplyGyroOverride(pitchSpeed, yawSpeed, 0);
+            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
-        void GetRotationAngles(Vector3D targetVector, MatrixD worldMatrix, out double yaw, out double pitch)
+        void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll)
         {
-            Vector3D localTargetVector = Vector3D.TransformNormal(targetVector, MatrixD.Transpose(worldMatrix));
-            Vector3D flattenedTargetVector = new Vector3D(0, localTargetVector.Y, localTargetVector.Z);
+            desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
 
-            pitch = GetAngleBetween(Vector3D.Forward, flattenedTargetVector) * Math.Sign(localTargetVector.Y); //up is positive
+            MatrixD transposedWm;
+            MatrixD.Transpose(ref worldMatrix, out transposedWm);
+            Vector3D.Rotate(ref desiredForwardVector, ref transposedWm, out desiredForwardVector);
+            Vector3D.Rotate(ref desiredUpVector, ref transposedWm, out desiredUpVector);
 
-            if (Math.Abs(pitch) < 1E-6 && localTargetVector.Z > 0)
+            Vector3D leftVector = Vector3D.Cross(desiredUpVector, desiredForwardVector);
+            Vector3D axis;
+            double angle;
+            if (Vector3D.IsZero(desiredUpVector) || Vector3D.IsZero(leftVector))
             {
-                pitch = Math.PI;
-            }
-            if (Vector3D.IsZero(flattenedTargetVector))
-            {
-                yaw = MathHelper.PiOver2 * Math.Sign(localTargetVector.X);
+                axis = new Vector3D(desiredForwardVector.Y, -desiredForwardVector.X, 0);
+                angle = Math.Acos(MathHelper.Clamp(-desiredForwardVector.Z, -1.0, 1.0));
             }
             else
             {
-                yaw = GetAngleBetween(localTargetVector, flattenedTargetVector) * Math.Sign(localTargetVector.X); //right is positive
+                leftVector = VectorMath.SafeNormalize(leftVector);
+                Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
+
+                // Create matrix
+                MatrixD targetMatrix = MatrixD.Zero;
+                targetMatrix.Forward = desiredForwardVector;
+                targetMatrix.Left = leftVector;
+                targetMatrix.Up = upVector;
+
+                axis = new Vector3D(targetMatrix.M23 - targetMatrix.M32,
+                                    targetMatrix.M31 - targetMatrix.M13,
+                                    targetMatrix.M12 - targetMatrix.M21);
+
+                double trace = targetMatrix.M11 + targetMatrix.M22 + targetMatrix.M33;
+                angle = Math.Acos(MathHelper.Clamp((trace - 1) * 0.5, -1, 1));
+            }
+
+            if (Vector3D.IsZero(axis))
+            {
+                angle = desiredForwardVector.Z < 0 ? 0 : Math.PI;
+                yaw = angle;
+                pitch = 0;
+                roll = 0;
+                return;
+            }
+
+            axis = VectorMath.SafeNormalize(axis);
+            // Because gyros rotate about -X -Y -Z, we need to negate our angles
+            yaw = -axis.Y * angle;
+            pitch = -axis.X * angle;
+            roll = -axis.Z * angle;
+        }
+
+        void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed, List<IMyGyro> gyroList, MatrixD worldMatrix)
+        {
+            var rotationVec = new Vector3D(pitchSpeed, yawSpeed, rollSpeed);
+            var relativeRotationVec = Vector3D.TransformNormal(rotationVec, worldMatrix);
+
+            foreach (var thisGyro in gyroList)
+            {
+                if (thisGyro.Closed)
+                    continue;
+                var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(thisGyro.WorldMatrix));
+                thisGyro.Pitch = (float)transformedRotationVec.X;
+                thisGyro.Yaw = (float)transformedRotationVec.Y;
+                thisGyro.Roll = (float)transformedRotationVec.Z;
+                thisGyro.GyroOverride = true;
             }
         }
 
-        public static double GetAngleBetween(Vector3D a, Vector3D b)
+        public Vector3D ComputeInterceptPoint(Vector3D targetPos, Vector3D targetVel, Vector3D projectileLocation, Vector3D shipDirection, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed, double projectileMaxRange)
         {
-            if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+            Vector3D z = targetPos - projectileLocation; 
+            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration); 
+            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k); 
+            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared(); 
+            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z)); 
+            double c = (p * p) - z.LengthSquared(); 
+            double t = SolveQuadratic(a, b, c); 
+            if (double.IsNaN(t) || t < 0)
             {
-                return 0;
+                return new Vector3D(double.NaN);
             }
-            if (Vector3D.IsUnit(ref a) && Vector3D.IsUnit(ref b))
-            {
-                return Math.Acos(MathHelperD.Clamp(a.Dot(b), -1, 1));
+            Vector3D interceptPoint; 
+            if (projectileAcceleration > 0.1)//if (projectileAcceleration.LengthSquared() > 0.1) 
+            { 
+                interceptPoint = targetPos + (targetVel * t) + (0.5 * projectileAcceleration * t * t); 
+            } 
+            else 
+            { 
+                interceptPoint = targetPos + (targetVel * t); 
             }
-            return Math.Acos(MathHelperD.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
-        }
-
-        void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed)
-        {
-            Vector3D rotationVec = new Vector3D(-pitchSpeed, yawSpeed, rollSpeed); //because keen does some weird stuff with signs 
-            MatrixD refMatrix = CONTROLLER.WorldMatrix;
-            Vector3D relativeRotationVec = Vector3D.TransformNormal(rotationVec, refMatrix);
-
-            foreach (var gyro in GYROS)
-            {
-                Vector3D transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(gyro.WorldMatrix));
-
-                gyro.Pitch = (float)transformedRotationVec.X;
-                gyro.Yaw = (float)transformedRotationVec.Y;
-                gyro.Roll = (float)transformedRotationVec.Z;
-                gyro.GyroOverride = true;
-            }
-        }
-
-        Vector3D ComputeInterceptPoint(Vector3D targetPos, Vector3D targetVel, Vector3D targetAccel, Vector3D projectileLocation, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed)
-        {
-            Vector3D z = targetPos - projectileLocation;
-            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration);
-            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k);
-
-            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared();
-            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z));
-            double c = (p * p) - z.LengthSquared();
-
-            double t = SolveQuadratic(a, b, c);
-
-            if (Double.IsNaN(t) || t < 0)
-            {
-                return new Vector3D(Double.NaN, Double.NaN, Double.NaN);
-            }
-            else
-            {
-                if (targetAccel.Sum > 0.001)
+            if (isCappedSpeed && projectileMaxSpeed > 0) {
+                int u = (int)Math.Ceiling(t * 60); 
+                Vector3D aimDirection; 
+                Vector3D stepAcceleration; 
+                Vector3D currentPosition; 
+                Vector3D currentDirection; 
+                aimDirection = Vector3D.Normalize(interceptPoint - projectileLocation); 
+                stepAcceleration = (aimDirection * projectileAcceleration) / 60; 
+                currentPosition = projectileLocation; 
+                currentDirection = shipDirection + (aimDirection * projectileInitialSpeed); 
+                for (int i = 0; i < u; i++)
                 {
-                    return targetPos + (targetVel * t) + (0.5 * targetAccel * t * t);
-                }
-                else
-                {
-                    return targetPos + (targetVel * t);
-                }
-            }
-        }
-
-        Vector3D ComputeInterceptPointWithInheritSpeed(Vector3D targetPos, Vector3D targetVel, Vector3D targetAccel, Vector3D projectileLocation, Vector3D shipDirection, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed, double projectileMaxRange)
-        {
-            Vector3D z = targetPos - projectileLocation;
-            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration);
-            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k);
-
-            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared();
-            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z));
-            double c = (p * p) - z.LengthSquared();
-
-            double t = SolveQuadratic(a, b, c);
-
-            if (Double.IsNaN(t) || t < 0)
-            {
-                return new Vector3D(Double.NaN, Double.NaN, Double.NaN);
-            }
-
-            int u = (int)Math.Ceiling(t * 60);
-
-            Vector3D targetPoint;
-            if (targetAccel.Sum > 0.001)
-            {
-                targetPoint = targetPos + (targetVel * t) + (0.5 * targetAccel * t * t);
-            }
-            else
-            {
-                targetPoint = targetPos + (targetVel * t);
-            }
-
-            Vector3D aimDirection;
-            Vector3D stepAcceleration;
-            Vector3D currentPosition;
-            Vector3D currentDirection;
-
-            aimDirection = Vector3D.Normalize(targetPoint - projectileLocation);
-            stepAcceleration = (aimDirection * projectileAcceleration) / 60;
-
-            currentPosition = projectileLocation;
-            currentDirection = shipDirection + (aimDirection * projectileInitialSpeed);
-
-            for (int i = 0; i < u; i++)
-            {
-                currentDirection += stepAcceleration;
-
-                double speed = currentDirection.Length();
-                if (speed > projectileMaxSpeed)
-                {
-                    currentDirection = currentDirection / speed * projectileMaxSpeed;
-                }
-
-                currentPosition += (currentDirection / 60);
-
-                if ((i + 1) % 60 == 0)
-                {
-                    if (Vector3D.Distance(projectileLocation, currentPosition) > projectileMaxRange)
-                    {
-                        return targetPoint;
+                    currentDirection += stepAcceleration; 
+                    double speed = currentDirection.Length(); 
+                    if (speed > projectileMaxSpeed) 
+                    { 
+                        currentDirection = currentDirection / speed * projectileMaxSpeed; 
+                    }
+                    currentPosition += (currentDirection / 60); 
+                    if ((i + 1) % 60 == 0) { 
+                        if (Vector3D.Distance(projectileLocation, currentPosition) > projectileMaxRange) 
+                        { 
+                            return interceptPoint; 
+                        } 
                     }
                 }
+                return interceptPoint + interceptPoint - currentPosition;
+            } 
+            else 
+            { 
+                return interceptPoint; 
             }
-
-            return targetPoint + targetPoint - currentPosition;
         }
 
-        double SolveQuadratic(double a, double b, double c)
+        public double SolveQuadratic(double a, double b, double c)
         {
-            double u = (b * b) - (4 * a * c);
+            if (a == 0) { 
+                return -(c / b); 
+            }
+            double u = (b * b) - (4 * a * c); 
             if (u < 0)
             {
                 return Double.NaN;
             }
-            u = Math.Sqrt(u);
-
-            double t1 = (-b + u) / (2 * a);
-            double t2 = (-b - u) / (2 * a);
+            u = Math.Sqrt(u); 
+            double t1 = (-b + u) / (2 * a); 
+            double t2 = (-b - u) / (2 * a); 
             return (t1 > 0 ? (t2 > 0 ? (t1 < t2 ? t1 : t2) : t1) : t2);
         }
 
@@ -948,10 +927,6 @@ namespace IngameScript
                 missilesInfo = tempMissilesInfo.Concat(missilesInfo.Where(kvp => !tempMissilesInfo.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 MissileIDs = tempMissileIDs.Concat(MissileIDs.Where(kvp => !tempMissileIDs.ContainsKey(kvp.Key))).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
-            //messageIdLog.Append("GetMessages: " + received + "\n");
-            //messageIdLog.Append("MissileIDs: ");
-            //foreach (var entry in MissileIDs) { messageIdLog.Append(entry.Key + "\n"); }
-            //messageIdLog.Append("\n");
             return received;
         }
 
@@ -1007,18 +982,14 @@ namespace IngameScript
             {
                 LostMissileIDs.Add(id);
             }
-            //AntennaLog.Append("Command: " + cmd + ", Unicast Message Sent:" + uniMessageSent + ", to ID: " + id + "\n");
             return uniMessageSent;
         }
 
         void RemoveLostMissiles()
         {
-            //messageIdLog.Clear();
-            //messageIdLog.Append("MissileIDs: ");
             Dictionary<long, string> TempMissileIDs = new Dictionary<long, string>();
             foreach (var entry in MissileIDs)
             {
-                //messageIdLog.Append(entry.Key + ", ");
                 bool found = false;
                 foreach (var id in LostMissileIDs)
                 {
@@ -1032,10 +1003,6 @@ namespace IngameScript
                     TempMissileIDs.Add(entry.Key, entry.Value);
                 }
             }
-            //messageIdLog.Append("\n");
-            //messageIdLog.Append("TempMissileIDs: ");
-            //foreach (var entry in TempMissileIDs) { messageIdLog.Append(entry.Key + ", "); }
-            //messageIdLog.Append(" \n");
             Dictionary<long, MyTuple<double, double, string>> tempMissilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
             foreach (var entry in missilesInfo)
             {
@@ -1052,7 +1019,6 @@ namespace IngameScript
                     tempMissilesInfo.Add(entry.Key, entry.Value);
                 }
             }
-
             missilesInfo = tempMissilesInfo;
             MissileIDs = TempMissileIDs;
         }
@@ -1065,13 +1031,12 @@ namespace IngameScript
             TurnAlarmOff();
             TurnGunsOff();
             ClearLogs();
-            //ClearDebugLogs();
 
             targetName = null;
             targetDiameter = 0;
             targetInfo = default(MyDetectedEntityInfo);
-            prevTargetVelocity = default(Vector3);
             targetPosition = default(Vector3D);
+            //prevTargetVelocity = default(Vector3);
 
             currentTick = 1;
             lostTicks = 0;
@@ -1186,7 +1151,6 @@ namespace IngameScript
         {
             foreach (IMySoundBlock block in ALARMS)
             {
-                //block.Enabled = true;
                 block.Play();
             }
             foreach (IMyLightingBlock block in LIGHTS) { block.Enabled = true; }
@@ -1197,7 +1161,6 @@ namespace IngameScript
             foreach (IMySoundBlock block in ALARMS)
             {
                 block.Stop();
-                //block.Enabled = false;
             }
             foreach (IMyLightingBlock block in LIGHTS) { block.Enabled = false; }
         }
@@ -1269,8 +1232,6 @@ namespace IngameScript
 
         bool LoadMissiles()//meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
         {
-            //loadLog.Clear();
-            //loadLog.Append("LoadMissiles, creative: " + creative + "\n");
             List<IMyShipConnector> MISSILECONNECTORS = new List<IMyShipConnector>();
             GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(MISSILECONNECTORS, b => b.CustomName.Contains(missilePrefix));
             if (MISSILECONNECTORS.Count == 0)
@@ -1288,28 +1249,32 @@ namespace IngameScript
             {
                 List<IMyTerminalBlock> MISSILEBLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
                 List<IMyInventory> MISSILEINVENTORIES = new List<IMyInventory>();
-                float margin = 0.1f;
                 if (selectedPayLoad == 0)//missiles
                 {
                     MISSILEBLOCKSWITHINVENTORY.Clear();
-                    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix) && !(block is IMyGasTank));
+                    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix) && block is IMyGasGenerator);
                     MISSILEINVENTORIES.Clear();
                     MISSILEINVENTORIES.AddRange(MISSILEBLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
                     int loaded = 0;
                     foreach (IMyInventory inventory in MISSILEINVENTORIES)
                     {
-                        //loadLog.Append("MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
                         MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
                         if (inventory.CanItemsBeAdded(availableVolume, iceOre))
                         {
                             TransferItems(availableVolume, inventory, iceOre);
                         }
-                        if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
+                        double currentVolume = (double)inventory.CurrentVolume;
+                        double maxVolume = (double)inventory.MaxVolume;
+                        double percent = 0;
+                        if (maxVolume > 0 && currentVolume > 0)
+                        {
+                            percent = currentVolume / maxVolume * 100;
+                        }
+                        if (percent >= 75)
                         {
                             loaded++;
                         }
                     }
-                    //loadLog.Append("loaded: " + loaded + ", MISSILEINVENTORIES: " + MISSILEINVENTORIES.Count + "\n");
                     if (loaded == MISSILEINVENTORIES.Count)
                     {
                         allFilled = true;
@@ -1323,178 +1288,84 @@ namespace IngameScript
                     int loaded = 0;
                     foreach (IMyTerminalBlock block in MISSILEBLOCKSWITHINVENTORY)
                     {
-                        if (block is IMyCargoContainer)
+                        if (block is IMyGasGenerator)
                         {
                             MISSILEINVENTORIES.Clear();
                             MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
                             inventoriesCount += MISSILEINVENTORIES.Count;
-                            //loadLog.Append("IMyCargoContainer, count: " + MISSILEINVENTORIES.Count + "\n");
-                            int alt = 0;
                             foreach (IMyInventory inventory in MISSILEINVENTORIES)
                             {
-                                //loadLog.Append("IMyCargoContainer, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
-                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
-                                if (alt == 0)
-                                {
-                                    if (inventory.CanItemsBeAdded(availableVolume, iceOre))
-                                    {
-                                        TransferItems(availableVolume, inventory, iceOre);
-                                    }
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
-                                    {
-                                        loaded++;
-                                    }
-                                    alt++;
-                                }
-                                else
-                                {
-                                    if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
-                                    {
-                                        TransferItems(availableVolume, inventory, gatlingAmmo);
-                                    }
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
-                                    {
-                                        loaded++;
-                                    }
-                                    alt = 0;
-                                }
-                            }
-                        }
-                        else if (block is IMyShipConnector)
-                        {
-                            MISSILEINVENTORIES.Clear();
-                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
-                            inventoriesCount += MISSILEINVENTORIES.Count;
-                            //loadLog.Append("IMyShipConnector, count: " + MISSILEINVENTORIES.Count + "\n");
-                            int alt = 0;
-                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
-                            {
-                                //loadLog.Append("IMyShipConnector, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
-                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
-                                if (alt == 0)
-                                {
-                                    if (inventory.CanItemsBeAdded(availableVolume, iceOre))
-                                    {
-                                        TransferItems(availableVolume, inventory, iceOre);
-                                    }
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
-                                    {
-                                        loaded++;
-                                    }
-                                    alt++;
-                                }
-                                else
-                                {
-                                    if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
-                                    {
-                                        TransferItems(availableVolume, inventory, gatlingAmmo);
-                                    }
-
-                                    if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
-                                    {
-                                        loaded++;
-                                    }
-                                    alt = 0;
-                                }
-                            }
-                        }
-                        else if (block is IMyGasGenerator)
-                        {
-                            MISSILEINVENTORIES.Clear();
-                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
-                            inventoriesCount += MISSILEINVENTORIES.Count;
-                            //loadLog.Append("IMyGasGenerator, count: " + MISSILEINVENTORIES.Count + "\n");
-                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
-                            {
-                                //loadLog.Append("IMyGasGenerator, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
                                 MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
                                 if (inventory.CanItemsBeAdded(availableVolume, iceOre))
                                 {
                                     TransferItems(availableVolume, inventory, iceOre);
                                 }
-                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
+                                double currentVolume = (double)inventory.CurrentVolume;
+                                double maxVolume = (double)inventory.MaxVolume;
+                                double percent = 0;
+                                if (maxVolume > 0 && currentVolume > 0)
+                                {
+                                    percent = currentVolume / maxVolume * 100;
+                                }
+                                if (percent >= 75)
                                 {
                                     loaded++;
                                 }
                             }
                         }
-                        else if (block is IMySmallGatlingGun)
+                        else if (block is IMySmallGatlingGun || block is IMyLargeTurretBase)
                         {
                             MISSILEINVENTORIES.Clear();
                             MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
                             inventoriesCount += MISSILEINVENTORIES.Count;
-                            //loadLog.Append("IMySmallGatlingGun, count: " + MISSILEINVENTORIES.Count + "\n");
                             foreach (IMyInventory inventory in MISSILEINVENTORIES)
                             {
-                                //loadLog.Append("IMySmallGatlingGun, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
                                 MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
                                 if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
                                 {
                                     TransferItems(availableVolume, inventory, gatlingAmmo);
                                 }
-                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
+                                double currentVolume = (double)inventory.CurrentVolume;
+                                double maxVolume = (double)inventory.MaxVolume;
+                                double percent = 0;
+                                if (maxVolume > 0 && currentVolume > 0)
                                 {
-                                    loaded++;
+                                    percent = currentVolume / maxVolume * 100;
                                 }
-                            }
-                        }
-                        else if (block is IMyLargeTurretBase)
-                        {
-                            MISSILEINVENTORIES.Clear();
-                            MISSILEINVENTORIES.AddRange(Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory));
-                            inventoriesCount += MISSILEINVENTORIES.Count;
-                            //loadLog.Append("IMyLargeTurretBase, count: " + MISSILEINVENTORIES.Count + "\n");
-                            foreach (IMyInventory inventory in MISSILEINVENTORIES)
-                            {
-                                //loadLog.Append("IMyLargeTurretBase, MaxVolume: " + (float)inventory.MaxVolume + ", CurrentVolume: " + (float)inventory.CurrentVolume + "\n");
-                                MyFixedPoint availableVolume = inventory.MaxVolume - inventory.CurrentVolume;
-                                if (inventory.CanItemsBeAdded(availableVolume, gatlingAmmo))
-                                {
-                                    TransferItems(availableVolume, inventory, gatlingAmmo);
-                                }
-                                else if (inventory.CanItemsBeAdded(availableVolume, missileAmmo))
-                                {
-                                    TransferItems(availableVolume, inventory, missileAmmo);
-                                }
-                                if ((float)inventory.CurrentVolume >= ((float)inventory.MaxVolume - margin))//TODO use percent and not margin
+                                if (percent >= 75)
                                 {
                                     loaded++;
                                 }
                             }
                         }
                     }
-                    //loadLog.Append("loaded: " + loaded + ", inventoriesCount: " + inventoriesCount + "\n");
                     if (loaded == inventoriesCount)
                     {
                         allFilled = true;
                     }
                 }
             }
-
-            //if (allFilled) { foreach (IMyShipConnector block in MISSILECONNECTORS) { block.Disconnect(); } }//the missile PB does the disconnection
-
             return allFilled;
         }
 
-        bool TransferItems(MyFixedPoint availableVolume, IMyInventory inventory, MyItemType item)
+        bool TransferItems(MyFixedPoint availableVolume, IMyInventory inventory, MyItemType itemToFind)
         {
-            bool tranferred = false;
-            foreach (IMyInventory sourceInventory in INVENTORIES)
-            {
-                MyInventoryItem? itemFound = sourceInventory.FindItem(item);
-                if (itemFound.HasValue)
-                {
-                    MyFixedPoint itemAmount = sourceInventory.GetItemAmount(item);
-                    if (sourceInventory.CanTransferItemTo(inventory, item))
-                    {
-                        //MyFixedPoint amount;
-                        //if ((float)availableVolume < (float)itemAmount) { amount = availableVolume; } else { amount = itemAmount; }//fill the inventories slower
-                        tranferred = sourceInventory.TransferItemTo(inventory, itemFound.Value, availableVolume);
-                        if (tranferred) { break; }
+            bool transferred = false;
+            foreach (IMyInventory sourceInventory in INVENTORIES) {
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                sourceInventory.GetItems(items, item => item.Type.TypeId == itemToFind.TypeId.ToString());
+                foreach (MyInventoryItem item in items) {
+                    transferred = false;
+                    if (sourceInventory.CanTransferItemTo(inventory, item.Type) && inventory.CanItemsBeAdded(item.Amount, item.Type)) { transferred = sourceInventory.TransferItemTo(inventory, item); }
+                    if (!transferred) {
+                        MyFixedPoint amount = inventory.MaxVolume - inventory.CurrentVolume;
+                        transferred = sourceInventory.TransferItemTo(inventory, item, amount);
                     }
+                    if (!transferred) { sourceInventory.TransferItemTo(inventory, item, item.Amount); }
+                    if (transferred) { break; }
                 }
             }
-            return tranferred;
+            return transferred;
         }
 
         void WriteInfo()
@@ -1506,18 +1377,6 @@ namespace IngameScript
                 text.Append(targetLog.ToString());
                 surface.WriteText(text);
             }
-        }
-
-        void WriteDebug()
-        {
-            //if (DEBUG != null) {
-            StringBuilder text = new StringBuilder("");
-            //text.Append(messageIdLog);
-            //text.Append(LidarLog);
-            //text.Append(AntennaLog);
-            //text.Append(loadLog);
-            //DEBUG.WriteText(text); 
-            //}
         }
 
         void ReadTargetInfo()
@@ -1566,13 +1425,6 @@ namespace IngameScript
             }
         }
 
-        void ClearDebugLogs()
-        {
-            //LidarLog.Clear();
-            //AntennaLog.Clear();
-            //if (DEBUG != null) { DEBUG.WriteText(""); }
-        }
-
         void GetBlocks()
         {
             LIDARS.Clear();
@@ -1603,21 +1455,14 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(CARGOS, b => b.CustomName.Contains(cargoName));
             INVENTORIES.Clear();
             INVENTORIES.AddRange(CARGOS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-
             SURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdsTargetName));
-            foreach (IMyTextPanel panel in panels)
-            {
-                SURFACES.Add(panel as IMyTextSurface);
-            }
-
+            foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             ANTENNA = GridTerminalSystem.GetBlockWithName(antennasName) as IMyRadioAntenna;
             CONTROLLER = CONTROLLERS[0];
-
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
-
             //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
@@ -1720,23 +1565,10 @@ namespace IngameScript
                 _integralDecay = true;
             }
 
-            public double Filter(double input, int round_d_digits)
-            {
-                double roundedInput = Math.Round(input, round_d_digits);
-
-                _integralDecayRatio += (input / _timeStep);
-                _integralDecayRatio = (_upperBound > 0 && _integralDecayRatio > _upperBound ? _upperBound : _integralDecayRatio);
-                _integralDecayRatio = (_lowerBound < 0 && _integralDecayRatio < _lowerBound ? _lowerBound : _integralDecayRatio);
-
-                double derivative = (roundedInput - _lastError) * _timeStep;
-                _lastError = roundedInput;
-
-                return (_kP * input) + (_kI * _integralDecayRatio) + (_kD * derivative);
-            }
-
             public double Control(double error)
             {
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
+                //Compute derivative term
+                var errorDerivative = (error - _lastError) * _inverseTimeStep;
 
                 if (_firstRun)
                 {
@@ -1744,27 +1576,27 @@ namespace IngameScript
                     _firstRun = false;
                 }
 
-                if (!_integralDecay)//Compute integral term
+                //Compute integral term
+                if (!_integralDecay)
                 {
                     _errorSum += error * _timeStep;
 
-                    if (_errorSum > _upperBound)//Clamp integral term
-                    {
+                    //Clamp integral term
+                    if (_errorSum > _upperBound)
                         _errorSum = _upperBound;
-                    }
                     else if (_errorSum < _lowerBound)
-                    {
                         _errorSum = _lowerBound;
-                    }
                 }
                 else
                 {
                     _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
                 }
 
-                _lastError = error;//Store this error as last error
+                //Store this error as last error
+                _lastError = error;
 
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;//Construct output
+                //Construct output
+                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
                 return this.Value;
             }
 
@@ -1782,6 +1614,194 @@ namespace IngameScript
                 _firstRun = true;
             }
         }
+
+        public static class VectorMath
+        {
+            public static Vector3D SafeNormalize(Vector3D a)
+            {
+                if (Vector3D.IsZero(a))
+                    return Vector3D.Zero;
+
+                if (Vector3D.IsUnit(ref a))
+                    return a;
+
+                return Vector3D.Normalize(a);
+            }
+
+            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) //reflect a over b
+            {
+                Vector3D project_a = Projection(a, b);
+                Vector3D reject_a = a - project_a;
+                return project_a - reject_a * rejectionFactor;
+            }
+
+            public static Vector3D Rejection(Vector3D a, Vector3D b) //reject a on b
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return Vector3D.Zero;
+
+                return a - a.Dot(b) / b.LengthSquared() * b;
+            }
+
+            public static Vector3D Projection(Vector3D a, Vector3D b)
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return Vector3D.Zero;
+
+                return a.Dot(b) / b.LengthSquared() * b;
+            }
+
+            public static double ScalarProjection(Vector3D a, Vector3D b)
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+
+                if (Vector3D.IsUnit(ref b))
+                    return a.Dot(b);
+
+                return a.Dot(b) / b.Length();
+            }
+
+            public static double AngleBetween(Vector3D a, Vector3D b) //returns radians
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+                else
+                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
+            }
+
+            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+                else
+                    return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
+            }
+        }
+
+        /*
+        //aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+
+        case 0://none
+            aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+            break;
+        case 1://rockets
+            aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetInfo.Velocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+            break;
+        case 2://gatlings
+            aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
+            break;
+        default:
+            aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
+            break;
+        
+        Vector3D ComputeInterceptPoint(Vector3D targetPos, Vector3D targetVel, Vector3D targetAccel, Vector3D projectileLocation, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed)
+        {
+            Vector3D z = targetPos - projectileLocation;
+            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration);
+            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k);
+
+            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared();
+            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z));
+            double c = (p * p) - z.LengthSquared();
+
+            double t = SolveQuadratic(a, b, c);
+
+            if (Double.IsNaN(t) || t < 0)
+            {
+                return new Vector3D(Double.NaN, Double.NaN, Double.NaN);
+            }
+            else
+            {
+                if (targetAccel.Sum > 0.001)
+                {
+                    return targetPos + (targetVel * t) + (0.5 * targetAccel * t * t);
+                }
+                else
+                {
+                    return targetPos + (targetVel * t);
+                }
+            }
+        }
+
+        Vector3D ComputeInterceptPointWithInheritSpeed(Vector3D targetPos, Vector3D targetVel, Vector3D targetAccel, Vector3D projectileLocation, Vector3D shipDirection, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed, double projectileMaxRange)
+        {
+            Vector3D z = targetPos - projectileLocation;
+            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration);
+            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k);
+
+            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared();
+            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z));
+            double c = (p * p) - z.LengthSquared();
+
+            double t = SolveQuadratic(a, b, c);
+
+            if (Double.IsNaN(t) || t < 0)
+            {
+                return new Vector3D(Double.NaN, Double.NaN, Double.NaN);
+            }
+
+            int u = (int)Math.Ceiling(t * 60);
+
+            Vector3D targetPoint;
+            if (targetAccel.Sum > 0.001)
+            {
+                targetPoint = targetPos + (targetVel * t) + (0.5 * targetAccel * t * t);
+            }
+            else
+            {
+                targetPoint = targetPos + (targetVel * t);
+            }
+
+            Vector3D aimDirection;
+            Vector3D stepAcceleration;
+            Vector3D currentPosition;
+            Vector3D currentDirection;
+
+            aimDirection = Vector3D.Normalize(targetPoint - projectileLocation);
+            stepAcceleration = (aimDirection * projectileAcceleration) / 60;
+
+            currentPosition = projectileLocation;
+            currentDirection = shipDirection + (aimDirection * projectileInitialSpeed);
+
+            for (int i = 0; i < u; i++)
+            {
+                currentDirection += stepAcceleration;
+
+                double speed = currentDirection.Length();
+                if (speed > projectileMaxSpeed)
+                {
+                    currentDirection = currentDirection / speed * projectileMaxSpeed;
+                }
+
+                currentPosition += (currentDirection / 60);
+
+                if ((i + 1) % 60 == 0)
+                {
+                    if (Vector3D.Distance(projectileLocation, currentPosition) > projectileMaxRange)
+                    {
+                        return targetPoint;
+                    }
+                }
+            }
+
+            return targetPoint + targetPoint - currentPosition;
+        }
+
+        double SolveQuadraticOld(double a, double b, double c)
+        {
+            double u = (b * b) - (4 * a * c);
+            if (u < 0)
+            {
+                return Double.NaN;
+            }
+            u = Math.Sqrt(u);
+
+            double t1 = (-b + u) / (2 * a);
+            double t2 = (-b - u) / (2 * a);
+            return (t1 > 0 ? (t2 > 0 ? (t1 < t2 ? t1 : t2) : t1) : t2);
+        }
+        */
 
     }
 }

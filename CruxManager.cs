@@ -859,7 +859,7 @@ namespace IngameScript
                         }
                     }
                 }
-                refineriesInputLog.Append(block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
+                refineriesInputLog.Append("\n" + block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
                 int count = 2;
                 foreach (KeyValuePair<MyDefinitionId, double> entry in oreDict) {
                     if (entry.Value != 0) {
@@ -881,6 +881,7 @@ namespace IngameScript
                         }
                     }
                 }
+                if (count > 0) { refineriesInputLog.Append("\n"); }
             }
         }
 
@@ -904,7 +905,7 @@ namespace IngameScript
                         if (ammosDict.TryGetValue(item.Type, out num)) { ammosDict[item.Type] = num + (double)item.Amount; }
                     }
                 }
-                assemblersInputLog.Append(block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
+                assemblersInputLog.Append("\n" + block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
                 int count = 2;
                 foreach (KeyValuePair<MyDefinitionId, double> entry in ammosDict) {
                     if (entry.Value != 0) {
@@ -936,7 +937,7 @@ namespace IngameScript
                         }
                     }
                 }
-                assemblersInputLog.Append("\n");
+                if (count > 0) { assemblersInputLog.Append("\n"); }
             }
         }
 
