@@ -22,9 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-
-        //TODO 
-        //check if when locking target gatlings hit the target
+        //TODO add weapon salvo for rockets
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -78,19 +76,12 @@ namespace IngameScript
         readonly int autoMissilesDelay = 91;
         readonly int writeDelay = 10;
         readonly bool creative = false;
-        readonly bool isCappedSpeed = true;
         readonly double initialLockDistance = 5000d;
-        readonly double rocketProjectileForwardOffset = 4d;  //By default, rockets are spawn 4 meters in front of the rocket launcher's tip
-        readonly double rocketProjectileInitialSpeed = 100d;//400;
-        readonly double rocketProjectileAccelleration = 600d;//0;
-        readonly double rocketProjectileMaxSpeed = 200d;//400;
-        readonly double rocketProjectileMaxRange = 800d;//850;
-        readonly double gatlingProjectileForwardOffset = 0d;
-        readonly double gatlingProjectileInitialSpeed = 400d;
-        readonly double gatlingProjectileAccelleration = 0d;
-        readonly double gatlingProjectileMaxSpeed = 400d;
-        readonly double gatlingProjectileMaxRange = 1000d;
-        readonly double gunsMaxRange = 1000d;
+        readonly float rocketProjectileMaxSpeed = 200f;
+        readonly double rocketProjectileMaxRange = 800d;
+        readonly float gatlingProjectileMaxSpeed = 400f;
+        readonly double gatlingProjectileMaxRange = 800d;
+        readonly double gunsMaxRange = 800d;
         readonly Random random = new Random();
         readonly int fudgeAttempts = 8;
 
@@ -110,7 +101,6 @@ namespace IngameScript
         bool fudgeVectorSwitch = false;
         double fudgeFactor = 5;
 
-        //Vector3 prevTargetVelocity = Vector3.Zero;
         Vector3D targetPosition;
         string targetName = null;
         double targetDiameter;
@@ -260,14 +250,13 @@ namespace IngameScript
                     }
                 }
 
-                LockOnTarget(LIDARS[0]);//TODO REF
+                LockOnTarget(LIDARS[0]);
 
                 CalculateTicks(targetFound);
 
                 ManageGuns();
 
                 ReadTargetInfo();
-                //prevTargetVelocity = targetInfo.Velocity;
             }
             else
             {
@@ -390,7 +379,7 @@ namespace IngameScript
                     {
                         foreach (var id in MissileIDs)
                         {
-                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))//TODO
+                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))
                             {
                                 SendMissileUnicastMessage(commandSpiral, id.Key);
                             }
@@ -706,44 +695,32 @@ namespace IngameScript
 
         void LockOnTarget(IMyTerminalBlock REF)
         {
-            MatrixD refWorldMatrix = REF.WorldMatrix;
             float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             Vector3D targetPos = targetPosition + (targetInfo.Velocity * elapsedTime);
-            //Vector3D targetAccel = Vector3D.Zero; if ((!Vector3D.IsZero(targetInfo.Velocity) || !Vector3D.IsZero(prevTargetVelocity)) && !Vector3D.IsZero(targetInfo.Velocity - prevTargetVelocity)) { targetAccel = (targetInfo.Velocity - prevTargetVelocity) / elapsedTime; }
-            Vector3D targetVel;
-            if (isCappedSpeed) { targetVel = targetInfo.Velocity; }
-            else { targetVel = targetInfo.Velocity - CONTROLLER.GetShipVelocities().LinearVelocity; }
-            double projectileForwardOffset;
-            if (weaponType == 1) { projectileForwardOffset = rocketProjectileForwardOffset; } 
-            else { projectileForwardOffset = gatlingProjectileForwardOffset; }
-            Vector3D projectileLocation = (projectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * projectileForwardOffset));
-            Vector3D shipDirection = CONTROLLER.GetShipVelocities().LinearVelocity;
             Vector3D aimDirection;
-            double distanceFromTarget = Vector3D.Distance(targetPosition, REF.GetPosition());
+            double distanceFromTarget = Vector3D.Distance(targetPos, REF.GetPosition());
             if (distanceFromTarget > gunsMaxRange)
             {
-                aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, 9999, 9999, 9999, 9999);
+                aimDirection = targetPos - CONTROLLER.GetPosition();
             }
             else
             {
                 switch (weaponType)
                 {
                     case 0://none
-                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, 9999, 9999, 9999, 9999);
+                        aimDirection = targetPos - CONTROLLER.GetPosition();
                         break;
                     case 1://rockets
-                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, rocketProjectileMaxSpeed, REF);
                         break;
                     case 2://gatlings
-                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed, gatlingProjectileMaxRange);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, gatlingProjectileMaxSpeed, REF);
                         break;
                     default:
-                        aimDirection = ComputeInterceptPoint(targetPos, targetVel, projectileLocation, shipDirection, 9999, 9999, 9999, 9999);
+                        aimDirection = targetPos - CONTROLLER.GetPosition();
                         break;
                 }
             }
-            aimDirection -= refWorldMatrix.Translation;
-
             Vector3D UpVector;
             if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; }
             else { UpVector = -CONTROLLER.GetNaturalGravity(); }
@@ -755,6 +732,55 @@ namespace IngameScript
             double rollSpeed = rollController.Control(rollAngle, globalTimestep);
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+        }
+        
+        Vector3D ComputeInterceptWithLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, IMyTerminalBlock muzzle)
+        {
+            MatrixD refWorldMatrix = CONTROLLER.WorldMatrix;
+            //MatrixD refLookAtMatrix = MatrixD.CreateLookAt(Vector3D.Zero, refWorldMatrix.Forward, refWorldMatrix.Up);
+            Vector3D aimDirection = GetPredictedTargetPosition(muzzle, CONTROLLER, targetPosition, targetVelocity, projectileSpeed);
+			aimDirection -= refWorldMatrix.Translation;
+            //aimDirection = Vector3D.Normalize(Vector3D.TransformNormal(aimDirection, refLookAtMatrix));
+            return aimDirection;
+        }
+
+        public Vector3D GetPredictedTargetPosition(IMyTerminalBlock gun, IMyShipController shooter, Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed)
+        {
+            float shootDelay = 0;
+
+            Vector3D muzzlePosition = gun.GetPosition();
+            
+            Vector3D toTarget = targetPosition - muzzlePosition;
+            Vector3D shooterVelocity = shooter.GetShipVelocities().LinearVelocity;
+                
+            Vector3D diffVelocity = targetVelocity - shooterVelocity;
+
+            float a = (float)diffVelocity.LengthSquared() - projectileSpeed * projectileSpeed;
+            float b = 2 * Vector3.Dot(diffVelocity, toTarget);
+            float c = (float)toTarget.LengthSquared();
+
+            float p = -b / (2 * a);
+            float q = (float)Math.Sqrt((b * b) - 4 * a * c) / (2 * a);
+
+            float t1 = p - q;
+            float t2 = p + q;
+            float t;
+
+            if (t1 > t2 && t2 > 0)
+            {
+                t = t2;
+            }
+            else
+            {
+                t = t1;
+            }
+
+            t += shootDelay;
+
+            Vector3D predictedPosition = targetPosition + diffVelocity * t;
+            //Vector3 bulletPath = predictedPosition - muzzlePosition;
+            //timeToHit = bulletPath.Length() / projectileSpeed;
+            return predictedPosition;
         }
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll)
@@ -824,78 +850,6 @@ namespace IngameScript
                 thisGyro.Roll = (float)transformedRotationVec.Z;
                 thisGyro.GyroOverride = true;
             }
-        }
-
-        public Vector3D ComputeInterceptPoint(Vector3D targetPos, Vector3D targetVel, Vector3D projectileLocation, Vector3D shipDirection, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed, double projectileMaxRange)
-        {
-            Vector3D z = targetPos - projectileLocation; 
-            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration); 
-            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k); 
-            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared(); 
-            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z)); 
-            double c = (p * p) - z.LengthSquared(); 
-            double t = SolveQuadratic(a, b, c); 
-            if (double.IsNaN(t) || t < 0)
-            {
-                return new Vector3D(double.NaN);
-            }
-            Vector3D interceptPoint; 
-            if (projectileAcceleration > 0.1)//if (projectileAcceleration.LengthSquared() > 0.1) 
-            { 
-                interceptPoint = targetPos + (targetVel * t) + (0.5 * projectileAcceleration * t * t); 
-            } 
-            else 
-            { 
-                interceptPoint = targetPos + (targetVel * t); 
-            }
-            if (isCappedSpeed && projectileMaxSpeed > 0) {
-                int u = (int)Math.Ceiling(t * 60); 
-                Vector3D aimDirection; 
-                Vector3D stepAcceleration; 
-                Vector3D currentPosition; 
-                Vector3D currentDirection; 
-                aimDirection = Vector3D.Normalize(interceptPoint - projectileLocation); 
-                stepAcceleration = (aimDirection * projectileAcceleration) / 60; 
-                currentPosition = projectileLocation; 
-                currentDirection = shipDirection + (aimDirection * projectileInitialSpeed); 
-                for (int i = 0; i < u; i++)
-                {
-                    currentDirection += stepAcceleration; 
-                    double speed = currentDirection.Length(); 
-                    if (speed > projectileMaxSpeed) 
-                    { 
-                        currentDirection = currentDirection / speed * projectileMaxSpeed; 
-                    }
-                    currentPosition += (currentDirection / 60); 
-                    if ((i + 1) % 60 == 0) { 
-                        if (Vector3D.Distance(projectileLocation, currentPosition) > projectileMaxRange) 
-                        { 
-                            return interceptPoint; 
-                        } 
-                    }
-                }
-                return interceptPoint + interceptPoint - currentPosition;
-            } 
-            else 
-            { 
-                return interceptPoint; 
-            }
-        }
-
-        public double SolveQuadratic(double a, double b, double c)
-        {
-            if (a == 0) { 
-                return -(c / b); 
-            }
-            double u = (b * b) - (4 * a * c); 
-            if (u < 0)
-            {
-                return Double.NaN;
-            }
-            u = Math.Sqrt(u); 
-            double t1 = (-b + u) / (2 * a); 
-            double t2 = (-b - u) / (2 * a); 
-            return (t1 > 0 ? (t2 > 0 ? (t1 < t2 ? t1 : t2) : t1) : t2);
         }
 
         bool GetMessages()
@@ -1036,7 +990,6 @@ namespace IngameScript
             targetDiameter = 0;
             targetInfo = default(MyDetectedEntityInfo);
             targetPosition = default(Vector3D);
-            //prevTargetVelocity = default(Vector3);
 
             currentTick = 1;
             lostTicks = 0;
@@ -1050,7 +1003,7 @@ namespace IngameScript
 
             foreach (var id in MissileIDs)
             {
-                if ((id.Value.Contains(commandUpdate) || id.Value.Contains(commandBeamRide) || id.Value.Contains(commandLaunch)) && !id.Value.Contains("Drone"))//TODO
+                if ((id.Value.Contains(commandUpdate) || id.Value.Contains(commandBeamRide) || id.Value.Contains(commandLaunch)) && !id.Value.Contains("Drone"))
                 {
                     SendMissileUnicastMessage(commandBeamRide, id.Key);
                 }
@@ -1502,6 +1455,70 @@ namespace IngameScript
             }
         }
 
+        public static class VectorMath
+        {
+            public static Vector3D SafeNormalize(Vector3D a)
+            {
+                if (Vector3D.IsZero(a))
+                    return Vector3D.Zero;
+
+                if (Vector3D.IsUnit(ref a))
+                    return a;
+
+                return Vector3D.Normalize(a);
+            }
+
+            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) //reflect a over b
+            {
+                Vector3D project_a = Projection(a, b);
+                Vector3D reject_a = a - project_a;
+                return project_a - reject_a * rejectionFactor;
+            }
+
+            public static Vector3D Rejection(Vector3D a, Vector3D b) //reject a on b
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return Vector3D.Zero;
+
+                return a - a.Dot(b) / b.LengthSquared() * b;
+            }
+
+            public static Vector3D Projection(Vector3D a, Vector3D b)
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return Vector3D.Zero;
+
+                return a.Dot(b) / b.LengthSquared() * b;
+            }
+
+            public static double ScalarProjection(Vector3D a, Vector3D b)
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+
+                if (Vector3D.IsUnit(ref b))
+                    return a.Dot(b);
+
+                return a.Dot(b) / b.Length();
+            }
+
+            public static double AngleBetween(Vector3D a, Vector3D b) //returns radians
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+                else
+                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
+            }
+
+            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
+            {
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                    return 0;
+                else
+                    return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
+            }
+        }
+
         void InitPIDControllers(IMyTerminalBlock block)
         {
             double aimP, aimI, aimD;
@@ -1614,194 +1631,6 @@ namespace IngameScript
                 _firstRun = true;
             }
         }
-
-        public static class VectorMath
-        {
-            public static Vector3D SafeNormalize(Vector3D a)
-            {
-                if (Vector3D.IsZero(a))
-                    return Vector3D.Zero;
-
-                if (Vector3D.IsUnit(ref a))
-                    return a;
-
-                return Vector3D.Normalize(a);
-            }
-
-            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) //reflect a over b
-            {
-                Vector3D project_a = Projection(a, b);
-                Vector3D reject_a = a - project_a;
-                return project_a - reject_a * rejectionFactor;
-            }
-
-            public static Vector3D Rejection(Vector3D a, Vector3D b) //reject a on b
-            {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return Vector3D.Zero;
-
-                return a - a.Dot(b) / b.LengthSquared() * b;
-            }
-
-            public static Vector3D Projection(Vector3D a, Vector3D b)
-            {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return Vector3D.Zero;
-
-                return a.Dot(b) / b.LengthSquared() * b;
-            }
-
-            public static double ScalarProjection(Vector3D a, Vector3D b)
-            {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return 0;
-
-                if (Vector3D.IsUnit(ref b))
-                    return a.Dot(b);
-
-                return a.Dot(b) / b.Length();
-            }
-
-            public static double AngleBetween(Vector3D a, Vector3D b) //returns radians
-            {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return 0;
-                else
-                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
-            }
-
-            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
-            {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return 0;
-                else
-                    return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
-            }
-        }
-
-        /*
-        //aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-
-        case 0://none
-            aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-            break;
-        case 1://rockets
-            aimDirection = ComputeInterceptPointWithInheritSpeed(targetPos, targetInfo.Velocity, targetAccel, (rocketProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * rocketProjectileForwardOffset)), REF.GetShipVelocities().LinearVelocity, rocketProjectileInitialSpeed, rocketProjectileAccelleration, rocketProjectileMaxSpeed, rocketProjectileMaxRange);
-            break;
-        case 2://gatlings
-            aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, (gatlingProjectileForwardOffset == 0 ? refWorldMatrix.Translation : refWorldMatrix.Translation + (refWorldMatrix.Forward * gatlingProjectileForwardOffset)), gatlingProjectileInitialSpeed, gatlingProjectileAccelleration, gatlingProjectileMaxSpeed);
-            break;
-        default:
-            aimDirection = ComputeInterceptPoint(targetPos, targetInfo.Velocity - REF.GetShipVelocities().LinearVelocity, targetAccel, refWorldMatrix.Translation, 9999, 9999, 9999);
-            break;
-        
-        Vector3D ComputeInterceptPoint(Vector3D targetPos, Vector3D targetVel, Vector3D targetAccel, Vector3D projectileLocation, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed)
-        {
-            Vector3D z = targetPos - projectileLocation;
-            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration);
-            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k);
-
-            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared();
-            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z));
-            double c = (p * p) - z.LengthSquared();
-
-            double t = SolveQuadratic(a, b, c);
-
-            if (Double.IsNaN(t) || t < 0)
-            {
-                return new Vector3D(Double.NaN, Double.NaN, Double.NaN);
-            }
-            else
-            {
-                if (targetAccel.Sum > 0.001)
-                {
-                    return targetPos + (targetVel * t) + (0.5 * targetAccel * t * t);
-                }
-                else
-                {
-                    return targetPos + (targetVel * t);
-                }
-            }
-        }
-
-        Vector3D ComputeInterceptPointWithInheritSpeed(Vector3D targetPos, Vector3D targetVel, Vector3D targetAccel, Vector3D projectileLocation, Vector3D shipDirection, double projectileInitialSpeed, double projectileAcceleration, double projectileMaxSpeed, double projectileMaxRange)
-        {
-            Vector3D z = targetPos - projectileLocation;
-            double k = (projectileAcceleration == 0 ? 0 : (projectileMaxSpeed - projectileInitialSpeed) / projectileAcceleration);
-            double p = (0.5 * projectileAcceleration * k * k) + (projectileInitialSpeed * k) - (projectileMaxSpeed * k);
-
-            double a = (projectileMaxSpeed * projectileMaxSpeed) - targetVel.LengthSquared();
-            double b = 2 * ((p * projectileMaxSpeed) - targetVel.Dot(z));
-            double c = (p * p) - z.LengthSquared();
-
-            double t = SolveQuadratic(a, b, c);
-
-            if (Double.IsNaN(t) || t < 0)
-            {
-                return new Vector3D(Double.NaN, Double.NaN, Double.NaN);
-            }
-
-            int u = (int)Math.Ceiling(t * 60);
-
-            Vector3D targetPoint;
-            if (targetAccel.Sum > 0.001)
-            {
-                targetPoint = targetPos + (targetVel * t) + (0.5 * targetAccel * t * t);
-            }
-            else
-            {
-                targetPoint = targetPos + (targetVel * t);
-            }
-
-            Vector3D aimDirection;
-            Vector3D stepAcceleration;
-            Vector3D currentPosition;
-            Vector3D currentDirection;
-
-            aimDirection = Vector3D.Normalize(targetPoint - projectileLocation);
-            stepAcceleration = (aimDirection * projectileAcceleration) / 60;
-
-            currentPosition = projectileLocation;
-            currentDirection = shipDirection + (aimDirection * projectileInitialSpeed);
-
-            for (int i = 0; i < u; i++)
-            {
-                currentDirection += stepAcceleration;
-
-                double speed = currentDirection.Length();
-                if (speed > projectileMaxSpeed)
-                {
-                    currentDirection = currentDirection / speed * projectileMaxSpeed;
-                }
-
-                currentPosition += (currentDirection / 60);
-
-                if ((i + 1) % 60 == 0)
-                {
-                    if (Vector3D.Distance(projectileLocation, currentPosition) > projectileMaxRange)
-                    {
-                        return targetPoint;
-                    }
-                }
-            }
-
-            return targetPoint + targetPoint - currentPosition;
-        }
-
-        double SolveQuadraticOld(double a, double b, double c)
-        {
-            double u = (b * b) - (4 * a * c);
-            if (u < 0)
-            {
-                return Double.NaN;
-            }
-            u = Math.Sqrt(u);
-
-            double t1 = (-b + u) / (2 * a);
-            double t2 = (-b - u) / (2 * a);
-            return (t1 > 0 ? (t2 > 0 ? (t1 < t2 ? t1 : t2) : t1) : t2);
-        }
-        */
 
     }
 }
