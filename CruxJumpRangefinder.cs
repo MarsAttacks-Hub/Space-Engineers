@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO print on screen selected planet for safety distance
 
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string cockpitsName = "[CRX] Controller Cockpit";

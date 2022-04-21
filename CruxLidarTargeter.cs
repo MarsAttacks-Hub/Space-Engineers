@@ -150,7 +150,6 @@ namespace IngameScript
         public StringBuilder missileLog = new StringBuilder("");
         //public StringBuilder debugLog = new StringBuilder("");
 
-
         PID yawController;
         PID pitchController;
         PID rollController;
