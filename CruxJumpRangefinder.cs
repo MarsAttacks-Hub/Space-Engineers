@@ -22,7 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO print on screen selected planet for safety distance
+        //RANGE FINDER
 
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
@@ -37,12 +37,12 @@ namespace IngameScript
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
 
-        const string argSetup = "Setup";
         const string argRangeFinder = "RangeFinder";
+        const string argAimTarget = "AimTarget";
         const string argChangeSafetyOffset = "ChangeSafetyOffset";
         const string argIncreaseJump = "IncreaseJump";
         const string argDecreaseJump = "DecreaseJump";
-        const string argAimTarget = "AimTarget";
+
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
@@ -65,7 +65,7 @@ namespace IngameScript
 
         const float globalTimestep = 1.0f / 60.0f;
         const double rad2deg = 180 / Math.PI;
-        const double angleTolerance = 0.1;   // degrees
+        const double angleTolerance = 0.1;//degrees
 
         public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
         public List<IMyJumpDrive> JUMPERS = new List<IMyJumpDrive>();
@@ -74,7 +74,7 @@ namespace IngameScript
         public List<IMyTextSurface> SURFACES = new List<IMyTextSurface>();
         public List<IMyRemoteControl> REMOTES = new List<IMyRemoteControl>();
         public List<IMySoundBlock> ALARMS = new List<IMySoundBlock>();
-        public IMyRemoteControl REMOTE;
+        IMyRemoteControl REMOTE;
         IMyProgrammableBlock MAGNETICDRIVEPB;
         IMyProgrammableBlock MANAGERPB;
 
@@ -118,7 +118,7 @@ namespace IngameScript
             InitPIDControllers(REMOTE);
         }
 
-        void Main(string arg)
+        public void Main(string arg)
         {
 
             Echo($"REMOTES:{REMOTES.Count}");
@@ -204,7 +204,6 @@ namespace IngameScript
         {
             switch (argument)
             {
-                case argSetup: Setup(); break;
                 case argRangeFinder: RangeFinder(); break;
                 case argChangeSafetyOffset:
                     planetSelector++;
@@ -477,7 +476,7 @@ namespace IngameScript
                 leftVector = VectorMath.SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
 
-                // Create matrix
+                //Create matrix
                 MatrixD targetMatrix = MatrixD.Zero;
                 targetMatrix.Forward = desiredForwardVector;
                 targetMatrix.Left = leftVector;
@@ -501,7 +500,7 @@ namespace IngameScript
             }
 
             axis = VectorMath.SafeNormalize(axis);
-            // Because gyros rotate about -X -Y -Z, we need to negate our angles
+            //Because gyros rotate about -X -Y -Z, we need to negate our angles
             yaw = -axis.Y * angle;
             pitch = -axis.X * angle;
             roll = -axis.Z * angle;
@@ -582,6 +581,7 @@ namespace IngameScript
                 StringBuilder text = new StringBuilder();
                 text.Append(lidarsLog.ToString());
                 text.Append(jumpersLog.ToString());
+                text.Append("Selected Planet Safety: " + selectedPlanet + "(" + planetAtmosphereRange + ")\n");
                 text.Append(targetLog.ToString());
                 surface.WriteText(text);
             }
@@ -639,18 +639,18 @@ namespace IngameScript
 
         public class PID
         {
-            double _kP = 0;
-            double _kI = 0;
-            double _kD = 0;
-            double _integralDecayRatio = 0;
-            double _lowerBound = 0;
-            double _upperBound = 0;
+            public double _kP = 0;
+            public double _kI = 0;
+            public double _kD = 0;
+            public double _integralDecayRatio = 0;
+            public double _lowerBound = 0;
+            public double _upperBound = 0;
             double _timeStep = 0;
             double _inverseTimeStep = 0;
             double _errorSum = 0;
             double _lastError = 0;
             bool _firstRun = true;
-            bool _integralDecay = false;
+            public bool _integralDecay = false;
             public double Value { get; private set; }
 
             public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep)
@@ -739,14 +739,14 @@ namespace IngameScript
                 return Vector3D.Normalize(a);
             }
 
-            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) //reflect a over b
+            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1)//reflect a over b
             {
                 Vector3D project_a = Projection(a, b);
                 Vector3D reject_a = a - project_a;
                 return project_a - reject_a * rejectionFactor;
             }
 
-            public static Vector3D Rejection(Vector3D a, Vector3D b) //reject a on b
+            public static Vector3D Rejection(Vector3D a, Vector3D b)//reject a on b
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return Vector3D.Zero;
@@ -773,7 +773,7 @@ namespace IngameScript
                 return a.Dot(b) / b.Length();
             }
 
-            public static double AngleBetween(Vector3D a, Vector3D b) //returns radians
+            public static double AngleBetween(Vector3D a, Vector3D b)//returns radians
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
@@ -781,7 +781,7 @@ namespace IngameScript
                     return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
             }
 
-            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
+            public static double CosBetween(Vector3D a, Vector3D b)//returns radians
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;

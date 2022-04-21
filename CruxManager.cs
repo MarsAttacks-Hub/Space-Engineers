@@ -23,6 +23,7 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         //TODO check if assemblers and refinery log return 
+        //MANAGER
 
         readonly string solarsName = "[CRX] Solar";
         readonly string turbinesName = "[CRX] Wind Turbine";
@@ -52,24 +53,22 @@ namespace IngameScript
         readonly string launchersName = "[CRX] Rocket";
         readonly string gatlingsName = "[CRX] Gatling";
         readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
-        //readonly string debugPanelName = "[CRX] Debug";
 
+        const string argTogglePB = "TogglePB";
         const string argSunChaserToggle = "SunChaserToggle";
         const string argSunchaseOn = "SunchaseOn";
         const string argSunchaseOff = "SunchaseOff";
-        const string argSetup = "Setup";
-        const string argTogglePB = "TogglePB";
 
         readonly string sectionTag = "ManagerSettings";
         readonly string cockpitPowerSurfaceKey = "cockpitPowerSurface";
 
         int cockpitPowerSurface = 2;
-        readonly bool findTheLight = false; // Search for the Sun in the shadows
+        readonly bool findTheLight = false;//Search for the Sun in the shadows
         readonly double tankThresold = 20;
-        readonly float solarPanelMaxRatio = 1;  // multiplier for modded panels
+        readonly float solarPanelMaxRatio = 1;//multiplier for modded panels
 
         bool sunChaserPaused = true;
-        float shipSize = .16f;  //.04f  small blocks
+        float shipSize = .16f;//.04f small blocks
         float maxPwr;
         double moveP = .01;
         double moveY = .01;
@@ -129,7 +128,7 @@ namespace IngameScript
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
         public IMyTextPanel LCDSUNCHASER;
-        //IMyTextPanel DEBUG;
+        
         readonly MyIni myIni = new MyIni();
 
         readonly MyDefinitionId electricityId = new MyDefinitionId(typeof(VRage.Game.ObjectBuilders.Definitions.MyObjectBuilder_GasProperties), "Electricity");
@@ -152,7 +151,10 @@ namespace IngameScript
         public StringBuilder assemblersInputLog = new StringBuilder("");
         public StringBuilder inventoriesPercentLog = new StringBuilder("");
         public StringBuilder powerLog = new StringBuilder("");
+        
         //public StringBuilder debugLog = new StringBuilder("");
+        //readonly string debugPanelName = "[CRX] Debug";
+        //IMyTextPanel DEBUG;
 
         public Dictionary<MyDefinitionId, double> oreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
             {MyItemType.MakeOre("Cobalt"),0},
@@ -361,7 +363,7 @@ namespace IngameScript
             }
         }
 
-        void Main(string argument) {
+        public void Main(string argument) {
             Echo($"CONTROLLERS:{CONTROLLERS.Count}");
             Echo($"COCKPITS:{COCKPITS.Count}");
             Echo($"GYROS:{GYROS.Count}");
@@ -462,7 +464,6 @@ namespace IngameScript
                     LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
                     Me.CustomData = "GyroStabilize=true";
                     break;
-                case argSetup: Setup(); break;
                 case argTogglePB:
                     togglePB = !togglePB;
                     if (togglePB) {
@@ -1541,7 +1542,7 @@ namespace IngameScript
             REACTORSINVENTORIES.Clear();
             REACTORSINVENTORIES.AddRange(REACTORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             BLOCKSWITHINVENTORY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(shipPrefix)); //&& block.IsSameConstructAs(Me)
+            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(shipPrefix));//&& block.IsSameConstructAs(Me)
             INVENTORIES.Clear();
             INVENTORIES.AddRange(BLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             LCDSSTATUS.Clear();

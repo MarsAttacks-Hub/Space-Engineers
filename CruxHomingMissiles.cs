@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //HOMING MISSILE
 
         readonly string antennaName = "A [M]1";
         readonly string missileTag = "[M]1";
@@ -126,8 +127,8 @@ namespace IngameScript
         IMyRadioAntenna ANTENNA;
         IMyShipController CONTROLLER;
 
-        public IMyUnicastListener UNICASTLISTENER;
-        public IMyBroadcastListener BROADCASTLISTENER;
+        IMyUnicastListener UNICASTLISTENER;
+        IMyBroadcastListener BROADCASTLISTENER;
         
         PID yawController;
         PID pitchController;
@@ -163,7 +164,7 @@ namespace IngameScript
             fuseDistance = isLargeGrid ? 16 : 7;
         }
 
-        void Main(string argument, UpdateType updateSource)
+        public void Main()
         {
             Echo($"TBLOCKS:{TBLOCKS.Count}");
             Echo($"CONTROLLERS:{CONTROLLERS.Count}");
@@ -1300,18 +1301,18 @@ namespace IngameScript
 
         public class PID
         {
-            double _kP = 0;
-            double _kI = 0;
-            double _kD = 0;
-            double _integralDecayRatio = 0;
-            double _lowerBound = 0;
-            double _upperBound = 0;
+            public double _kP = 0;
+            public double _kI = 0;
+            public double _kD = 0;
+            public double _integralDecayRatio = 0;
+            public double _lowerBound = 0;
+            public double _upperBound = 0;
             double _timeStep = 0;
             double _inverseTimeStep = 0;
             double _errorSum = 0;
             double _lastError = 0;
             bool _firstRun = true;
-            bool _integralDecay = false;
+            public bool _integralDecay = false;
             public double Value { get; private set; }
 
             public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep)
@@ -1442,7 +1443,7 @@ namespace IngameScript
                     return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
             }
 
-            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
+            public static double CosBetween(Vector3D a, Vector3D b) //returns radians
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;

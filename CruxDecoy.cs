@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //DECOY
 
         readonly string ProjectorsDecoyName = "Decoy";
         readonly string ProjectorsBombName = "Bomb";
@@ -32,11 +33,10 @@ namespace IngameScript
         readonly string idL1 = "L1";
         readonly string idR1 = "R1";
 
-        const string argSetup = "Setup";
         const string argToggle = "Toggle";
         const string argSwitch = "Switch";
 
-        int selectedDrop = 0;   //0 decoys - 1 bombs
+        int selectedDrop = 0;//0 decoys - 1 bombs
 
         public List<IMyProjector> PROJECTORSDECOY = new List<IMyProjector>();
         public List<IMyProjector> PROJECTORSBOMB = new List<IMyProjector>();
@@ -66,13 +66,14 @@ namespace IngameScript
             }
         }
 
-        void Main(string argument)
+        public void Main(string argument)
         {
             Echo($"PROJECTORSDECOY:{PROJECTORSDECOY.Count}");
             Echo($"PROJECTORSBOMB:{PROJECTORSBOMB.Count}");
             Echo($"MERGES:{MERGES.Count}");
             Echo($"GRAVGENS:{GRAVGENS.Count}");
             Echo($"WELDERS:{WELDERS.Count}");
+
             if (selectedDrop == 0)
             {
                 Echo("Selected Drop: Decoy");
@@ -141,7 +142,6 @@ namespace IngameScript
         {
             switch (argument)
             {
-                case argSetup: Setup(); break;
                 case argToggle:
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     if (toggle)

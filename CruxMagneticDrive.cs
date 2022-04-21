@@ -21,7 +21,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        
+        //MAGNETIC DRIVE
+
         readonly string rotorsName = "Rotor_MD_A";
         readonly string rotorsInvName = "Rotor_MD_B";
         readonly string plusXname = "Merge_MD-X";
@@ -41,22 +42,20 @@ namespace IngameScript
         readonly string gyrosName = "[CRX] Gyro";
         readonly string managerName = "[CRX] PB Manager";
         readonly string remotesName = "[CRX] Controller Remote";
-        readonly string cockpitName = "[CRX] Controller Cockpit";
         readonly string deadManPanelName = "[CRX] LCD DeadMan Toggle";
         readonly string idleThrusterPanelName = "[CRX] LCD IdleThrusters Toggle";
-        //readonly string debugPanelName = "[CRX] Debug";
-
-        const string argSetup = "Setup";
+        
+        const string argDeadMan = "DeadMan";
+        const string argMagneticDrive = "ToggleMagneticDrive";
         const string argIdleThrusters = "ToggleIdleThrusters";
+
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
-        const string argDeadMan = "DeadMan";
-        const string argMagneticDrive = "ToggleMagneticDrive";
-
+        
         bool magneticDrive = true;
         bool controlDampeners = true;
-        bool useGyrosToStabilize = true;    //If the script will override gyros to try and combat torque
+        bool useGyrosToStabilize = true;//If the script will override gyros to try and combat torque
         readonly bool useRoll = true;
         bool idleThrusters = false;
         readonly float maxSpeed = 105f;
@@ -65,9 +64,7 @@ namespace IngameScript
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
         readonly int tickDelay = 100;
-        //readonly int writeDelay = 100;
 
-        //int writeCount = 0;
         int tickCount = 0;
         bool magneticDriveManOnce = true;
         bool deadManOnce = false;
@@ -99,21 +96,23 @@ namespace IngameScript
         public List<IMyThrust> RIGHTTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> FORWARDTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> BACKWARDTHRUSTERS = new List<IMyThrust>();
-        public IMyThrust UPTHRUST;
-        public IMyThrust DOWNTHRUST;
-        public IMyThrust LEFTTHRUST;
-        public IMyThrust RIGHTTHRUST;
-        public IMyThrust FORWARDTHRUST;
-        public IMyThrust BACKWARDTHRUST;
-        public IMyShipController CONTROLLER = null;
-        public IMyShipController COCKPIT;
-        public IMyProgrammableBlock MANAGERPB;
-        public IMyRemoteControl REMOTE;
-        public IMyTextPanel LCDDEADMAN;
-        public IMyTextPanel LCDIDLETHRUSTERS;
+        IMyThrust UPTHRUST;
+        IMyThrust DOWNTHRUST;
+        IMyThrust LEFTTHRUST;
+        IMyThrust RIGHTTHRUST;
+        IMyThrust FORWARDTHRUST;
+        IMyThrust BACKWARDTHRUST;
+        IMyShipController CONTROLLER = null;
+        IMyProgrammableBlock MANAGERPB;
+        IMyRemoteControl REMOTE;
+        IMyTextPanel LCDDEADMAN;
+        IMyTextPanel LCDIDLETHRUSTERS;
+
         //public IMyTextPanel DEBUG;
         //public StringBuilder debugLog = new StringBuilder("");
-        
+        //readonly int writeDelay = 100;
+        //int writeCount = 0;
+        //readonly string debugPanelName = "[CRX] Debug";
 
         Program()
         {
@@ -135,7 +134,7 @@ namespace IngameScript
             }
         }
 
-        void Main(string argument)
+        public void Main(string argument)
         {
             Echo($"ROTORS:{ROTORS.Count}");
             Echo($"ROTORSINV:{ROTORSINV.Count}");
@@ -267,7 +266,6 @@ namespace IngameScript
         {
             switch (argument)
             {
-                case argSetup: Setup(); break;
                 case argIdleThrusters: 
                     idleThrusters = !idleThrusters;
                     if (idleThrusters) {
@@ -313,7 +311,6 @@ namespace IngameScript
                     if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters && !(block is IMyRemoteControl))
                     {
                         CONTROLLER = block;
-                        COCKPIT = CONTROLLER;
                     }
                 }
             }
@@ -606,7 +603,7 @@ namespace IngameScript
                         block.Yaw = (float)Math.Round(gyroAngularVelocity.Y, 2);
                         block.Roll = (float)Math.Round(gyroAngularVelocity.Z, 2);
                         block.GyroOverride = true;
-                        //block.GyroPower = 100f; //im assuming this is a percentage
+                        //block.GyroPower = 100f;//im assuming this is a percentage
                     }
                     else
                     {
@@ -642,7 +639,7 @@ namespace IngameScript
                 leftVector = VectorMath.SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
 
-                // Create matrix
+                //Create matrix
                 MatrixD targetMatrix = MatrixD.Zero;
                 targetMatrix.Forward = desiredForwardVector;
                 targetMatrix.Left = leftVector;
@@ -666,7 +663,7 @@ namespace IngameScript
             }
 
             axis = VectorMath.SafeNormalize(axis);
-            // Because gyros rotate about -X -Y -Z, we need to negate our angles
+            //Because gyros rotate about -X -Y -Z, we need to negate our angles
             yaw = -axis.Y * angle;
             pitch = -axis.X * angle;
             roll = -axis.Z * angle;
@@ -753,9 +750,6 @@ namespace IngameScript
             List<IMyRemoteControl> REMOTES = new List<IMyRemoteControl>();
             GridTerminalSystem.GetBlocksOfType<IMyRemoteControl>(REMOTES, block => block.CustomName.Contains(remotesName));
             REMOTE = REMOTES[0];
-            List<IMyShipController> COCKPITS = new List<IMyShipController>();
-            GridTerminalSystem.GetBlocksOfType<IMyShipController>(COCKPITS, block => block.CustomName.Contains(cockpitName));
-            COCKPIT = COCKPITS[0];
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
             LCDDEADMAN = GridTerminalSystem.GetBlockWithName(deadManPanelName) as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
@@ -775,14 +769,14 @@ namespace IngameScript
                 return Vector3D.Normalize(a);
             }
 
-            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) //reflect a over b
+            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1)//reflect a over b
             {
                 Vector3D project_a = Projection(a, b);
                 Vector3D reject_a = a - project_a;
                 return project_a - reject_a * rejectionFactor;
             }
 
-            public static Vector3D Rejection(Vector3D a, Vector3D b) //reject a on b
+            public static Vector3D Rejection(Vector3D a, Vector3D b)//reject a on b
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return Vector3D.Zero;
@@ -809,7 +803,7 @@ namespace IngameScript
                 return a.Dot(b) / b.Length();
             }
 
-            public static double AngleBetween(Vector3D a, Vector3D b) //returns radians
+            public static double AngleBetween(Vector3D a, Vector3D b)//returns radians
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
@@ -817,7 +811,7 @@ namespace IngameScript
                     return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
             }
 
-            public static double CosBetween(Vector3D a, Vector3D b, bool useSmallestAngle = false) //returns radians
+            public static double CosBetween(Vector3D a, Vector3D b)//returns radians
             {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
@@ -825,73 +819,6 @@ namespace IngameScript
                     return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
             }
         }
-
-        /*static void GetRotationAngles(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double yaw, out double pitch, out double roll)
-        {
-            var localTargetVector = Vector3D.Rotate(desiredForwardVector, MatrixD.Transpose(worldMatrix));
-            var flattenedTargetVector = new Vector3D(localTargetVector.X, 0, localTargetVector.Z);
-
-            int yawSign = localTargetVector.X >= 0 ? 1 : -1;
-            yaw = GetAngleBetween(Vector3D.Forward, flattenedTargetVector) * yawSign; //right is positive
-
-            int pitchSign = Math.Sign(localTargetVector.Y);
-            if (Vector3D.IsZero(flattenedTargetVector))//check for straight up case
-            {
-                pitch = MathHelper.PiOver2 * pitchSign;
-            }
-            else
-            {
-                pitch = GetAngleBetween(localTargetVector, flattenedTargetVector) * pitchSign; //up is positive
-            }
-            if (Vector3D.IsZero(desiredUpVector))
-            {
-                roll = 0;
-                return;
-            }
-            Vector3D orthagonalUp;// Since there is a relationship between roll and the orientation of forward we need to ensure that the up we are comparing is orthagonal to forward.
-            Vector3D orthagonalLeft = Vector3D.Cross(desiredUpVector, desiredForwardVector);
-            if (Vector3D.Dot(desiredForwardVector, desiredUpVector) == 0)// Already orthagonal
-            {
-                orthagonalUp = desiredUpVector;
-            }
-            else
-            {
-                orthagonalUp = Vector3D.Cross(desiredForwardVector, orthagonalLeft);
-            }
-            var localUpVector = Vector3D.Rotate(orthagonalUp, MatrixD.Transpose(worldMatrix));
-            int signRoll = Vector3D.Dot(localUpVector, Vector3D.Right) >= 0 ? 1 : -1;
-
-            if (Vector3D.IsZero(flattenedTargetVector))// Desired forward and current up are parallel This implies pitch is ±90° and yaw is 0°.
-            {
-                var localUpFlattenedY = new Vector3D(localUpVector.X, 0, localUpVector.Z);
-
-                var referenceDirection = Vector3D.Dot(Vector3D.Up, localTargetVector) >= 0 ? Vector3D.Backward : Vector3D.Forward;// If straight up, reference direction would be backward, if straight down, reference direction would be forward. This is because we are simply doing a ±90° pitch rotation of the axes.
-
-                roll = GetAngleBetween(localUpFlattenedY, referenceDirection) * signRoll;
-                return;
-            }
-            var intermediateFront = flattenedTargetVector;// We are going to try and construct new intermediate axes where: Up = Vector3D.Up Front = flattenedTargetVector This will let us create a plane that contains Vector3D.Up and  whose normal equals flattenedTargetVector
-
-            var localUpProjOnIntermediateForward = Vector3D.Dot(intermediateFront, localUpVector) / intermediateFront.LengthSquared() * intermediateFront;// Reject up vector onto the plane normal
-            var flattenedUpVector = localUpVector - localUpProjOnIntermediateForward;
-
-            var intermediateRight = Vector3D.Cross(intermediateFront, Vector3D.Up);
-            int rollSign = Vector3D.Dot(flattenedUpVector, intermediateRight) >= 0 ? 1 : -1;
-            roll = GetAngleBetween(flattenedUpVector, Vector3D.Up) * rollSign;
-        }
-
-        public static double GetAngleBetween(Vector3D a, Vector3D b)
-        {
-            if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-            {
-                return 0;
-            }
-            if (Vector3D.IsUnit(ref a) && Vector3D.IsUnit(ref b))
-            {
-                return Math.Acos(MathHelperD.Clamp(a.Dot(b), -1, 1));
-            }
-            return Math.Acos(MathHelperD.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
-        }*/
 
     }
 }
