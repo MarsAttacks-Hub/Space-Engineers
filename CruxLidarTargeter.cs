@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO when locking on target use roll user inputs 
         //LIDAR TARGETER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -76,15 +77,15 @@ namespace IngameScript
         readonly float rocketProjectileMaxSpeed = 200f;
         readonly double rocketProjectileMaxRange = 800d;
         readonly float gatlingProjectileMaxSpeed = 400f;
-        readonly double gatlingProjectileMaxRange = 800d;
-        readonly double gunsMaxRange = 800d;
+        readonly double gatlingProjectileMaxRange = 900d;
+        readonly double gunsMaxRange = 900d;
         readonly int fudgeAttempts = 8;
         
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings
         int selectedPayLoad = 0;//0 Missiles - 1 Drones
         bool autoFire = true;
         bool autoMissiles = false;
-        bool useAllGuns = false;
+        bool useAllGuns = true;
         bool sequenceWeapons = false;
         int fireCount = 0;
         int weaponIndex = 0;
@@ -156,9 +157,9 @@ namespace IngameScript
         PID pitchController;
         PID rollController;
         
-        //readonly string debugPanelName = "[CRX] Debug";
-        //IMyTextPanel DEBUG;
-        //StringBuilder debugLog = new StringBuilder("");
+        readonly string debugPanelName = "[CRX] Debug";
+        IMyTextPanel DEBUG;
+        StringBuilder debugLog = new StringBuilder("");
 
         Program()
         {
@@ -198,104 +199,112 @@ namespace IngameScript
 
         public void Main(string arg)
         {
-            Echo($"MISSILEANTENNAS:{MISSILEANTENNAS.Count}");
-            Echo($"LIDARS:{LIDARS.Count}");
-            Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-            Echo($"COCKPITS:{COCKPITS.Count}");
-            Echo($"TURRETS:{TURRETS.Count}");
-            Echo($"LIGHTS:{LIGHTS.Count}");
-            Echo($"SURFACES:{SURFACES.Count}");
-            Echo($"ALARMS:{ALARMS.Count}");
-            Echo($"GYROS:{GYROS.Count}");
-            Echo($"WELDERS:{WELDERS.Count}");
-            Echo($"ROCKETS:{ROCKETS.Count}");
-            Echo($"GATLINGS:{GATLINGS.Count}");
-            Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
-            Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
-            Echo($"CARGOS:{CARGOS.Count}");
-
-            if (targetName != null)
+            try
             {
+                Echo($"MISSILEANTENNAS:{MISSILEANTENNAS.Count}");
+                Echo($"LIDARS:{LIDARS.Count}");
+                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
+                Echo($"COCKPITS:{COCKPITS.Count}");
+                Echo($"TURRETS:{TURRETS.Count}");
+                Echo($"LIGHTS:{LIGHTS.Count}");
+                Echo($"SURFACES:{SURFACES.Count}");
+                Echo($"ALARMS:{ALARMS.Count}");
+                Echo($"GYROS:{GYROS.Count}");
+                Echo($"WELDERS:{WELDERS.Count}");
+                Echo($"ROCKETS:{ROCKETS.Count}");
+                Echo($"GATLINGS:{GATLINGS.Count}");
+                Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
+                Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
+                Echo($"CARGOS:{CARGOS.Count}");
+
                 RemoveLostMissiles();
                 GetMessages();
                 ReadMessages();
 
-                if (lostTicks > ticksScanDelay)//if lidars or turrets doesn't detect a enemy for some time reset the script
+                if (targetName != null)
                 {
-                    ResetTargeter();
-                    return;
-                }
-
-                ActivateTargeter();//things to run once when a enemy is detected
-
-                DeactivateOtherScriptsGyros();
-
-                bool targetFound = TurretsDetection(true);
-
-                if (!targetFound)
-                {
-                    targetFound = AcquireTarget();
-                }
-
-                if (targetFound && currentTick == ticksScanDelay)//send message to missiles every some ticks
-                {
-                    foreach (var id in MissileIDs)
+                    if (lostTicks > ticksScanDelay)//if lidars or turrets doesn't detect a enemy for some time reset the script
                     {
-                        SendMissileUnicastMessage(commandUpdate, id.Key);
+                        ResetTargeter();
+                        return;
                     }
 
-                    if (autoMissiles)
+                    ActivateTargeter();//things to run once when a enemy is detected
+
+                    DeactivateOtherScriptsGyros();
+
+                    bool targetFound = TurretsDetection(true);
+
+                    if (!targetFound)
                     {
-                        if (autoMissilesCounter > autoMissilesDelay)
+                        targetFound = AcquireTarget();
+                    }
+
+                    if (targetFound && currentTick == ticksScanDelay)//send message to missiles every some ticks
+                    {
+                        foreach (var id in MissileIDs)
                         {
-                            arg = commandLaunch;
-                            autoMissilesCounter = 0;
+                            SendMissileUnicastMessage(commandUpdate, id.Key);
                         }
-                        autoMissilesCounter++;
+
+                        if (autoMissiles)
+                        {
+                            if (autoMissilesCounter > autoMissilesDelay)
+                            {
+                                arg = commandLaunch;
+                                autoMissilesCounter = 0;
+                            }
+                            autoMissilesCounter++;
+                        }
                     }
+
+                    LockOnTarget(LIDARS[0]);
+
+                    CalculateTicks(targetFound);
+
+                    ManageGuns();
+
+                    ReadTargetInfo();
                 }
-
-                LockOnTarget(LIDARS[0]);
-
-                CalculateTicks(targetFound);
-
-                ManageGuns();
-
-                ReadTargetInfo();
-            }
-            else
-            {
-                if (doOnce)//things to run once when a enemy is lost
+                else
                 {
-                    ResetTargeter();
+                    if (doOnce)//things to run once when a enemy is lost
+                    {
+                        ResetTargeter();
+                        return;
+                    }
+
+                    ActivateOtherScriptsGyros();
+
+                    TurretsDetection(false);
                 }
 
-                ActivateOtherScriptsGyros();
+                bool completed = CheckProjectors();
+                if (completed && !missilesLoaded)
+                {
+                    missilesLoaded = LoadMissiles();
+                }
+                if (!completed)
+                {
+                    missilesLoaded = false;
+                }
 
-                TurretsDetection(false);
-            }
+                if (!String.IsNullOrEmpty(arg))
+                {
+                    ProcessArgs(arg);
+                }
 
-            bool completed = CheckProjectors();
-            if (completed && !missilesLoaded)
-            {
-                missilesLoaded = LoadMissiles();
+                if (writeCount == writeDelay)
+                {
+                    WriteInfo();
+                    writeCount = 0;
+                }
+                writeCount++;
             }
-            if (!completed)
+            catch (Exception e)
             {
-                missilesLoaded = false;
+                DEBUG.WriteText(e.Message);
             }
-
-            if (!String.IsNullOrEmpty(arg))
-            {
-                ProcessArgs(arg);
-            }
-
-            if (writeCount == writeDelay)
-            {
-                WriteInfo();
-                writeCount = 0;
-            }
-            writeCount++;
         }
 
         void ProcessArgs(string arg)
@@ -351,7 +360,8 @@ namespace IngameScript
                     break;
                 case argClear:
                     ResetTargeter();
-                    break;
+                    return;
+                    //break;
                 case argSwitchWeapon:
                     weaponType = (weaponType == 1 ? 2 : 1);
                     break;
@@ -733,9 +743,9 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle, globalTimestep);
-            double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
-            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
@@ -1021,36 +1031,6 @@ namespace IngameScript
                     }
                 }
             }
-            MissileIDs.Clear();
-            missilesInfo.Clear();
-
-            if (MAGNETICDRIVEPB != null)
-            {
-                if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
-                {
-                    bool mdRun = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
-                    MDOff = !mdRun;
-                }
-            }
-
-            GetBlocks();
-            SetBlocks();
-
-            GetMissileAntennas();
-            SetMissileAntennas();
-
-            if (selectedPayLoad == 0)
-            {
-                TEMPPROJECTORS = PROJECTORSMISSILES;
-                foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = true; }
-                foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = false; }
-            }
-            else if (selectedPayLoad == 1)
-            {
-                TEMPPROJECTORS = PROJECTORSDRONES;
-                foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = true; }
-                foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = false; }
-            }
         }
 
         void ActivateTargeter()
@@ -1157,6 +1137,7 @@ namespace IngameScript
                         {
                             if (!farShootOnce)
                             {
+                                weaponType = 2;
                                 foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
                                 farShootOnce = true;
                                 shootOnce = false;
@@ -1166,6 +1147,7 @@ namespace IngameScript
                         {
                             if (!shootOnce)
                             {
+                                weaponType = 1;
                                 shootOnce = true;
                                 farShootOnce = false;
                                 sequenceWeapons = true;
@@ -1366,7 +1348,7 @@ namespace IngameScript
             return transferred;
         }
 
-        void WriteInfo()//TODO write selectedGun
+        void WriteInfo()
         {
             foreach (IMyTextSurface surface in SURFACES)
             {
@@ -1431,10 +1413,7 @@ namespace IngameScript
         {
             targetLog.Clear();
             missileLog.Clear();
-            foreach (IMyTextSurface surface in SURFACES)
-            {
-                surface.WriteText("");
-            }
+            foreach (IMyTextSurface surface in SURFACES) { surface.WriteText(""); }
         }
 
         void GetBlocks()
@@ -1475,7 +1454,7 @@ namespace IngameScript
             CONTROLLER = CONTROLLERS[0];
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
-            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+            DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
         void SetBlocks()

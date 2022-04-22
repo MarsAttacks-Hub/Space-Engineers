@@ -107,9 +107,9 @@ namespace IngameScript
         public List<IMyInventory> GATLINGTURRETSINVENTORIES = new List<IMyInventory>();
         public List<IMyLargeMissileTurret> MISSILETURRETS = new List<IMyLargeMissileTurret>();
         public List<IMyInventory> MISSILETURRETSINVENTORIES = new List<IMyInventory>();
-        public List<IMySmallGatlingGun> GATLINGS = new List<IMySmallGatlingGun>();
+        public List<IMyUserControllableGun> GATLINGS = new List<IMyUserControllableGun>();
         public List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
-        public List<IMySmallMissileLauncher> LAUNCHERS = new List<IMySmallMissileLauncher>();
+        public List<IMyUserControllableGun> LAUNCHERS = new List<IMyUserControllableGun>();
         public List<IMyInventory> LAUNCHERSINVENTORIES = new List<IMyInventory>();
         public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
         public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
@@ -1128,7 +1128,7 @@ namespace IngameScript
         void BalanceGatlingsAmmo() {
             List<IMyInventory> gatlingInventories = new List<IMyInventory>();
             int totGatlingAmmo = 0;
-            foreach (IMySmallGatlingGun gatlingsTurret in GATLINGS) {
+            foreach (IMyUserControllableGun gatlingsTurret in GATLINGS) {
                 gatlingInventories.Add(gatlingsTurret.GetInventory());
                 totGatlingAmmo += gatlingsTurret.GetInventory().GetItemAmount(gatlingAmmo).ToIntSafe();
             }
@@ -1188,7 +1188,7 @@ namespace IngameScript
         void BalanceMissileLaunchersAmmo() {
             int totMissileAmmo = 0;
             List<IMyInventory> missileInventories = new List<IMyInventory>();
-            foreach (IMySmallMissileLauncher missileTurret in LAUNCHERS) {
+            foreach (IMyUserControllableGun missileTurret in LAUNCHERS) {
                 missileInventories.Add(missileTurret.GetInventory());
                 totMissileAmmo += missileTurret.GetInventory().GetItemAmount(missileAmmo).ToIntSafe();
             }
@@ -1518,11 +1518,11 @@ namespace IngameScript
             MISSILETURRETSINVENTORIES.Clear();
             MISSILETURRETSINVENTORIES.AddRange(MISSILETURRETS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             GATLINGS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMySmallGatlingGun>(GATLINGS, block => block.CustomName.Contains(gatlingsName));
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(GATLINGS, block => block.CustomName.Contains(gatlingsName));
             GATLINGSINVENTORIES.Clear();
             GATLINGSINVENTORIES.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             LAUNCHERS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMySmallMissileLauncher>(LAUNCHERS, block => block.CustomName.Contains(launchersName));
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(LAUNCHERS, block => block.CustomName.Contains(launchersName));
             LAUNCHERSINVENTORIES.Clear();
             LAUNCHERSINVENTORIES.AddRange(LAUNCHERS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             CONTAINERS.Clear();
