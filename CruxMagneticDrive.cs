@@ -21,7 +21,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //MAGNETIC DRIVE
+        //NAVIGATOR
 
         readonly string rotorsName = "Rotor_MD_A";
         readonly string rotorsInvName = "Rotor_MD_B";
@@ -48,9 +48,9 @@ namespace IngameScript
         const string argDeadMan = "DeadMan";
         const string argMagneticDrive = "ToggleMagneticDrive";
         const string argIdleThrusters = "ToggleIdleThrusters";
-
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
+
         const string argSunchaseOff = "SunchaseOff";
         
         bool magneticDrive = true;

@@ -22,7 +22,6 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO check if assemblers and refinery log return 
         //MANAGER
 
         readonly string solarsName = "[CRX] Solar";
@@ -283,8 +282,8 @@ namespace IngameScript
         };
 
         readonly Dictionary<MyDefinitionId, MyTuple<string, double>> componentsDefBpQuota = new Dictionary<MyDefinitionId, MyTuple<string, double>>() {
-            { MyItemType.MakeAmmo("Missile200mm"),              MyTuple.Create("Missile200mm",                  0d) },
-            { MyItemType.MakeAmmo("NATO_25x184mm"),             MyTuple.Create("NATO_25x184mmMagazine",         0d) },
+            { MyItemType.MakeAmmo("Missile200mm"),              MyTuple.Create("Missile200mm",                  5d) },
+            { MyItemType.MakeAmmo("NATO_25x184mm"),             MyTuple.Create("NATO_25x184mmMagazine",         5d) },
             { MyItemType.MakeComponent("BulletproofGlass"),     MyTuple.Create("BulletproofGlass",              5d) },
             { MyItemType.MakeComponent("Canvas"),               MyTuple.Create("Canvas",                        5d) },
             { MyItemType.MakeComponent("Computer"),             MyTuple.Create("ComputerComponent",             5d) },
@@ -861,7 +860,7 @@ namespace IngameScript
                     }
                 }
                 refineriesInputLog.Append("\n" + block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
-                int count = 2;
+                int count = 0;
                 foreach (KeyValuePair<MyDefinitionId, double> entry in oreDict) {
                     if (entry.Value != 0) {
                         refineriesInputLog.Append($"{entry.Key.SubtypeId} Ore: ").Append($"{(int)entry.Value}, ");
@@ -907,7 +906,7 @@ namespace IngameScript
                     }
                 }
                 assemblersInputLog.Append("\n" + block.CustomName.Replace(shipPrefix, "")).Append(" Input: \n");
-                int count = 2;
+                int count = 0;
                 foreach (KeyValuePair<MyDefinitionId, double> entry in ammosDict) {
                     if (entry.Value != 0) {
                         assemblersInputLog.Append($"{entry.Key.SubtypeId}: ").Append($"{(int)entry.Value}, ");
@@ -979,9 +978,9 @@ namespace IngameScript
                 StringBuilder text = new StringBuilder();
                 text.Append("INVENTORIES: \n");
                 text.Append(inventoriesPercentLog.ToString());
-                text.Append("\n");
+                //text.Append("\n");
                 text.Append(refineriesInputLog.ToString());
-                text.Append("\n");
+                //text.Append("\n");
                 text.Append(assemblersInputLog.ToString());
                 surface.WriteText(text);
             }
@@ -1319,8 +1318,9 @@ namespace IngameScript
                     }
                 }
             }
+            List<MyInventoryItem> cargoItems = null;
             foreach (IMyInventory cargoInv in CARGOINVENTORIES) {
-                List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
+                cargoItems = new List<MyInventoryItem>();
                 cargoInv.GetItems(cargoItems, item => item.Type.TypeId == ingotToQueue.TypeId.ToString());
                 foreach (MyInventoryItem item in cargoItems) {
                     foreach (var refinery in REFINERIES) {
@@ -1368,7 +1368,7 @@ namespace IngameScript
                     }
                 }
                 foreach (IMyInventory cargoInv in CARGOINVENTORIES) {
-                    List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
+                    cargoItems = new List<MyInventoryItem>();
                     cargoInv.GetItems(cargoItems, item => item.Type.TypeId == ingotToQueue.TypeId.ToString());
                     foreach (MyInventoryItem item in cargoItems) {
                         foreach (var refinery in REFINERIES) {
