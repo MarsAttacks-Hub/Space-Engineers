@@ -82,7 +82,7 @@ namespace IngameScript
         readonly int fudgeAttempts = 8;
         
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings
-        int selectedPayLoad = 0;//0 Missiles - 1 Drones
+        int selectedPayLoad = 1;//0 Missiles - 1 Drones
         bool autoFire = true;
         bool autoMissiles = false;
         bool useAllGuns = true;
