@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO set variable to weld and launch once
         //DECOY
 
         readonly string ProjectorsDecoyName = "Decoy";

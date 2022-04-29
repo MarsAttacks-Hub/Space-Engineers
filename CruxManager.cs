@@ -52,6 +52,7 @@ namespace IngameScript
         readonly string launchersName = "[CRX] Rocket";
         readonly string gatlingsName = "[CRX] Gatling";
         readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
+        readonly string debugPanelName = "[CRX] Debug";
 
         const string argTogglePB = "TogglePB";
         const string argSunChaserToggle = "SunChaserToggle";
@@ -88,7 +89,6 @@ namespace IngameScript
         float solarMaxOutput;
         float turbineMaxOutput;
         float registeredhEngMaxOutput;
-        double uraniumKg;
 
         public List<IMyTerminalBlock> TERMINALS = new List<IMyTerminalBlock>();
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
@@ -126,8 +126,9 @@ namespace IngameScript
         public List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
-        public IMyTextPanel LCDSUNCHASER;
-        
+        IMyTextPanel LCDSUNCHASER;
+        IMyTextPanel DEBUG;
+
         readonly MyIni myIni = new MyIni();
 
         readonly MyDefinitionId electricityId = new MyDefinitionId(typeof(VRage.Game.ObjectBuilders.Definitions.MyObjectBuilder_GasProperties), "Electricity");
@@ -150,10 +151,7 @@ namespace IngameScript
         public StringBuilder assemblersInputLog = new StringBuilder("");
         public StringBuilder inventoriesPercentLog = new StringBuilder("");
         public StringBuilder powerLog = new StringBuilder("");
-        
-        //public StringBuilder debugLog = new StringBuilder("");
-        //readonly string debugPanelName = "[CRX] Debug";
-        //IMyTextPanel DEBUG;
+        public StringBuilder debugLog = new StringBuilder("");
 
         public Dictionary<MyDefinitionId, double> oreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
             {MyItemType.MakeOre("Cobalt"),0},
@@ -363,80 +361,87 @@ namespace IngameScript
         }
 
         public void Main(string argument) {
-            Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-            Echo($"COCKPITS:{COCKPITS.Count}");
-            Echo($"GYROS:{GYROS.Count}");
-            Echo($"THRUSTERS:{THRUSTERS.Count}");
-            Echo($"SOLARS:{SOLARS.Count}");
-            Echo($"TURBINES:{TURBINES.Count}");
-            Echo($"BATTERIES:{BATTERIES.Count}");
-            Echo($"REACTORS:{REACTORS.Count}");
-            Echo($"GASGENERATORS:{GASGENERATORS.Count}");
-            Echo($"HENGINES:{HENGINES.Count}");
-            Echo($"REFINERIES:{REFINERIES.Count}");
-            Echo($"ASSEMBLERS:{ASSEMBLERS.Count}");
-            Echo($"CONTAINERS:{CONTAINERS.Count}");
-            Echo($"CONNECTORS:{CONNECTORS.Count}");
-            Echo($"HTANKS:{HTANKS.Count}");
-            Echo($"GATLINGS:{GATLINGS.Count}");
-            Echo($"LAUNCHERS:{LAUNCHERS.Count}");
-            Echo($"GATLINGTURRETS:{GATLINGTURRETS.Count}");
-            Echo($"MISSILETURRETS:{MISSILETURRETS.Count}");
-            Echo($"TERMINALS:{TERMINALS.Count}");
-            Echo($"BLOCKSWITHINVENTORY:{BLOCKSWITHINVENTORY.Count}");
-            Echo($"INVENTORIES:{INVENTORIES.Count}");
-            Echo($"LCDSSTATUS:{LCDSSTATUS.Count}");
-            Echo($"POWERSURFACES:{POWERSURFACES.Count}");
-            Echo($"INVENTORYSURFACES:{INVENTORYSURFACES.Count}");
-            Echo($"COMPONENTSURFACES:{COMPONENTSURFACES.Count}");
+            try { 
+                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
+                Echo($"COCKPITS:{COCKPITS.Count}");
+                Echo($"GYROS:{GYROS.Count}");
+                Echo($"THRUSTERS:{THRUSTERS.Count}");
+                Echo($"SOLARS:{SOLARS.Count}");
+                Echo($"TURBINES:{TURBINES.Count}");
+                Echo($"BATTERIES:{BATTERIES.Count}");
+                Echo($"REACTORS:{REACTORS.Count}");
+                Echo($"GASGENERATORS:{GASGENERATORS.Count}");
+                Echo($"HENGINES:{HENGINES.Count}");
+                Echo($"REFINERIES:{REFINERIES.Count}");
+                Echo($"ASSEMBLERS:{ASSEMBLERS.Count}");
+                Echo($"CONTAINERS:{CONTAINERS.Count}");
+                Echo($"CONNECTORS:{CONNECTORS.Count}");
+                Echo($"HTANKS:{HTANKS.Count}");
+                Echo($"GATLINGS:{GATLINGS.Count}");
+                Echo($"LAUNCHERS:{LAUNCHERS.Count}");
+                Echo($"GATLINGTURRETS:{GATLINGTURRETS.Count}");
+                Echo($"MISSILETURRETS:{MISSILETURRETS.Count}");
+                Echo($"TERMINALS:{TERMINALS.Count}");
+                Echo($"BLOCKSWITHINVENTORY:{BLOCKSWITHINVENTORY.Count}");
+                Echo($"INVENTORIES:{INVENTORIES.Count}");
+                Echo($"LCDSSTATUS:{LCDSSTATUS.Count}");
+                Echo($"POWERSURFACES:{POWERSURFACES.Count}");
+                Echo($"INVENTORYSURFACES:{INVENTORYSURFACES.Count}");
+                Echo($"COMPONENTSURFACES:{COMPONENTSURFACES.Count}");
 
-            if (!string.IsNullOrEmpty(argument)) { ProcessArgument(argument); }
+                if (!string.IsNullOrEmpty(argument)) { ProcessArgument(argument); }
 
-            if (!IsInGravity() && !sunChaserPaused) { SunChase(); }
+                if (!IsInGravity() && !sunChaserPaused) { SunChase(); }
 
-            CalcPower();
-            PowerManager();
-            ReadPowerInfos();
-            WritePowerInfo();
+                CalcPower();
+                PowerManager();
+                ReadPowerInfos();
+                WritePowerInfo();
 
-            if (ticks == 1) {
-                //debugLog.Clear();
-                MoveProductionOutputsToMainInventory();
-                MoveItemsIntoCargo(CONNECTORSINVENTORIES);
-            } else if (ticks == 5) {
-                CompactInventory();
-                CompactMainCargos();
-            } else if (ticks == 10) {
-                FillFromCargo(GASINVENTORIES, "Ice");
-                FillFromCargo(REACTORSINVENTORIES, "Uranium");
-            } else if (ticks == 15) {
-                FillFromCargo(GATLINGSINVENTORIES, "NATO_25x184mm");
-                FillFromCargo(GATLINGTURRETSINVENTORIES, "NATO_25x184mm");
-            } else if (ticks == 20) {
-                FillFromCargo(LAUNCHERSINVENTORIES, "Missile200mm");
-                FillFromCargo(MISSILETURRETSINVENTORIES, "Missile200mm");
-            } else if (ticks == 25) {
-                BalanceGatlingTurretsAmmo();
-                BalanceMissileTurretsAmmo();
-            } else if (ticks == 30) {
-                BalanceGatlingsAmmo();
-                BalanceMissileLaunchersAmmo();
-            } else if (ticks == 35) {
-                BalanceHidrogenGeneratorsIce();
-                BalanceReactorsUranium();
-            } else if (ticks == 40) {
-                ReadAllItems(CARGOINVENTORIES);
-                AutoAssemblers();
-            } else if (ticks == 45) {
-                AutoRefineries();
-            } else if (ticks >= 50) {
-                ReadInventoryInfos();
-                WriteInventoryInfo();
-                WriteComponentsInfo();
-                ticks = 0;
-                //if (DEBUG != null) { DEBUG.WriteText(debugLog); }
+                if (ticks == 1) {
+                    MoveProductionOutputsToMainInventory();
+                    MoveItemsIntoCargo(CONNECTORSINVENTORIES);
+                } else if (ticks == 5) {
+                    CompactInventory();
+                    CompactMainCargos();
+                } else if (ticks == 10) {
+                    FillFromCargo(GASINVENTORIES, "Ice");
+                    FillFromCargo(REACTORSINVENTORIES, "Uranium");
+                } else if (ticks == 15) {
+                    FillFromCargo(GATLINGSINVENTORIES, "NATO_25x184mm");
+                    FillFromCargo(GATLINGTURRETSINVENTORIES, "NATO_25x184mm");
+                } else if (ticks == 20) {
+                    FillFromCargo(LAUNCHERSINVENTORIES, "Missile200mm");
+                    FillFromCargo(MISSILETURRETSINVENTORIES, "Missile200mm");
+                } else if (ticks == 25) {
+                    BalanceGatlingTurretsAmmo();
+                    BalanceMissileTurretsAmmo();
+                } else if (ticks == 30) {
+                    BalanceGatlingsAmmo();
+                    BalanceMissileLaunchersAmmo();
+                } else if (ticks == 35) {
+                    BalanceHidrogenGeneratorsIce();
+                    BalanceReactorsUranium();
+                } else if (ticks == 40) {
+                    ReadAllItems(CARGOINVENTORIES);
+                    AutoAssemblers();
+                } else if (ticks == 45) {
+                    AutoRefineries();
+                } else if (ticks >= 50) {
+                    ReadInventoryInfos();
+                    WriteInventoryInfo();
+                    WriteComponentsInfo();
+                    ticks = 0;
+                }
+                ticks++;
             }
-            ticks++;
+            catch (Exception e)
+            {
+                DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                debugLog.Clear();
+                debugLog.Append(e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                DEBUG.WriteText(debugLog);
+            }
         }
 
         void ProcessArgument(string argument) {
@@ -633,7 +638,6 @@ namespace IngameScript
             GetTurbinesOutput();
             GetHydrogenEnginesOutput();
             GetPercentTanksCapacity();
-            GetReactorsOutput();
         }
 
         void GetPowInOut() {
@@ -682,11 +686,6 @@ namespace IngameScript
             hEngMaxOutput = maxOutput;
         }
 
-        void GetReactorsOutput() {
-            uraniumKg = 0;
-            foreach (IMyReactor reactor in REACTORS) { uraniumKg += (double)reactor.GetInventory(0).CurrentMass; }
-        }
-
         void GetBatteriesInOut() {
             battsCurrentInput = 0;
             battsCurrentOutput = 0;
@@ -718,23 +717,32 @@ namespace IngameScript
 
         void ReadPowerInfos() {
             powerLog.Clear();
-            powerLog.Append("Status: ").Append(powerStatus).Append("\n");
+            powerLog.Append("Status: ").Append(powerStatus).Append(", ");
             if (sunChaserPaused) { 
                 LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
-                powerLog.Append("SunChase OFF\n"); 
+                powerLog.Append("SunChase: OFF"); 
             } else { 
                 LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
-                powerLog.Append("SunChase ON\n"); 
+                powerLog.Append("SunChase: ON"); 
             }
-            powerLog.Append("Current Input: ").Append(terminalCurrentInput.ToString("0.00")).Append("\n");
+            powerLog.Append("\n");
+            powerLog.Append("Current Input: ").Append(terminalCurrentInput.ToString("0.00")).Append(", ");
             powerLog.Append("Max Req. Input: ").Append(terminalMaxRequiredInput.ToString("0.00")).Append("\n");
             powerLog.Append("Solar Power: ").Append(solarMaxOutput.ToString("0.00")).Append("\n");
             if (turbineMaxOutput > 0) { powerLog.Append("Turbines Power: ").Append(turbineMaxOutput.ToString("0.00")).Append("\n"); }
-            powerLog.Append("Batteries Curr. In: ").Append(battsCurrentInput.ToString("0.00")).Append("\n");
-            powerLog.Append("Batteries Curr. Out: ").Append(battsCurrentOutput.ToString("0.00")).Append("\n");
+            powerLog.Append("Batteries Curr. In: ").Append(battsCurrentInput.ToString("0.00")).Append(", ");
+            powerLog.Append("Out: ").Append(battsCurrentOutput.ToString("0.00")).Append("\n");
             powerLog.Append("H2Tanks Fill: ").Append(tankCapacityPercent.ToString("0.00")).Append("%\n");
             powerLog.Append("H2Engine Max Out: ").Append(registeredhEngMaxOutput.ToString("0.00")).Append("\n");
-            powerLog.Append("Uranium Kg: ").Append(uraniumKg.ToString("0.00")).Append("\n");
+            double num;
+            oreDict.TryGetValue(iceOre, out num);
+            powerLog.Append("Ice: ").Append(num.ToString("0.0")).Append(", ");
+            ingotsDict.TryGetValue(uraniumIngot, out num);
+            powerLog.Append("Uranium: ").Append(num.ToString("0.0")).Append("\n");
+            ammosDict.TryGetValue(gatlingAmmo, out num);
+            powerLog.Append("Gatling Ammo: ").Append(num.ToString("0.0")).Append(", ");
+            ammosDict.TryGetValue(missileAmmo, out num);
+            powerLog.Append("Rockets: ").Append(num.ToString("0.0")).Append("\n");
         }
 
         void ReadInventoryInfos() {
@@ -978,9 +986,7 @@ namespace IngameScript
                 StringBuilder text = new StringBuilder();
                 text.Append("INVENTORIES: \n");
                 text.Append(inventoriesPercentLog.ToString());
-                //text.Append("\n");
                 text.Append(refineriesInputLog.ToString());
-                //text.Append("\n");
                 text.Append(assemblersInputLog.ToString());
                 surface.WriteText(text);
             }
@@ -1296,7 +1302,7 @@ namespace IngameScript
             MoveItemsIntoCargo(REFINERIESINVENTORIES);
             ReadAllItems(CARGOINVENTORIES);
             MyDefinitionId blueprintDef = default(MyDefinitionId);
-            MyItemType ingotToQueue = default(MyItemType);
+            MyDefinitionId ingotToQueue = default(MyDefinitionId);
             double ingotToQueueAmount = 100000;
             bool unprintable = false;
             foreach (var availableIngots in ingotsDict) {
@@ -1318,9 +1324,8 @@ namespace IngameScript
                     }
                 }
             }
-            List<MyInventoryItem> cargoItems = null;
             foreach (IMyInventory cargoInv in CARGOINVENTORIES) {
-                cargoItems = new List<MyInventoryItem>();
+                List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
                 cargoInv.GetItems(cargoItems, item => item.Type.TypeId == ingotToQueue.TypeId.ToString());
                 foreach (MyInventoryItem item in cargoItems) {
                     foreach (var refinery in REFINERIES) {
@@ -1368,7 +1373,7 @@ namespace IngameScript
                     }
                 }
                 foreach (IMyInventory cargoInv in CARGOINVENTORIES) {
-                    cargoItems = new List<MyInventoryItem>();
+                    List<MyInventoryItem> cargoItems = new List<MyInventoryItem>();
                     cargoInv.GetItems(cargoItems, item => item.Type.TypeId == ingotToQueue.TypeId.ToString());
                     foreach (MyInventoryItem item in cargoItems) {
                         foreach (var refinery in REFINERIES) {
@@ -1560,7 +1565,7 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdComponentsName));
             foreach (IMyTextPanel panel in panels) { COMPONENTSURFACES.Add(panel as IMyTextSurface); }
             LCDSUNCHASER = GridTerminalSystem.GetBlockWithName(sunChaserPanelName) as IMyTextPanel;
-            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+            DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
         void ResetOreDict() {

@@ -23,6 +23,7 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         //TODO spiral doesn't work
+        //test beam ride
         //HOMING MISSILE
 
         readonly string antennaName = "A [M]1";
@@ -49,7 +50,7 @@ namespace IngameScript
         readonly string statusCruising = "Cruising";
         readonly string statusLaunched = "Launched";
 
-        readonly int missileType = 0;//0 kinetic - 1 explosive - 2 drone
+        int missileType = 0;//0 kinetic - 1 explosive - 2 drone
         readonly int weaponType = 0;//0 None - 1 Rockets - 2 Gatlings
         readonly int startThrustersDelay = 50;
         readonly int startTargetingDelay = 100;
@@ -63,11 +64,14 @@ namespace IngameScript
         readonly float rocketProjectileMaxSpeed = 200f;
         readonly float gatlingProjectileMaxSpeed = 400f;
         readonly double gunsMaxRange = 800d;
-        
+        readonly int checkLoadDelay = 100;
+
         const double rpm2Rad = Math.PI / 30;
         const double deg2Rad = Math.PI / 180;
         const double updatesPerSecond = 10.0;
         const double gyroSlowdownAngle = Math.PI / 36;
+        const double rad2deg = 180 / Math.PI;
+        const double angleTolerance = 2;//degrees
 
         bool useSpiral = false;
         double fuseDistance = 7d;
@@ -98,13 +102,17 @@ namespace IngameScript
         bool rightAltitude = true;
         bool tooAbove = true;
         bool tooBelow = true;
+        bool readyToFire = false;
+        bool readyToFireOnce = true;
+        int checkLoad = 0;
+        bool creative = false;
 
         Vector3D platformPosition;
         MatrixD platformMatrix;
         Vector3D targetPosition;
         Vector3 targetVelocity;
         Vector3 prevTargetVelocity = new Vector3();
-        
+
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
         public List<IMyThrust> ALLTHRUSTERS = new List<IMyThrust>();
@@ -115,7 +123,7 @@ namespace IngameScript
         public List<IMyThrust> DOWNWARDTHRUSTERS = new List<IMyThrust>();
         public List<IMyShipMergeBlock> MERGES = new List<IMyShipMergeBlock>();
         public List<IMyWarhead> WARHEADS = new List<IMyWarhead>();
-        public List<IMyPowerProducer> GENERATORS = new List<IMyPowerProducer>();
+        public List<IMyPowerProducer> GENERATORS = new List<IMyPowerProducer>();//IMyGasGenerator
         public List<IMyShipConnector> CONNECTORS = new List<IMyShipConnector>();
         public List<IMyTerminalBlock> TBLOCKS = new List<IMyTerminalBlock>();
         public List<IMyUserControllableGun> ROCKETS = new List<IMyUserControllableGun>();
@@ -127,7 +135,11 @@ namespace IngameScript
 
         IMyUnicastListener UNICASTLISTENER;
         IMyBroadcastListener BROADCASTLISTENER;
-        
+
+        readonly MyItemType missileAmmo = MyItemType.MakeAmmo("Missile200mm");
+        readonly MyItemType gatlingAmmo = MyItemType.MakeAmmo("NATO_25x184mm");
+        readonly MyItemType iceOre = MyItemType.MakeOre("Ice");
+
         PID yawController;
         PID pitchController;
         PID rollController;
@@ -183,7 +195,7 @@ namespace IngameScript
             {
                 GetMessages();
 
-                if (command.Equals(commandLaunch) && !launched)
+                if (!launched && command.Equals(commandLaunch))
                 {
                     if (!init)
                     {
@@ -199,7 +211,7 @@ namespace IngameScript
 
                     UpdateBroadcastRange(platformPosition);
                 }
-                else if (command.Equals(commandUpdate) || command.Equals(commandSpiral))
+                else if (launched && (command.Equals(commandUpdate) || command.Equals(commandSpiral)))
                 {
                     if (command.Equals(commandSpiral))
                     {
@@ -231,7 +243,7 @@ namespace IngameScript
                         prevTargetVelocity = targetVelocity;
                     }
                 }
-                else if (command.Equals(commandLost))
+                else if (launched && command.Equals(commandLost))
                 {
                     if (lostOnce)
                     {
@@ -244,7 +256,7 @@ namespace IngameScript
 
                     ManageBrakes();
                 }
-                else if (command.Equals(commandBeamRide))
+                else if (launched && command.Equals(commandBeamRide))
                 {
                     if (beamRideOnce)
                     {
@@ -264,7 +276,38 @@ namespace IngameScript
 
                     SendUnicastMessage();
                 }
-                //if (writeCount == writeDelay) { writeCount = 0; } writeCount++;
+                else if (!launched && command.Equals(commandBeamRide))
+                {
+                    if (!init)
+                    {
+                        GetAntenna();
+                        GetBlocks();
+                        init = true;
+                    }
+
+                    if (launchOnce)
+                    {
+                        InitiateLaunch();
+                    }
+
+                    if (beamRideOnce)
+                    {
+                        InitiateBeamRide();
+                    }
+
+                    if (!startTargeting)
+                    {
+                        InitiateThrusters();
+                    }
+                    else
+                    {
+                        BeamRide();
+                    }
+
+                    UpdateBroadcastRange(platformPosition);
+
+                    SendUnicastMessage();
+                }
             }
         }
 
@@ -276,11 +319,11 @@ namespace IngameScript
                 {
                     var msg = UNICASTLISTENER.AcceptMessage();
 
-                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD>,
+                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                             MyTuple<Vector3, Vector3D>>>)
                     {
 
-                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD>,
+                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                                     MyTuple<Vector3, Vector3D>>>)msg.Data;
 
                         currentTick = 1;
@@ -297,6 +340,7 @@ namespace IngameScript
                             command = tup1.Item2;
                             platformPosition = tup1.Item3;
                             platformMatrix = tup1.Item4;
+                            creative = tup1.Item5;
 
                             targetVelocity = tup2.Item1;
                             targetPosition = tup2.Item2;
@@ -311,11 +355,11 @@ namespace IngameScript
                 {
                     var msg = BROADCASTLISTENER.AcceptMessage();
 
-                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD>,
+                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                             MyTuple<Vector3, Vector3D>>>)
                     {
 
-                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD>,
+                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                                     MyTuple<Vector3, Vector3D>>>)msg.Data;
 
                         currentTick = 1;
@@ -336,6 +380,7 @@ namespace IngameScript
                                 command = tup1.Item2;
                                 platformPosition = tup1.Item3;
                                 platformMatrix = tup1.Item4;
+                                creative = tup1.Item5;
 
                                 targetVelocity = tup2.Item1;
                                 targetPosition = tup2.Item2;
@@ -346,6 +391,7 @@ namespace IngameScript
                                 command = tup1.Item2;
                                 platformPosition = tup1.Item3;
                                 platformMatrix = tup1.Item4;
+                                creative = tup1.Item5;
 
                                 targetVelocity = tup2.Item1;
                                 targetPosition = tup2.Item2;
@@ -578,7 +624,64 @@ namespace IngameScript
                 LockOnTarget(CONTROLLER);
 
                 ManageDrone();
+
+                if (!creative)
+                {
+                    if (checkLoad >= checkLoadDelay)
+                    {
+                        bool hasAmmo = CheckAmmo();
+                        double hasIce = CheckIce();
+                        if (!hasAmmo || hasIce < 5d)
+                        {
+                            missileType = 0;//suicide
+                        }
+                        checkLoad = 0;
+                    }
+                    checkLoad++;
+                }
             }
+        }
+
+        bool CheckAmmo(){
+            bool gatlingAmmoFound = false;
+            List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
+            GATLINGSINVENTORIES.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            foreach (IMyInventory sourceInventory in GATLINGSINVENTORIES)
+            {
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                sourceInventory.GetItems(items, item => item.Type.TypeId == gatlingAmmo.TypeId.ToString());
+                if (items.Count > 0)
+                {
+                    gatlingAmmoFound = true;
+                    break;
+                }
+            }
+            return gatlingAmmoFound;
+        }
+
+        double CheckIce(){
+            double currentVolume = 0d;
+            double maxVolume = 0d;
+            //double iceAmount = 0d;
+            List<IMyInventory> GENERATORSINVENTORIES = new List<IMyInventory>();
+            GENERATORSINVENTORIES.AddRange(GENERATORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+            foreach (IMyInventory sourceInventory in GENERATORSINVENTORIES)
+            {
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                sourceInventory.GetItems(items, item => item.Type.TypeId == iceOre.TypeId.ToString());
+                if (items.Count > 0)
+                {
+                    currentVolume += (double)sourceInventory.CurrentVolume;
+                    maxVolume += (double)sourceInventory.MaxVolume;
+                    //foreach (var item in items) { iceAmount += (double)item.Amount; }
+                }
+            }
+            double percent = 0;
+            if (maxVolume > 0 && currentVolume > 0)
+            {
+                percent = currentVolume / maxVolume * 100;
+            }
+            return percent;
         }
 
         void ManageDrone()
@@ -591,8 +694,6 @@ namespace IngameScript
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = 0f; }
-                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
-                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; }
                     approaching = false;
                     rightDistance = true;
                     tooClose = true;
@@ -606,8 +707,6 @@ namespace IngameScript
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = 0f; }
-                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
-                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; }
                     approaching = true;
                     rightDistance = false;
                     tooClose = true;
@@ -621,8 +720,6 @@ namespace IngameScript
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
-                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
-                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; }
                     approaching = true;
                     rightDistance = true;
                     tooClose = false;
@@ -636,12 +733,29 @@ namespace IngameScript
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = 0f; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = 0f; }
-                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
                     approaching = true;
                     rightDistance = true;
                     tooClose = true;
                     tooFar = false;
+                }
+            }
+
+            if (readyToFire && distanceFromTarget < 800)
+            {
+                if (readyToFireOnce)
+                {
+                    readyToFireOnce = false;
+                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
+                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; }
+                }
+            }
+            else
+            {
+                if (!readyToFireOnce)
+                {
+                    readyToFireOnce = true;
+                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
+                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
                 }
             }
 
@@ -787,11 +901,22 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle);
-            double pitchSpeed = pitchController.Control(pitchAngle);
-            double rollSpeed = rollController.Control(rollAngle);
+            double yawSpeed = yawController.Control(yawAngle, globalTimestep);
+            double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
+            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+
+            Vector3D forwardVec = REF.WorldMatrix.Forward;
+            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
+            if (angle * rad2deg <= angleTolerance)
+            {
+                readyToFire = true;
+            }
+            else
+            {
+                readyToFire = false;
+            }
         }
         
         Vector3D ComputeInterceptWithLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, IMyTerminalBlock muzzle)
