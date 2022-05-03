@@ -132,7 +132,6 @@ namespace IngameScript
                     launchTick++;
                 }
             }
-            
         }
 
         void ProcessArgument(string argument)
@@ -143,7 +142,7 @@ namespace IngameScript
                     toggle = !toggle;
                     break;
                 case argSwitch:
-                    if (!launchOnce)
+                    if (!launchOnce && launchTick == 0)
                     {
                         if (selectedDrop == 1)
                         {
@@ -160,7 +159,7 @@ namespace IngameScript
                     }
                     break;
                 case argLaunchOne:
-                    if (launchTick == 0 && !toggle)
+                    if (!launchOnce && launchTick == 0)
                     {
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                         launchOnce = true;

@@ -24,6 +24,7 @@ namespace IngameScript
     {
         //TODO spiral doesn't work
         //beam doesn't work
+        //missile detach even if the target is null
         //HOMING MISSILE
 
         readonly string antennaName = "A [M]1";

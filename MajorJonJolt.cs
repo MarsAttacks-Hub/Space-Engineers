@@ -40,11 +40,13 @@ namespace IngameScript
         readonly string merges3Name = "3 Jolt";
         
         const string argFire = "FireJolt";
+        const string argToggle = "Toggle";
 
         int inittick = 0;
         int firetick = 0; 
         bool firing = false;
         bool ready = false;
+        bool toggle = true;
 
         public List<IMyMotorBase> HINGESDETACH = new List<IMyMotorBase>();
         public List<IMyMotorBase> HINGESFRONT = new List<IMyMotorBase>();
@@ -111,14 +113,11 @@ namespace IngameScript
                 ProcessArgs(arg);
             }
 
-            if (firing == true)
+            if (firing)
             {
                 Fire();
             }
-            else if (Me.CustomData == "" && firing == false) { 
-                firetick = 0; 
-                Fire(); 
-            }
+            //else if (Me.CustomData == "" && !firing) { firetick = 0; Fire(); }
             else if (Me.CustomData == "0")
             {
                 Init_1();
@@ -142,17 +141,21 @@ namespace IngameScript
 
         public void Fire()
         {
-            firing = true;
+            if (firetick == 0)
+            {
+                foreach (IMyProjector block in PROJECTORS) { block.Enabled = true; }
+                foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
+                    
+                firetick++;
+            }
 
             if (!ready)
             {
-                Runtime.UpdateFrequency = UpdateFrequency.Update10;
-
                 ready = CheckProjectors();
             }
             else
             {
-                if(firetick == 0)
+                if(firetick == 1)
                 {
                     Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
@@ -165,7 +168,7 @@ namespace IngameScript
                         }
                     }
                 }
-                if(firetick == 1)
+                if(firetick == 2)
                 {
                     foreach(IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) {
                         if (piston.PendingAttachment) { 
@@ -174,7 +177,7 @@ namespace IngameScript
                         }
                     }
                 }
-                if(firetick == 2)
+                if(firetick == 3)
                 {
                     foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Retract(); }
 
@@ -204,12 +207,16 @@ namespace IngameScript
                 }
                 else if(firetick == 260)
                 {
-                    Runtime.UpdateFrequency = UpdateFrequency.None;
-                    firing = false;
+                    if (toggle)
+                    {
+                        Runtime.UpdateFrequency = UpdateFrequency.None;
+                        firing = false;
+                    }
                     ready = false;
                     firetick = 0;
+                    return;
                 }
-
+                
                 firetick++;
             }
         }
@@ -218,7 +225,17 @@ namespace IngameScript
         {
             switch (arg)
             {
-                case argFire: Fire(); break;
+                case argToggle:
+                    toggle = !toggle;
+                    break;
+                case argFire:
+                    if (!firing && firetick == 0)
+                    {
+                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                        firing = true;
+                        firetick = 0;
+                    }
+                    break;
             }
         }
 
@@ -233,11 +250,8 @@ namespace IngameScript
             if (blocksCount == 0)
             {
                 foreach (IMyShipWelder block in WELDERS) { block.Enabled = false; }
+                foreach (IMyProjector block in PROJECTORS) { block.Enabled = false; }
                 completed = true;
-            }
-            else
-            {
-                foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
             }
             return completed;
         }
