@@ -21,6 +21,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO add security system where if uncontroller and a turret detect a eneemy the ship fly away from it
+        //or calculate the enemy trajectory vector and if it's going toward the ship then move away (evasive manouvre)
         //NAVIGATOR
 
         readonly string rotorsName = "Rotor_MD_A";

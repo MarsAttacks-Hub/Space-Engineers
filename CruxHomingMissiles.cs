@@ -23,7 +23,7 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         //TODO spiral doesn't work
-        //test beam ride
+        //beam doesn't work
         //HOMING MISSILE
 
         readonly string antennaName = "A [M]1";
