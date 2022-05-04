@@ -314,14 +314,11 @@ namespace IngameScript
             }
             catch (Exception e)
             {
-                if (DEBUG != null)
-                {
-                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
-                    debugLog = new StringBuilder("");
-                    DEBUG.ReadText(debugLog, true);
-                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
-                    DEBUG.WriteText(debugLog);
-                }
+                DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                debugLog = new StringBuilder("");
+                DEBUG.ReadText(debugLog, true);
+                debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                DEBUG.WriteText(debugLog);
             }
         }
 
@@ -936,14 +933,11 @@ namespace IngameScript
                     {
                         var data = (ImmutableArray<MyTuple<string>>)igcMessage.Data;
 
-                        if (DEBUG != null)
-                        {
-                            DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
-                            debugLog = new StringBuilder("");
-                            DEBUG.ReadText(debugLog, true);
-                            debugLog.Append("\n" + data[0].Item1 + "\n");
-                            DEBUG.WriteText(debugLog);
-                        }
+                        DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                        debugLog = new StringBuilder("");
+                        DEBUG.ReadText(debugLog, true);
+                        debugLog.Append("\n" + data[0].Item1 + "\n");
+                        DEBUG.WriteText(debugLog);
                     }
                 }
                 //eliminate duplicates by preferring entries from the first dictionary

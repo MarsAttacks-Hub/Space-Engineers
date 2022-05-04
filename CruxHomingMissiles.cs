@@ -145,12 +145,6 @@ namespace IngameScript
         PID pitchController;
         PID rollController;
 
-        //readonly string debugPanelName = "[M]1 Debug";
-        //IMyTextPanel DEBUG;
-        //public StringBuilder debugLog = new StringBuilder("");
-        //readonly int writeDelay = 10;
-        //int writeCount = 0;
-
         Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
@@ -1435,7 +1429,6 @@ namespace IngameScript
             TURRETS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyLargeTurretBase>(TURRETS, b => b.CustomName.Contains(missileTag) && b.CustomName.Contains(turretsName));
             CONTROLLER = CONTROLLERS[0];
-            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 
         void InitPIDControllers(IMyTerminalBlock block)
