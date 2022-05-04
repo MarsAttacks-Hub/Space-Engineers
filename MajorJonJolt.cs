@@ -25,25 +25,21 @@ namespace IngameScript
         //JOLT
 
         readonly string joltName = "Jolt";
-
         readonly string hingeDetachName = "Detach Jolt";
         readonly string hingeFrontName = "Front Jolt";
-
         readonly string pistonsDoubleOuterName = "Double Outer";
         readonly string pistonsDoubleInnerName = "Double Inner";
         readonly string pistonsFrontName = "Front Jolt";
-
         readonly string ammoName = "Ammo Jolt";
-
         readonly string merges1Name = "1 Jolt";
         readonly string merges2Name = "2 Jolt";
         readonly string merges3Name = "3 Jolt";
-        
+
         const string argFire = "FireJolt";
         const string argToggle = "Toggle";
 
         int inittick = 0;
-        int firetick = 0; 
+        int firetick = 0;
         bool firing = false;
         bool ready = false;
         bool toggle = true;
@@ -66,7 +62,7 @@ namespace IngameScript
         public List<IMyShipMergeBlock> MERGES1 = new List<IMyShipMergeBlock>();
         public List<IMyShipMergeBlock> MERGES2 = new List<IMyShipMergeBlock>();
         public List<IMyShipMergeBlock> MERGES3 = new List<IMyShipMergeBlock>();
-        
+
         Program()
         {
             HINGESDETACH.Clear();
@@ -95,7 +91,7 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(BATTERIES, block => block.CustomName.Contains(ammoName));
             MERGES.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES, block => block.CustomName.Contains(ammoName));
-            
+
             MERGES1.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES1, block => block.CustomName.Contains(merges1Name));
             MERGES2.Clear();
@@ -106,7 +102,15 @@ namespace IngameScript
 
         public void Main(string arg, UpdateType updateSource)
         {
-            Echo(firetick.ToString());
+            Echo($"HINGESDETACH:{HINGESDETACH.Count}");
+            Echo($"HINGESFRONT:{HINGESFRONT.Count}");
+            Echo($"HINGESJOLT:{HINGESJOLT.Count}");
+            Echo($"PISTONSDOUBLEOUTER:{PISTONSDOUBLEOUTER.Count}");
+            Echo($"PISTONSDOUBLEINNER:{PISTONSDOUBLEINNER.Count}");
+            Echo($"PISTONSFRONT:{PISTONSFRONT.Count}");
+            Echo($"PISTONSJOLT:{PISTONSJOLT.Count}");
+            Echo($"PROJECTORS:{PROJECTORS.Count}");
+            Echo($"WELDERS:{WELDERS.Count}");
 
             if (!String.IsNullOrEmpty(arg))
             {
@@ -117,7 +121,7 @@ namespace IngameScript
             {
                 Fire();
             }
-            //else if (Me.CustomData == "" && !firing) { firetick = 0; Fire(); }
+
             else if (Me.CustomData == "0")
             {
                 Init_1();
@@ -125,16 +129,18 @@ namespace IngameScript
                 Me.CustomData = "1";
             }
             else if (updateSource == UpdateType.Update1 && Me.CustomData == "1") { Init_1(); }
-            else if (Me.CustomData == "1") {
-                Init_2(); 
-                inittick = 0; 
-                Me.CustomData = "2"; 
+            else if (Me.CustomData == "1")
+            {
+                Init_2();
+                inittick = 0;
+                Me.CustomData = "2";
             }
             else if (updateSource == UpdateType.Update1 && Me.CustomData == "2") { Init_2(); }
-            else if (Me.CustomData == "2") {
-                Init_3(); 
-                inittick = 0; 
-                Me.CustomData = "3"; 
+            else if (Me.CustomData == "2")
+            {
+                Init_3();
+                inittick = 0;
+                Me.CustomData = "3";
             }
             else if (updateSource == UpdateType.Update1 && Me.CustomData == "3") { Init_3(); }
         }
@@ -145,7 +151,7 @@ namespace IngameScript
             {
                 foreach (IMyProjector block in PROJECTORS) { block.Enabled = true; }
                 foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
-                    
+
                 firetick++;
             }
 
@@ -155,57 +161,43 @@ namespace IngameScript
             }
             else
             {
-                if(firetick == 1)
+                if (firetick == 1)
                 {
                     Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
                     GetJoltAmmoBlocks();
 
-                    foreach(IMyMotorBase hinge in HINGESDETACH) {
-                        if (hinge.PendingAttachment) {
-                            hinge.Detach();
-                            hinge.Attach();
-                        }
-                    }
+                    foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
                 }
-                if(firetick == 2)
+                if (firetick == 2)
                 {
-                    foreach(IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) {
-                        if (piston.PendingAttachment) { 
-                            piston.Detach();
-                            piston.Attach();
-                        }
-                    }
+                    foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Attach(); }
                 }
-                if(firetick == 3)
+                if (firetick == 3)
                 {
                     foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Retract(); }
-
                     foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
                 }
-                else if(firetick == 120)
+                else if (firetick == 120)
                 {
                     foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Detach(); }
-
                     foreach (IMyWarhead warhead in WARHEADS) { warhead.IsArmed = true; }
-
                     foreach (IMyBatteryBlock battery in BATTERIES) { battery.Enabled = true; }
                 }
-                else if(firetick == 121)
+                else if (firetick == 121)
                 {
                     foreach (IMyShipMergeBlock merge in MERGES) { merge.Enabled = false; }
                 }
-                else if(firetick == 140)
+                else if (firetick == 140)
                 {
                     foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Extend(); }
-
-                    foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Detach(); }
+                    foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Detach(); }
                 }
-                else if(firetick == 200)
+                else if (firetick == 200)
                 {
                     foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
                 }
-                else if(firetick == 260)
+                else if (firetick == 260)
                 {
                     if (toggle)
                     {
@@ -216,10 +208,10 @@ namespace IngameScript
                     firetick = 0;
                     return;
                 }
-                
                 firetick++;
             }
         }
+
 
         void ProcessArgs(string arg)
         {
@@ -270,117 +262,88 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
-            if(inittick == 0)
+            if (inittick == 0)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Extend(); }
             }
-            else if(inittick == 100)
+            else if (inittick == 100)
             {
                 foreach (IMyShipMergeBlock merge in MERGES1) { merge.Enabled = false; }
             }
-            else if(inittick == 101)
+            else if (inittick == 101)
             {
-                foreach(IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) {
-                    if (piston.PendingAttachment) {
-                        piston.Detach();
-                        piston.Attach();
-                    }
-                }
+                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Attach(); }
             }
-            else if(inittick == 200)
+            else if (inittick == 200)
             {
                 foreach (IMyShipMergeBlock merge in MERGES2) { merge.Enabled = false; }
             }
-            else if(inittick == 201)
+            else if (inittick == 201)
             {
-                foreach (IMyExtendedPistonBase piston in PISTONSFRONT)
-                {
-                    if (piston.PendingAttachment) {
-                        piston.Detach();
-                        piston.Attach();
-                    }
-                }
+                foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.Attach(); }
 
                 Runtime.UpdateFrequency = UpdateFrequency.None;
             }
-
             inittick++;
         }
-
         public void Init_2()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
-            if(inittick == 0)
+            if (inittick == 0)
             {
                 foreach (IMyShipMergeBlock merge in MERGES3) { merge.Enabled = false; }
             }
-            if(inittick == 1)
+            if (inittick == 1)
             {
-                foreach (IMyMotorBase hinge in HINGESDETACH)
-                {
-                    if (hinge.PendingAttachment) {
-                        hinge.Detach();
-                        hinge.Attach();
-                    }
-                }
+                foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
             }
-            if(inittick == 10)
+            if (inittick == 10)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 7.34f; }
 
                 Runtime.UpdateFrequency = UpdateFrequency.None;
             }
-
             inittick++;
         }
-
         public void Init_3()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
-            if(inittick == 0)
+            if (inittick == 0)
             {
-                foreach (IMyMotorBase hinge in HINGESFRONT)
-                {
-                    if (hinge.PendingAttachment) {
-                        hinge.Detach();
-                        hinge.Attach();
-                    }
-                }
+                foreach (IMyMotorBase hinge in HINGESFRONT) { hinge.Attach(); }
             }
-            if(inittick == 30)
+            if (inittick == 30)
             {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Detach(); }
             }
-            if(inittick == 31)
+            if (inittick == 31)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 9.7f; }
-
-                foreach(IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) {
+                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
+                {
                     piston.Retract();
                     piston.MaxLimit = 2.34f;
                 }
             }
-            if(inittick == 100)
+            if (inittick == 100)
             {
-                foreach(IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) {
+                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
+                {
                     piston.Extend();
                     piston.MinLimit = 0f;
                 }
             }
-            if(inittick == 160)
+            if (inittick == 160)
             {
-                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Velocity = 1.25f; }
-
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Velocity = 1.25f; }
-
+                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Velocity = 1.25f; }
                 foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
 
                 Me.CustomData = "";
                 Runtime.UpdateFrequency = UpdateFrequency.None;
             }
-
             inittick++;
         }
 
