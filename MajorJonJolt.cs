@@ -166,10 +166,7 @@ namespace IngameScript
             if (firetick == 0)
             {
                 Runtime.UpdateFrequency = UpdateFrequency.Update10;
-
-                foreach (IMyProjector block in PROJECTORS) { block.Enabled = true; }
                 foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
-
                 firetick++;
             }
 
@@ -259,7 +256,6 @@ namespace IngameScript
             if (blocksCount == 0)
             {
                 foreach (IMyShipWelder block in WELDERS) { block.Enabled = false; }
-                foreach (IMyProjector block in PROJECTORS) { block.Enabled = false; }
                 completed = true;
             }
             return completed;

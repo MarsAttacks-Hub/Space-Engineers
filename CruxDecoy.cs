@@ -57,10 +57,14 @@ namespace IngameScript
             if (selectedDrop == 0)
             {
                 TEMPPROJECTORS = PROJECTORSDECOY;
+                foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = true; }
+                foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = false; }
             }
             else if (selectedDrop == 1)
             {
                 TEMPPROJECTORS = PROJECTORSBOMB;
+                foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = false; }
+                foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = true; }
             }
         }
 
@@ -92,9 +96,7 @@ namespace IngameScript
                 {
                     if (launchTick == 0)
                     {
-                        foreach (IMyProjector block in TEMPPROJECTORS) { block.Enabled = true; }
                         foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
-
                         launchTick++;
                     }
 
@@ -164,12 +166,14 @@ namespace IngameScript
                         {
                             selectedDrop = 0;
                             TEMPPROJECTORS = PROJECTORSDECOY;
+                            foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = true; }
                             foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = false; }
                         }
                         else if (selectedDrop == 0)
                         {
                             selectedDrop = 1;
                             TEMPPROJECTORS = PROJECTORSBOMB;
+                            foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = true; }
                             foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = false; }
                         }
                     }
@@ -195,7 +199,6 @@ namespace IngameScript
             }
             if (blocksCount == 0)
             {
-                foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = false; }
                 foreach (IMyShipWelder block in WELDERS) { block.Enabled = false; }
                 completed = true;
             }
