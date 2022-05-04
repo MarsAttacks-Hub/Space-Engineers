@@ -137,7 +137,7 @@ namespace IngameScript
         IMyUnicastListener UNICASTLISTENER;
         IMyBroadcastListener BROADCASTLISTENER;
 
-        readonly MyItemType missileAmmo = MyItemType.MakeAmmo("Missile200mm");
+        //readonly MyItemType missileAmmo = MyItemType.MakeAmmo("Missile200mm");
         readonly MyItemType gatlingAmmo = MyItemType.MakeAmmo("NATO_25x184mm");
         readonly MyItemType iceOre = MyItemType.MakeOre("Ice");
 
@@ -175,140 +175,149 @@ namespace IngameScript
 
         public void Main()
         {
-            Echo($"TBLOCKS:{TBLOCKS.Count}");
-            Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-            Echo($"GYROS:{GYROS.Count}");
-            Echo($"THRUSTERS:{THRUSTERS.Count}");
-            Echo($"ALLTHRUSTERS:{ALLTHRUSTERS.Count}");
-            Echo($"SIDETHRUSTERS:{SIDETHRUSTERS.Count}");
-            Echo($"BACKWARDTHRUSTERS:{BACKWARDTHRUSTERS.Count}");
-            Echo($"UPWARDTHRUSTERS:{UPWARDTHRUSTERS.Count}");
-            Echo($"DOWNWARDTHRUSTERS:{DOWNWARDTHRUSTERS.Count}");
-            Echo($"MERGES:{MERGES.Count}");
-            Echo($"CONNECTORS:{CONNECTORS.Count}");
-            Echo($"GENERATORS:{GENERATORS.Count}");
-            Echo($"WARHEADS:{WARHEADS.Count}");
-            Echo($"ROCKETS:{ROCKETS.Count}");
-            Echo($"GATLINGS:{GATLINGS.Count}");
-            Echo($"TURRETS:{TURRETS.Count}");
-
-            if (ANTENNA.Enabled)
+            try
             {
-                GetMessages();
+                Echo($"TBLOCKS:{TBLOCKS.Count}");
+                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
+                Echo($"GYROS:{GYROS.Count}");
+                Echo($"THRUSTERS:{THRUSTERS.Count}");
+                Echo($"ALLTHRUSTERS:{ALLTHRUSTERS.Count}");
+                Echo($"SIDETHRUSTERS:{SIDETHRUSTERS.Count}");
+                Echo($"BACKWARDTHRUSTERS:{BACKWARDTHRUSTERS.Count}");
+                Echo($"UPWARDTHRUSTERS:{UPWARDTHRUSTERS.Count}");
+                Echo($"DOWNWARDTHRUSTERS:{DOWNWARDTHRUSTERS.Count}");
+                Echo($"MERGES:{MERGES.Count}");
+                Echo($"CONNECTORS:{CONNECTORS.Count}");
+                Echo($"GENERATORS:{GENERATORS.Count}");
+                Echo($"WARHEADS:{WARHEADS.Count}");
+                Echo($"ROCKETS:{ROCKETS.Count}");
+                Echo($"GATLINGS:{GATLINGS.Count}");
+                Echo($"TURRETS:{TURRETS.Count}");
 
-                if (!launched && command.Equals(commandLaunch))
+                if (ANTENNA.Enabled)
                 {
-                    if (!init)
-                    {
-                        GetAntenna();
-                        GetBlocks();
-                        init = true;
-                    }
+                    GetMessages();
 
-                    if (launchOnce)
+                    if (!launched && command.Equals(commandLaunch))
                     {
-                        InitiateLaunch();
-                    }
+                        if (!init)
+                        {
+                            GetAntenna();
+                            GetBlocks();
+                            init = true;
+                        }
 
-                    UpdateBroadcastRange(platformPosition);
+                        if (launchOnce)
+                        {
+                            InitiateLaunch();
+                        }
+
+                        UpdateBroadcastRange(platformPosition);
+                    }
+                    else if (launched && (command.Equals(commandUpdate) || command.Equals(commandSpiral)))
+                    {
+                        if (command.Equals(commandSpiral))
+                        {
+                            useSpiral = !useSpiral;
+                        }
+
+                        if (updateOnce)
+                        {
+                            InitiateUpdate();
+                        }
+
+                        UpdateBroadcastRange(platformPosition);
+
+                        SendUnicastMessage();
+
+                        if (!startTargeting)
+                        {
+                            InitiateThrusters();
+                        }
+                        else
+                        {
+                            UpdateMaxSpeed();
+
+                            bool targetFound = TurretsDetection();
+
+                            ManageMissileType();
+
+                            currentTick++;
+                            prevTargetVelocity = targetVelocity;
+                        }
+                    }
+                    else if (launched && command.Equals(commandLost))
+                    {
+                        if (lostOnce)
+                        {
+                            InitiateLost();
+                        }
+
+                        UpdateBroadcastRange(platformPosition);
+
+                        SendUnicastMessage();
+
+                        ManageBrakes();
+                    }
+                    else if (launched && command.Equals(commandBeamRide))
+                    {
+                        if (beamRideOnce)
+                        {
+                            InitiateBeamRide();
+                        }
+
+                        if (!startTargeting)
+                        {
+                            InitiateThrusters();
+                        }
+                        else
+                        {
+                            BeamRide();
+                        }
+
+                        UpdateBroadcastRange(platformPosition);
+
+                        SendUnicastMessage();
+                    }
+                    else if (!launched && command.Equals(commandBeamRide))
+                    {
+                        if (!init)
+                        {
+                            GetAntenna();
+                            GetBlocks();
+                            init = true;
+                        }
+
+                        if (launchOnce)
+                        {
+                            InitiateLaunch();
+                        }
+
+                        if (beamRideOnce)
+                        {
+                            InitiateBeamRide();
+                        }
+
+                        if (!startTargeting)
+                        {
+                            InitiateThrusters();
+                        }
+                        else
+                        {
+                            BeamRide();
+                        }
+
+                        UpdateBroadcastRange(platformPosition);
+
+                        SendUnicastMessage();
+                    }
                 }
-                else if (launched && (command.Equals(commandUpdate) || command.Equals(commandSpiral)))
-                {
-                    if (command.Equals(commandSpiral))
-                    {
-                        useSpiral = !useSpiral;
-                    }
-
-                    if (updateOnce)
-                    {
-                        InitiateUpdate();
-                    }
-
-                    UpdateBroadcastRange(platformPosition);
-
-                    SendUnicastMessage();
-
-                    if (!startTargeting)
-                    {
-                        InitiateThrusters();
-                    }
-                    else
-                    {
-                        UpdateMaxSpeed();
-
-                        bool targetFound = TurretsDetection();
-
-                        ManageMissileType();
-
-                        currentTick++;
-                        prevTargetVelocity = targetVelocity;
-                    }
-                }
-                else if (launched && command.Equals(commandLost))
-                {
-                    if (lostOnce)
-                    {
-                        InitiateLost();
-                    }
-
-                    UpdateBroadcastRange(platformPosition);
-
-                    SendUnicastMessage();
-
-                    ManageBrakes();
-                }
-                else if (launched && command.Equals(commandBeamRide))
-                {
-                    if (beamRideOnce)
-                    {
-                        InitiateBeamRide();
-                    }
-
-                    if (!startTargeting)
-                    {
-                        InitiateThrusters();
-                    }
-                    else
-                    {
-                        BeamRide();
-                    }
-
-                    UpdateBroadcastRange(platformPosition);
-
-                    SendUnicastMessage();
-                }
-                else if (!launched && command.Equals(commandBeamRide))
-                {
-                    if (!init)
-                    {
-                        GetAntenna();
-                        GetBlocks();
-                        init = true;
-                    }
-
-                    if (launchOnce)
-                    {
-                        InitiateLaunch();
-                    }
-
-                    if (beamRideOnce)
-                    {
-                        InitiateBeamRide();
-                    }
-
-                    if (!startTargeting)
-                    {
-                        InitiateThrusters();
-                    }
-                    else
-                    {
-                        BeamRide();
-                    }
-
-                    UpdateBroadcastRange(platformPosition);
-
-                    SendUnicastMessage();
-                }
+            }
+            catch (Exception e)
+            {
+                StringBuilder debugLog = new StringBuilder("");
+                debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                SendErrorMessage(debugLog.ToString());
             }
         }
 
@@ -426,6 +435,19 @@ namespace IngameScript
             var immArray = ImmutableArray.CreateBuilder<MyTuple<string, Vector3D, double, double>>();
 
             var tuple = MyTuple.Create(info, position, speed, distanceFromTarget);
+
+            immArray.Add(tuple);
+
+            bool messageSent = IGC.SendUnicastMessage(platFormId, platformTag, immArray.ToImmutable());
+
+            return messageSent;
+        }
+
+        bool SendErrorMessage(String msg)
+        {
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<string>>();
+
+            var tuple = MyTuple.Create(msg);
 
             immArray.Add(tuple);
 
@@ -643,7 +665,8 @@ namespace IngameScript
             }
         }
 
-        bool CheckAmmo(){
+        bool CheckAmmo()
+        {
             bool gatlingAmmoFound = false;
             List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
             GATLINGSINVENTORIES.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
@@ -660,7 +683,8 @@ namespace IngameScript
             return gatlingAmmoFound;
         }
 
-        double CheckIce(){
+        double CheckIce()
+        {
             double currentVolume = 0d;
             double maxVolume = 0d;
             //double iceAmount = 0d;
@@ -919,13 +943,13 @@ namespace IngameScript
                 readyToFire = false;
             }
         }
-        
+
         Vector3D ComputeInterceptWithLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, IMyTerminalBlock muzzle)
         {
             MatrixD refWorldMatrix = muzzle.WorldMatrix;
             //MatrixD refLookAtMatrix = MatrixD.CreateLookAt(Vector3D.Zero, refWorldMatrix.Forward, refWorldMatrix.Up);
             Vector3D aimDirection = GetPredictedTargetPosition(muzzle, CONTROLLER, targetPosition, targetVelocity, projectileSpeed);
-			aimDirection -= refWorldMatrix.Translation;
+            aimDirection -= refWorldMatrix.Translation;
             //aimDirection = Vector3D.Normalize(Vector3D.TransformNormal(aimDirection, refLookAtMatrix));
             return aimDirection;
         }
@@ -980,7 +1004,7 @@ namespace IngameScript
 
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
-            
+
             double rollSpeed;
             if (Math.Abs(missileSpinRPM) > 1e-3 && status.Equals(statusCruising) && Vector3D.IsZero(gravityVec))
             {
@@ -998,7 +1022,7 @@ namespace IngameScript
             {
                 pitchSpeed = updatesPerSecond * .5 * pitchAngle;
             }
-            
+
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
@@ -1024,12 +1048,12 @@ namespace IngameScript
                 var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
                 ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
             }
-            
+
             double yawAngle;
             double pitchAngle;
             double rollAngle;
             GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
-            
+
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
             double rollSpeed;
@@ -1049,7 +1073,7 @@ namespace IngameScript
             {
                 pitchSpeed = updatesPerSecond * .5 * pitchAngle;
             }
-            
+
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
@@ -1066,13 +1090,13 @@ namespace IngameScript
                 var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
                 ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
             }
-            
+
             double yawAngle, pitchAngle, rollAngle;
             Vector3D UpVector;
             if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; }
             else { UpVector = -CONTROLLER.GetNaturalGravity(); }
             GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
-            
+
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
             double rollSpeed;
@@ -1092,7 +1116,7 @@ namespace IngameScript
             {
                 pitchSpeed = updatesPerSecond * .5 * pitchAngle;
             }
-            
+
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
@@ -1215,7 +1239,7 @@ namespace IngameScript
 
             return parallelAccel * parallel - normal * normalAccel;
         }
-        
+
         double CalculateMissileThrust(List<IMyThrust> mainThrusters)
         {
             double thrust = 0;

@@ -22,7 +22,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO when locking on target use roll user inputs 
+        //TODO when locking on target use roll user inputs
+        //missile detach even if the target is null
         //LIDAR TARGETER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -65,7 +66,7 @@ namespace IngameScript
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
-        
+
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
 
@@ -75,13 +76,14 @@ namespace IngameScript
         readonly int autoMissilesDelay = 91;
         readonly int writeDelay = 10;
         readonly double initialLockDistance = 5000d;
+        readonly float joltProjectileMaxSpeed = 933f;
         readonly float rocketProjectileMaxSpeed = 200f;
         double rocketProjectileMaxRange = 500d;
         readonly float gatlingProjectileMaxSpeed = 400f;
         readonly double gatlingProjectileMaxRange = 800d;
         readonly double gunsMaxRange = 900d;
         readonly int fudgeAttempts = 8;
-        
+
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings
         int selectedPayLoad = 1;//0 Missiles - 1 Drones
         bool autoFire = true;
@@ -164,7 +166,7 @@ namespace IngameScript
         PID yawController;
         PID pitchController;
         PID rollController;
-        
+
         Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
@@ -265,12 +267,12 @@ namespace IngameScript
                     LockOnTarget(LIDARS[0]);
 
                     CalculateTicks(targetFound);
-                    
+
                     if (writeCount == writeDelay)
                     {
                         CheckGunsAmmo();
                     }
-                    
+
                     ManageGuns();
 
                     ReadTargetInfo();
@@ -312,10 +314,14 @@ namespace IngameScript
             }
             catch (Exception e)
             {
-                DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
-                debugLog.Clear();
-                debugLog.Append(e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
-                DEBUG.WriteText(debugLog);
+                if (DEBUG != null)
+                {
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                    DEBUG.WriteText(debugLog);
+                }
             }
         }
 
@@ -366,7 +372,7 @@ namespace IngameScript
                 case argClear:
                     ResetTargeter();
                     return;
-                    //break;
+                //break;
                 case argSwitchWeapon:
                     weaponType = (weaponType == 1 ? 2 : 1);
                     break;
@@ -734,14 +740,14 @@ namespace IngameScript
             double distanceFromTarget = Vector3D.Distance(targetPos, REF.GetPosition());
             if (distanceFromTarget > gunsMaxRange)
             {
-                aimDirection = targetPos - REF.GetPosition();
+                aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
             }
             else
             {
                 switch (weaponType)
                 {
                     case 0:
-                        aimDirection = targetPos - REF.GetPosition();
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
                         break;
                     case 1:
                         aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, rocketProjectileMaxSpeed, REF);
@@ -760,7 +766,7 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle, globalTimestep);//TODO elapsedTime
+            double yawSpeed = yawController.Control(yawAngle, globalTimestep);//elapsedTime
             double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
             double rollSpeed = rollController.Control(rollAngle, globalTimestep);
 
@@ -777,13 +783,13 @@ namespace IngameScript
                 readyToFire = false;
             }
         }
-        
+
         Vector3D ComputeInterceptWithLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, IMyTerminalBlock muzzle)
         {
             MatrixD refWorldMatrix = muzzle.WorldMatrix;
             //MatrixD refLookAtMatrix = MatrixD.CreateLookAt(Vector3D.Zero, refWorldMatrix.Forward, refWorldMatrix.Up);
             Vector3D aimDirection = GetPredictedTargetPosition(muzzle, CONTROLLER, targetPosition, targetVelocity, projectileSpeed);
-			aimDirection -= refWorldMatrix.Translation;
+            aimDirection -= refWorldMatrix.Translation;
             //aimDirection = Vector3D.Normalize(Vector3D.TransformNormal(aimDirection, refLookAtMatrix));
             return aimDirection;
         }
@@ -793,10 +799,10 @@ namespace IngameScript
             float shootDelay = 0;
 
             Vector3D muzzlePosition = gun.GetPosition();
-            
+
             Vector3D toTarget = targetPosition - muzzlePosition;
             Vector3D shooterVelocity = shooter.GetShipVelocities().LinearVelocity;
-                
+
             Vector3D diffVelocity = targetVelocity - shooterVelocity;
 
             float a = (float)diffVelocity.LengthSquared() - projectileSpeed * projectileSpeed;
@@ -923,6 +929,20 @@ namespace IngameScript
                         if (!tempMissileIDs.ContainsKey(missileId))
                         {
                             tempMissileIDs.Add(missileId, data[0].Item1);
+                        }
+                    }
+
+                    if (igcMessage.Data is ImmutableArray<MyTuple<string>>)//error message from missile
+                    {
+                        var data = (ImmutableArray<MyTuple<string>>)igcMessage.Data;
+
+                        if (DEBUG != null)
+                        {
+                            DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                            debugLog = new StringBuilder("");
+                            DEBUG.ReadText(debugLog, true);
+                            debugLog.Append("\n" + data[0].Item1 + "\n");
+                            DEBUG.WriteText(debugLog);
                         }
                     }
                 }
@@ -1137,7 +1157,7 @@ namespace IngameScript
             int blocksCount = 0;
             foreach (IMyProjector block in TEMPPROJECTORS)
             {
-                blocksCount += block.BuildableBlocksCount;
+                blocksCount += block.RemainingBlocks;//BuildableBlocksCount;
             }
             if (blocksCount == 0)
             {
@@ -1241,7 +1261,7 @@ namespace IngameScript
                                     foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
                                 }
                             }
-                            else if(shootOnce || farShootOnce)
+                            else if (shootOnce || farShootOnce)
                             {
                                 foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
                                 foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
@@ -1271,7 +1291,7 @@ namespace IngameScript
                                     shootOnce = false;
                                 }
                             }
-                            else if(shootOnce || farShootOnce)
+                            else if (shootOnce || farShootOnce)
                             {
                                 foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
                                 foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
@@ -1310,16 +1330,16 @@ namespace IngameScript
 
         void SequenceWeapons(List<IMyUserControllableGun> weapons)
         {
-            if (fireCount == fireDelay) 
+            if (fireCount == fireDelay)
             {
                 weapons[weaponIndex].ShootOnce();
-                fireCount = 0; 
+                fireCount = 0;
             }
             weaponIndex++;
             if (weaponIndex > weapons.Count) { weaponIndex = 0; }
             fireCount++;
         }
-        
+
         void TurnGunsOff()
         {
             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
@@ -1447,13 +1467,16 @@ namespace IngameScript
         bool TransferItems(IMyInventory inventory, MyItemType itemToFind)
         {
             bool transferred = false;
-            foreach (IMyInventory sourceInventory in INVENTORIES) {
+            foreach (IMyInventory sourceInventory in INVENTORIES)
+            {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 sourceInventory.GetItems(items, item => item.Type.TypeId == itemToFind.TypeId.ToString());
-                foreach (MyInventoryItem item in items) {
+                foreach (MyInventoryItem item in items)
+                {
                     transferred = false;
                     if (sourceInventory.CanTransferItemTo(inventory, item.Type) && inventory.CanItemsBeAdded(item.Amount, item.Type)) { transferred = sourceInventory.TransferItemTo(inventory, item); }
-                    if (!transferred) {
+                    if (!transferred)
+                    {
                         MyFixedPoint amount = inventory.MaxVolume - inventory.CurrentVolume;
                         transferred = sourceInventory.TransferItemTo(inventory, item, amount);
                     }
@@ -1478,7 +1501,7 @@ namespace IngameScript
                     default: gun = "None"; break;
                 }
                 text.Append("Guns: " + gun + ", ");
-                text.Append("autoFire: " + autoFire + ", useAllGuns: " + useAllGuns  + "\n");
+                text.Append("autoFire: " + autoFire + ", useAllGuns: " + useAllGuns + "\n");
                 text.Append("PayLoad: " + (selectedPayLoad == 0 ? "Missiles" : "Drones") + ", autoMissiles: " + autoMissiles + "\n");
                 text.Append(targetLog.ToString());
                 text.Append(missileLog.ToString());

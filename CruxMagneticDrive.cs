@@ -21,8 +21,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO add security system where if uncontroller and a turret detect a eneemy the ship fly away from it
-        //or calculate the enemy trajectory vector and if it's going toward the ship then move away (evasive manouvre)
+        //TODO add security system where if a turret detect a enemy,
+        //calculate the enemy trajectory vector and if it's going toward the ship then move away (evasive manouvre)
         //NAVIGATOR
 
         readonly string rotorsName = "Rotor_MD_A";
@@ -46,7 +46,8 @@ namespace IngameScript
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string deadManPanelName = "[CRX] LCD DeadMan Toggle";
         readonly string idleThrusterPanelName = "[CRX] LCD IdleThrusters Toggle";
-        
+        readonly string debugPanelName = "[CRX] Debug";
+
         const string argDeadMan = "DeadMan";
         const string argMagneticDrive = "ToggleMagneticDrive";
         const string argIdleThrusters = "ToggleIdleThrusters";
@@ -54,7 +55,7 @@ namespace IngameScript
         const string argGyroStabilizeOn = "StabilizeOn";
 
         const string argSunchaseOff = "SunchaseOff";
-        
+
         bool magneticDrive = true;
         bool controlDampeners = true;
         bool useGyrosToStabilize = true;//If the script will override gyros to try and combat torque
@@ -98,6 +99,7 @@ namespace IngameScript
         public List<IMyThrust> RIGHTTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> FORWARDTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> BACKWARDTHRUSTERS = new List<IMyThrust>();
+
         IMyThrust UPTHRUST;
         IMyThrust DOWNTHRUST;
         IMyThrust LEFTTHRUST;
@@ -109,12 +111,6 @@ namespace IngameScript
         IMyRemoteControl REMOTE;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
-
-        //public IMyTextPanel DEBUG;
-        //public StringBuilder debugLog = new StringBuilder("");
-        //readonly int writeDelay = 100;
-        //int writeCount = 0;
-        //readonly string debugPanelName = "[CRX] Debug";
 
         Program()
         {
@@ -138,95 +134,110 @@ namespace IngameScript
 
         public void Main(string argument)
         {
-            Echo($"ROTORS:{ROTORS.Count}");
-            Echo($"ROTORSINV:{ROTORSINV.Count}");
-            Echo($"THRUSTERS:{THRUSTERS.Count}");
-            Echo($"GYROS:{GYROS.Count}");
-            Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-            Echo($"MERGESPLUSX:{MERGESPLUSX.Count}");
-            Echo($"MERGESPLUSY:{MERGESPLUSY.Count}");
-            Echo($"MERGESPLUSZ:{MERGESPLUSZ.Count}");
-            Echo($"MERGESMINUSX:{MERGESMINUSX.Count}");
-            Echo($"MERGESMINUSY:{MERGESMINUSY.Count}");
-            Echo($"MERGESMINUSZ:{MERGESMINUSZ.Count}");
+            try
+            {
+                Echo($"ROTORS:{ROTORS.Count}");
+                Echo($"ROTORSINV:{ROTORSINV.Count}");
+                Echo($"THRUSTERS:{THRUSTERS.Count}");
+                Echo($"GYROS:{GYROS.Count}");
+                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
+                Echo($"MERGESPLUSX:{MERGESPLUSX.Count}");
+                Echo($"MERGESPLUSY:{MERGESPLUSY.Count}");
+                Echo($"MERGESPLUSZ:{MERGESPLUSZ.Count}");
+                Echo($"MERGESMINUSX:{MERGESMINUSX.Count}");
+                Echo($"MERGESMINUSY:{MERGESMINUSY.Count}");
+                Echo($"MERGESMINUSZ:{MERGESMINUSZ.Count}");
 
-            if (!string.IsNullOrEmpty(argument))
-            {
-                ProcessArgument(argument);
-            }
-            //debugLog.Clear();
-            if (magneticDrive)
-            {
-                if (magneticDriveManOnce)
+                if (!string.IsNullOrEmpty(argument))
                 {
-                    InitMagneticDrive();
-                    magneticDriveManOnce = false;
+                    ProcessArgument(argument);
                 }
 
-                bool isControlled = GetController();
-
-                if (!isControlled)
+                if (magneticDrive)
                 {
-                    if (!setOnce)
+                    if (magneticDriveManOnce)
                     {
-                        IdleMagneticDrive();
-                        setOnce = true;
+                        InitMagneticDrive();
+                        magneticDriveManOnce = false;
+                    }
+
+                    bool isControlled = GetController();
+
+                    if (!isControlled)
+                    {
+                        if (!setOnce)
+                        {
+                            IdleMagneticDrive();
+                            setOnce = true;
+                        }
+                    }
+                    else
+                    {
+                        if (setOnce)
+                        {
+                            InitMagneticDrive();
+                            setOnce = false;
+                        }
+                        if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                        {
+                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                        }
+
+                        SyncRotors();
+
+                        if (REMOTE.IsAutoPilotEnabled)
+                        {
+                            AutoMagneticDrive();
+                            GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
+                        }
+                        else
+                        {
+                            if (!initAutoThrustOnce)
+                            {
+                                foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+                                initAutoThrustOnce = true;
+                            }
+
+                            MagneticDrive();
+                            GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
+                        }
                     }
                 }
                 else
                 {
-                    if (setOnce)
+                    if (!magneticDriveManOnce)
                     {
-                        InitMagneticDrive();
-                        setOnce = false;
+                        IdleMagneticDrive();
+                        magneticDriveManOnce = true;
                     }
-                    if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
+                    if (tickCount == tickDelay)
                     {
-                        sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                    }
-
-                    SyncRotors();
-
-                    if (REMOTE.IsAutoPilotEnabled)
-                    {                
-                        AutoMagneticDrive();
-                        GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
-                    }
-                    else
-                    {
-                        if (!initAutoThrustOnce) {
-                            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-                            initAutoThrustOnce = true;
+                        if (controlDampeners)
+                        {
+                            DeadMan();
+                            LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
                         }
-                        
-                        MagneticDrive();
-                        GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
-                    }
-                }
-            }
-            else
-            {
-                if (!magneticDriveManOnce)
-                {
-                    IdleMagneticDrive();
-                    magneticDriveManOnce = true;
-                }
-                if (tickCount == tickDelay) 
-                { 
-                    if (controlDampeners) 
-                    { 
-                        DeadMan();
-                        LCDDEADMAN.BackgroundColor = new Color(0, 255, 255); 
-                    }
-                    else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
-                    if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); }
-                    else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
+                        else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
+                        if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); }
+                        else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
 
-                    tickCount = 0; 
-                } 
-                tickCount++;
+                        tickCount = 0;
+                    }
+                    tickCount++;
+                }
             }
-            //if (writeCount == writeDelay)  { DEBUG.WriteText(debugLog); writeCount = 0; } writeCount++;
+            catch (Exception e)
+            {
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                if (DEBUG != null)
+                {
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    StringBuilder debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                    DEBUG.WriteText(debugLog);
+                }
+            }
         }
 
         void InitMagneticDrive()
@@ -257,8 +268,8 @@ namespace IngameScript
                 block.TargetVelocityRPM = 0;
                 block.Enabled = false;
             }
-            if (idleThrusters) 
-            { 
+            if (idleThrusters)
+            {
                 foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
             }
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
@@ -268,13 +279,16 @@ namespace IngameScript
         {
             switch (argument)
             {
-                case argIdleThrusters: 
+                case argIdleThrusters:
                     idleThrusters = !idleThrusters;
-                    if (idleThrusters) {
-                        foreach(IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
+                    if (idleThrusters)
+                    {
+                        foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
                         LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255);
-                    } else {
-                        foreach(IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+                    }
+                    else
+                    {
+                        foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                         LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0);
                     }
                     break;
@@ -286,11 +300,14 @@ namespace IngameScript
                     useGyrosToStabilize = false;
                     Me.CustomData = "GyroStabilize=false";
                     break;
-                case argDeadMan: 
-                    controlDampeners = !controlDampeners; 
-                    if (controlDampeners) {
+                case argDeadMan:
+                    controlDampeners = !controlDampeners;
+                    if (controlDampeners)
+                    {
                         LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
-                    } else {
+                    }
+                    else
+                    {
                         LCDDEADMAN.BackgroundColor = new Color(0, 0, 0);
                     }
                     break;
@@ -392,7 +409,7 @@ namespace IngameScript
         {
             IMyThrust thruster = null;
             int i = 0;
-            foreach(IMyThrust thrust in thrusters)
+            foreach (IMyThrust thrust in thrusters)
             {
                 if (i == 0)
                 {
@@ -410,7 +427,8 @@ namespace IngameScript
 
         void AutoMagneticDrive()
         {
-            if (initAutoThrustOnce) { 
+            if (initAutoThrustOnce)
+            {
                 UPTHRUST = AutopilotThrustInitializer(UPTHRUSTERS);
                 DOWNTHRUST = AutopilotThrustInitializer(DOWNTHRUSTERS);
                 LEFTTHRUST = AutopilotThrustInitializer(LEFTTHRUSTERS);
@@ -670,16 +688,21 @@ namespace IngameScript
             pitch = -axis.X * angle;
             roll = -axis.Z * angle;
         }
-        
-        bool IsPiloted() {
+
+        bool IsPiloted()
+        {
             bool isPiloted = false;
-            foreach (IMyShipController block in CONTROLLERS) {
-                if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters) {
+            foreach (IMyShipController block in CONTROLLERS)
+            {
+                if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters)
+                {
                     isPiloted = true;
                     break;
                 }
-                if (block is IMyRemoteControl) {
-                    if ((block as IMyRemoteControl).IsAutoPilotEnabled) {
+                if (block is IMyRemoteControl)
+                {
+                    if ((block as IMyRemoteControl).IsAutoPilotEnabled)
+                    {
                         isPiloted = true;
                         break;
                     }
@@ -688,31 +711,43 @@ namespace IngameScript
             return isPiloted;
         }
 
-        void DeadMan() {
+        void DeadMan()
+        {
             bool undercontrol = IsPiloted();
-            if (!undercontrol) {
+            if (!undercontrol)
+            {
                 IMyShipController cntrllr = null;
-                foreach (IMyShipController block in CONTROLLERS) {
-                    if (block.CanControlShip) {
+                foreach (IMyShipController block in CONTROLLERS)
+                {
+                    if (block.CanControlShip)
+                    {
                         cntrllr = block;
                         break;
                     }
                 }
-                if (cntrllr != null) {
+                if (cntrllr != null)
+                {
                     double speed = cntrllr.GetShipSpeed();
-                    if (speed > deadManMinSpeed) {
+                    if (speed > deadManMinSpeed)
+                    {
                         foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
                         cntrllr.DampenersOverride = true;
-                    } else {
-                        if (!deadManOnce) {
+                    }
+                    else
+                    {
+                        if (!deadManOnce)
+                        {
                             if (idleThrusters)
                             { foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; } }
                             deadManOnce = true;
                         }
                     }
                 }
-            } else {
-                if (deadManOnce) {
+            }
+            else
+            {
+                if (deadManOnce)
+                {
                     foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
                     deadManOnce = false;
                 }
@@ -755,9 +790,8 @@ namespace IngameScript
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
             LCDDEADMAN = GridTerminalSystem.GetBlockWithName(deadManPanelName) as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
-            //DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
-        
+
         public static class VectorMath
         {
             public static Vector3D SafeNormalize(Vector3D a)

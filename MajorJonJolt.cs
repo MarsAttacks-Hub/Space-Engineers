@@ -34,6 +34,7 @@ namespace IngameScript
         readonly string merges1Name = "1 Jolt";
         readonly string merges2Name = "2 Jolt";
         readonly string merges3Name = "3 Jolt";
+        readonly string debugPanelName = "[CRX] Debug";
 
         const string argFire = "FireJolt";
         const string argToggle = "Toggle";
@@ -102,53 +103,70 @@ namespace IngameScript
 
         public void Main(string arg, UpdateType updateSource)
         {
-            Echo($"HINGESDETACH:{HINGESDETACH.Count}");
-            Echo($"HINGESFRONT:{HINGESFRONT.Count}");
-            Echo($"HINGESJOLT:{HINGESJOLT.Count}");
-            Echo($"PISTONSDOUBLEOUTER:{PISTONSDOUBLEOUTER.Count}");
-            Echo($"PISTONSDOUBLEINNER:{PISTONSDOUBLEINNER.Count}");
-            Echo($"PISTONSFRONT:{PISTONSFRONT.Count}");
-            Echo($"PISTONSJOLT:{PISTONSJOLT.Count}");
-            Echo($"PROJECTORS:{PROJECTORS.Count}");
-            Echo($"WELDERS:{WELDERS.Count}");
+            try
+            {
+                Echo($"HINGESDETACH:{HINGESDETACH.Count}");
+                Echo($"HINGESFRONT:{HINGESFRONT.Count}");
+                Echo($"HINGESJOLT:{HINGESJOLT.Count}");
+                Echo($"PISTONSDOUBLEOUTER:{PISTONSDOUBLEOUTER.Count}");
+                Echo($"PISTONSDOUBLEINNER:{PISTONSDOUBLEINNER.Count}");
+                Echo($"PISTONSFRONT:{PISTONSFRONT.Count}");
+                Echo($"PISTONSJOLT:{PISTONSJOLT.Count}");
+                Echo($"PROJECTORS:{PROJECTORS.Count}");
+                Echo($"WELDERS:{WELDERS.Count}");
 
-            if (!String.IsNullOrEmpty(arg))
-            {
-                ProcessArgs(arg);
-            }
+                if (!String.IsNullOrEmpty(arg))
+                {
+                    ProcessArgs(arg);
+                }
 
-            if (firing)
-            {
-                Fire();
-            }
+                if (firing)
+                {
+                    Fire();
+                }
 
-            else if (Me.CustomData == "0")
-            {
-                Init_1();
-                inittick = 0;
-                Me.CustomData = "1";
+                else if (Me.CustomData == "0")
+                {
+                    Init_1();
+                    inittick = 0;
+                    Me.CustomData = "1";
+                }
+                else if (updateSource == UpdateType.Update1 && Me.CustomData == "1") { Init_1(); }
+                else if (Me.CustomData == "1")
+                {
+                    Init_2();
+                    inittick = 0;
+                    Me.CustomData = "2";
+                }
+                else if (updateSource == UpdateType.Update1 && Me.CustomData == "2") { Init_2(); }
+                else if (Me.CustomData == "2")
+                {
+                    Init_3();
+                    inittick = 0;
+                    Me.CustomData = "3";
+                }
+                else if (updateSource == UpdateType.Update1 && Me.CustomData == "3") { Init_3(); }
             }
-            else if (updateSource == UpdateType.Update1 && Me.CustomData == "1") { Init_1(); }
-            else if (Me.CustomData == "1")
+            catch (Exception e)
             {
-                Init_2();
-                inittick = 0;
-                Me.CustomData = "2";
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                if (DEBUG != null)
+                {
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    StringBuilder debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                    DEBUG.WriteText(debugLog);
+                }
             }
-            else if (updateSource == UpdateType.Update1 && Me.CustomData == "2") { Init_2(); }
-            else if (Me.CustomData == "2")
-            {
-                Init_3();
-                inittick = 0;
-                Me.CustomData = "3";
-            }
-            else if (updateSource == UpdateType.Update1 && Me.CustomData == "3") { Init_3(); }
         }
 
         public void Fire()
         {
             if (firetick == 0)
             {
+                Runtime.UpdateFrequency = UpdateFrequency.Update10;
+
                 foreach (IMyProjector block in PROJECTORS) { block.Enabled = true; }
                 foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
 
@@ -212,7 +230,6 @@ namespace IngameScript
             }
         }
 
-
         void ProcessArgs(string arg)
         {
             switch (arg)
@@ -237,7 +254,7 @@ namespace IngameScript
             int blocksCount = 0;
             foreach (IMyProjector block in PROJECTORS)
             {
-                blocksCount += block.BuildableBlocksCount;
+                blocksCount += block.RemainingBlocks;//BuildableBlocksCount;
             }
             if (blocksCount == 0)
             {

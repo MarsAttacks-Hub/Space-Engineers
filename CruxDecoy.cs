@@ -30,6 +30,7 @@ namespace IngameScript
         readonly string mergesName = "Drop";
         readonly string weldersName = "Drop";
         readonly string warHeadsName = "Decoy";
+        readonly string debugPanelName = "[CRX] Debug";
 
         const string argToggle = "Toggle";
         const string argSwitch = "Switch";
@@ -65,71 +66,86 @@ namespace IngameScript
 
         public void Main(string argument)
         {
-            Echo($"PROJECTORSDECOY:{PROJECTORSDECOY.Count}");
-            Echo($"PROJECTORSBOMB:{PROJECTORSBOMB.Count}");
-            Echo($"MERGES:{MERGES.Count}");
-            Echo($"GRAVGENS:{GRAVGENS.Count}");
-            Echo($"WELDERS:{WELDERS.Count}");
+            try
+            {
+                Echo($"PROJECTORSDECOY:{PROJECTORSDECOY.Count}");
+                Echo($"PROJECTORSBOMB:{PROJECTORSBOMB.Count}");
+                Echo($"MERGES:{MERGES.Count}");
+                Echo($"GRAVGENS:{GRAVGENS.Count}");
+                Echo($"WELDERS:{WELDERS.Count}");
 
-            if (selectedDrop == 0)
-            {
-                Echo("Selected Drop: Decoy");
-            }
-            else if (selectedDrop == 1)
-            {
-                Echo("Selected Drop: Bombs");
-            }
-
-            if (!string.IsNullOrEmpty(argument))
-            {
-                ProcessArgument(argument);
-            }
-
-            if (launchOnce)
-            {
-                if (launchTick == 0)
+                if (selectedDrop == 0)
                 {
-                    foreach (IMyProjector block in TEMPPROJECTORS) { block.Enabled = true; }
-                    foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
-                    
-                    launchTick++;
+                    Echo("Selected Drop: Decoy");
+                }
+                else if (selectedDrop == 1)
+                {
+                    Echo("Selected Drop: Bombs");
                 }
 
-                if (!ready)
+                if (!string.IsNullOrEmpty(argument))
                 {
-                    ready = CheckProjectors();
+                    ProcessArgument(argument);
                 }
-                else
+
+                if (launchOnce)
                 {
-                    if (launchTick == 1)
+                    if (launchTick == 0)
                     {
-                        if (selectedDrop == 0)
-                        {
-                            foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = true; }
-                        }
-                        else if (selectedDrop == 1)
-                        {
-                            List<IMyWarhead> warHeads = new List<IMyWarhead>();
-                            GridTerminalSystem.GetBlocksOfType<IMyWarhead>(warHeads, block => block.CustomName.Contains(warHeadsName));
-                            foreach (IMyWarhead war in warHeads) { war.IsArmed = true; }
-                        }
-                        foreach (IMyShipMergeBlock merge in MERGES) { merge.Enabled = false; }
-                    }
-                    else if (launchTick == launchDelay)
-                    {
-                        foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = false; }
-                        foreach (IMyShipMergeBlock merge in MERGES) { merge.Enabled = true; }
-                        if (toggle)
-                        {
-                            Runtime.UpdateFrequency = UpdateFrequency.None;
-                            launchOnce = false;
-                        }
-                        launchTick = 0;
-                        ready = false;
-                        return;
+                        foreach (IMyProjector block in TEMPPROJECTORS) { block.Enabled = true; }
+                        foreach (IMyShipWelder block in WELDERS) { block.Enabled = true; }
+
+                        launchTick++;
                     }
 
-                    launchTick++;
+                    if (!ready)
+                    {
+                        ready = CheckProjectors();
+                    }
+                    else
+                    {
+                        if (launchTick == 1)
+                        {
+                            if (selectedDrop == 0)
+                            {
+                                foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = true; }
+                            }
+                            else if (selectedDrop == 1)
+                            {
+                                List<IMyWarhead> warHeads = new List<IMyWarhead>();
+                                GridTerminalSystem.GetBlocksOfType<IMyWarhead>(warHeads, block => block.CustomName.Contains(warHeadsName));
+                                foreach (IMyWarhead war in warHeads) { war.IsArmed = true; }
+                            }
+                            foreach (IMyShipMergeBlock merge in MERGES) { merge.Enabled = false; }
+                        }
+                        else if (launchTick == launchDelay)
+                        {
+                            foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = false; }
+                            foreach (IMyShipMergeBlock merge in MERGES) { merge.Enabled = true; }
+                            if (toggle)
+                            {
+                                Runtime.UpdateFrequency = UpdateFrequency.None;
+                                launchOnce = false;
+                            }
+                            launchTick = 0;
+                            ready = false;
+                            return;
+                        }
+
+                        launchTick++;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                if (DEBUG != null)
+                {
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    StringBuilder debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                    DEBUG.WriteText(debugLog);
                 }
             }
         }
@@ -175,7 +191,7 @@ namespace IngameScript
             int blocksCount = 0;
             foreach (IMyProjector block in TEMPPROJECTORS)
             {
-                blocksCount += block.BuildableBlocksCount;
+                blocksCount += block.RemainingBlocks;//BuildableBlocksCount;
             }
             if (blocksCount == 0)
             {

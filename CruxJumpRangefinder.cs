@@ -33,6 +33,7 @@ namespace IngameScript
         readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
         readonly string alarmsName = "[CRX] Alarm Lidar";
         readonly string managerName = "[CRX] PB Manager";
+        readonly string debugPanelName = "[CRX] Debug";
 
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
@@ -120,84 +121,98 @@ namespace IngameScript
 
         public void Main(string arg)
         {
-
-            Echo($"REMOTES:{REMOTES.Count}");
-            Echo($"COCKPITS:{COCKPITS.Count}");
-            Echo($"JUMPERS:{JUMPERS.Count}");
-            Echo($"LIDARS:{LIDARS.Count}");
-            Echo($"GYROS:{GYROS.Count}");
-            Echo($"ALARMS:{ALARMS.Count}");
-            Echo($"SURFACES:{SURFACES.Count}");
-
-            if (!string.IsNullOrEmpty(arg))
+            try
             {
-                ProcessArgument(arg);
-            }
+                Echo($"REMOTES:{REMOTES.Count}");
+                Echo($"COCKPITS:{COCKPITS.Count}");
+                Echo($"JUMPERS:{JUMPERS.Count}");
+                Echo($"LIDARS:{LIDARS.Count}");
+                Echo($"GYROS:{GYROS.Count}");
+                Echo($"ALARMS:{ALARMS.Count}");
+                Echo($"SURFACES:{SURFACES.Count}");
 
-            if (aimTarget)
-            {
-                if (!runMDOnce)
+                if (!string.IsNullOrEmpty(arg))
                 {
-                    if (MAGNETICDRIVEPB != null)
+                    ProcessArgument(arg);
+                }
+
+                if (aimTarget)
+                {
+                    if (!runMDOnce)
                     {
-                        if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                        if (MAGNETICDRIVEPB != null)
                         {
-                            MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                            if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                            {
+                                MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                            }
                         }
+                        if (MANAGERPB != null)
+                        {
+                            if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                            {
+                                sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                            }
+                        }
+                        runMDOnce = true;
                     }
-                    if (MANAGERPB != null)
+                    if (!MDOff && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
                     {
-                        if (MANAGERPB.CustomData.Contains("SunChaser=true"))
-                        {
-                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                        }
+                        MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
                     }
-                    runMDOnce = true;
-                }
-                if (!MDOff && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
-                {
-                    MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
-                }
-                if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
-                {
-                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                }
-
-                AimAtTarget();
-            }
-            else
-            {
-                if (runMDOnce)
-                {
-                    if (MAGNETICDRIVEPB != null)
+                    if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
                     {
-                        if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
-                        {
-                            MDOn = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
-                        }
+                        sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                     }
-                    runMDOnce = false;
-                }
-                if (!MDOn && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
-                {
-                    MDOn = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
-                }
-                //if (MDOn) { Echo("Magnetic drive turned ON"); } else { Echo("Magnetic drive failed to turn ON"); }
-            }
 
-            if (REMOTE.IsAutoPilotEnabled && targetPosition != null)
+                    AimAtTarget();
+                }
+                else
+                {
+                    if (runMDOnce)
+                    {
+                        if (MAGNETICDRIVEPB != null)
+                        {
+                            if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                            {
+                                MDOn = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
+                            }
+                        }
+                        runMDOnce = false;
+                    }
+                    if (!MDOn && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                    {
+                        MDOn = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
+                    }
+                    //if (MDOn) { Echo("Magnetic drive turned ON"); } else { Echo("Magnetic drive failed to turn ON"); }
+                }
+
+                if (REMOTE.IsAutoPilotEnabled && targetPosition != null)
+                {
+                    double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
+                    if (dist < 150)
+                    {
+                        REMOTE.SetAutoPilotEnabled(false);
+                    }
+                }
+
+                ReadLidarInfos();
+                ReadJumpersInfos();
+
+                WriteInfo();
+            }
+            catch (Exception e)
             {
-                double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
-                if (dist < 150)
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                if (DEBUG != null)
                 {
-                    REMOTE.SetAutoPilotEnabled(false);
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    StringBuilder debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                    DEBUG.WriteText(debugLog);
                 }
             }
-
-            ReadLidarInfos();
-            ReadJumpersInfos();
-
-            WriteInfo();
         }
 
         void ProcessArgument(string argument)
@@ -258,7 +273,7 @@ namespace IngameScript
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
-                    
+
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0 && distance != 0)
@@ -316,7 +331,7 @@ namespace IngameScript
                 {
                     Vector3D hitPosition = TARGET.HitPosition.Value;
                     Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * enemySafeDistance);
-                    
+
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
 
@@ -431,7 +446,7 @@ namespace IngameScript
             double yawAngle;
             double pitchAngle;
             double rollAngle;
-            GetRotationAnglesSimultaneous(aimDirection, UpVector, REMOTE.WorldMatrix, out pitchAngle,  out yawAngle, out rollAngle);
+            GetRotationAnglesSimultaneous(aimDirection, UpVector, REMOTE.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle, globalTimestep);
             double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
@@ -789,6 +804,6 @@ namespace IngameScript
                     return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
             }
         }
-        
+
     }
 }
