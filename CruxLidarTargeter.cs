@@ -24,6 +24,7 @@ namespace IngameScript
     {
         //TODO when locking on target use roll user inputs
         //missile detach even if the target is null
+        //if a enemy comes in range (800m) start building decoy
         //LIDAR TARGETER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -75,7 +76,6 @@ namespace IngameScript
         readonly int missilesCount = 2;
         readonly int autoMissilesDelay = 91;
         readonly int writeDelay = 10;
-        readonly double initialLockDistance = 5000d;
         readonly float joltProjectileMaxSpeed = 933f;
         readonly float rocketProjectileMaxSpeed = 200f;
         double rocketProjectileMaxRange = 500d;
@@ -518,7 +518,7 @@ namespace IngameScript
         {
             bool targetFound = false;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            MyDetectedEntityInfo entityInfo = lidar.Raycast(initialLockDistance, 0, 0);
+            MyDetectedEntityInfo entityInfo = lidar.Raycast(lidar.AvailableScanRange, 0, 0);
             if (!entityInfo.IsEmpty())
             {
                 if (IsValidLidarTarget(ref entityInfo))
