@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //built decoy at the end of the procedure
         //DECOY
 
         readonly string projectorsDecoyName = "Decoy";
@@ -36,7 +37,7 @@ namespace IngameScript
         const string argSwitch = "Switch";
         const string argLaunchOne = "Launch";
 
-        readonly int launchDelay = 100;
+        readonly int launchDelay = 25;
 
         int selectedDrop = 0;//0 decoys - 1 bombs
         bool toggle = false;
@@ -195,7 +196,7 @@ namespace IngameScript
             int blocksCount = 0;
             foreach (IMyProjector block in TEMPPROJECTORS)
             {
-                blocksCount += block.RemainingBlocks;//BuildableBlocksCount;
+                blocksCount += block.RemainingBlocks;// BuildableBlocksCount;
             }
             if (blocksCount == 0)
             {

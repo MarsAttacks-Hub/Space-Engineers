@@ -25,6 +25,8 @@ namespace IngameScript
         //TODO when locking on target use roll user inputs
         //missile detach even if the target is null
         //if a enemy comes in range (800m) start building decoy
+        //automatic fire jolts if not rotating and not moving left or right
+        //lock on target calculate aim vector if is in gravity or not to fire jolts
         //LIDAR TARGETER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -53,8 +55,6 @@ namespace IngameScript
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";
         const string commandLost = "Lost";
-        const string commandSpiral = "Spiral";
-        const string commandBeamRide = "BeamRide";
 
         const string argClear = "Clear";
         const string argLock = "Lock";
@@ -291,13 +291,16 @@ namespace IngameScript
                 }
 
                 bool completed = CheckProjectors();
-                if (completed && !missilesLoaded)
-                {
-                    missilesLoaded = LoadMissiles();
-                }
                 if (!completed)
                 {
                     missilesLoaded = false;
+                }
+                else
+                {
+                    if (!missilesLoaded)
+                    {
+                        missilesLoaded = LoadMissiles();
+                    }
                 }
 
                 if (!String.IsNullOrEmpty(arg))
@@ -328,7 +331,7 @@ namespace IngameScript
             {
                 case argLock: AcquireTarget(); break;
                 case commandLaunch:
-                    if (missilesLoaded)
+                    if (missilesLoaded && targetName != null)
                     {
                         foreach (IMyRadioAntenna block in MISSILEANTENNAS)
                         {
@@ -340,7 +343,7 @@ namespace IngameScript
                             }
                         }
                         selectedMissile++;
-                        if (selectedMissile > missilesCount + 1)
+                        if (selectedMissile > missilesCount + 1)//TODO if (selectedMissile > missilesCount + 1)
                         {
                             GetMissileAntennas();
                             SetMissileAntennas();
@@ -355,13 +358,6 @@ namespace IngameScript
                             if (id.Value.Contains(commandLost))
                             {
                                 SendMissileUnicastMessage(commandUpdate, id.Key);
-                            }
-                        }
-                        else//TODO doesn't work
-                        {
-                            if (id.Value.Contains(commandLost))
-                            {
-                                SendMissileUnicastMessage(commandBeamRide, id.Key);
                             }
                         }
                     }
@@ -380,42 +376,26 @@ namespace IngameScript
                     autoMissiles = !autoMissiles;
                     break;
                 case argSwitchPayLoad:
-                    if (selectedPayLoad == 1)
+                    int blockCount = 0;
+                    foreach (IMyProjector proj in TEMPPROJECTORS)
                     {
-                        selectedPayLoad = 0;
-                        TEMPPROJECTORS = PROJECTORSMISSILES;
-                        foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = true; }
-                        foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = false; }
+                        blockCount += proj.BuildableBlocksCount;// RemainingBlocks;//TODO
                     }
-                    else if (selectedPayLoad == 0)
+                    if (blockCount == 0)
                     {
-                        selectedPayLoad = 1;
-                        TEMPPROJECTORS = PROJECTORSDRONES;
-                        foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = true; }
-                        foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = false; }
-                    }
-                    break;
-                case commandSpiral:
-                    if (targetName != null)
-                    {
-                        foreach (var id in MissileIDs)
+                        if (selectedPayLoad == 1)
                         {
-                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))
-                            {
-                                SendMissileUnicastMessage(commandSpiral, id.Key);
-                            }
+                            selectedPayLoad = 0;
+                            TEMPPROJECTORS = PROJECTORSMISSILES;
+                            foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = true; }
+                            foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = false; }
                         }
-                    }
-                    break;
-                case commandBeamRide:
-                    if (targetName != null)
-                    {
-                        foreach (var id in MissileIDs)
+                        else if (selectedPayLoad == 0)
                         {
-                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))
-                            {
-                                SendMissileUnicastMessage(commandBeamRide, id.Key);
-                            }
+                            selectedPayLoad = 1;
+                            TEMPPROJECTORS = PROJECTORSDRONES;
+                            foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = true; }
+                            foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = false; }
                         }
                     }
                     break;
@@ -957,7 +937,7 @@ namespace IngameScript
             foreach (var inf in missilesInfo)
             {
                 missileLog.Append("Status: ").Append(inf.Value.Item3).Append(", Missile ID: ").Append(inf.Key.ToString()).Append("\n");
-                if (inf.Value.Item3.Contains(commandUpdate) || inf.Value.Item3.Contains(commandSpiral))
+                if (inf.Value.Item3.Contains(commandUpdate))
                 {
                     missileLog.Append("Dist. From Target: ").Append(inf.Value.Item1.ToString("0.0")).Append(", ");
                 }
@@ -1066,16 +1046,9 @@ namespace IngameScript
 
             foreach (var id in MissileIDs)
             {
-                if ((id.Value.Contains(commandUpdate) || id.Value.Contains(commandBeamRide) || id.Value.Contains(commandLaunch)) && !id.Value.Contains("Drone"))
+                if (!id.Value.Contains(commandLost))
                 {
-                    SendMissileUnicastMessage(commandBeamRide, id.Key);
-                }
-                else
-                {
-                    if (!id.Value.Contains(commandLost))
-                    {
-                        SendMissileUnicastMessage(commandLost, id.Key);
-                    }
+                    SendMissileUnicastMessage(commandLost, id.Key);
                 }
             }
         }
@@ -1147,11 +1120,24 @@ namespace IngameScript
 
         bool CheckProjectors()
         {
+            string selection = "";
+            switch (selectedMissile)
+            {
+                case 1:
+                    selection = "R2";
+                    break;
+                case 2:
+                    selection = "L2";
+                    break;
+            }
             bool completed = false;
-            int blocksCount = 0;
+            int blocksCount = 1000;
             foreach (IMyProjector block in TEMPPROJECTORS)
             {
-                blocksCount += block.RemainingBlocks;//BuildableBlocksCount;
+                if (block.CustomName.Contains(selection))
+                {
+                    blocksCount = block.BuildableBlocksCount;//RemainingBlocks;
+                }
             }
             if (blocksCount == 0)
             {
@@ -1344,10 +1330,7 @@ namespace IngameScript
         {
             List<IMyShipConnector> MISSILECONNECTORS = new List<IMyShipConnector>();
             GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(MISSILECONNECTORS, b => b.CustomName.Contains(missilePrefix));
-            if (MISSILECONNECTORS.Count == 0)
-            {
-                return false;
-            }
+            if (MISSILECONNECTORS.Count == 0) { return false; }
             foreach (IMyShipConnector block in MISSILECONNECTORS) { block.Connect(); }
 
             bool allFilled = false;
