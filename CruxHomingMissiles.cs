@@ -790,15 +790,18 @@ namespace IngameScript
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
 
-            Vector3D forwardVec = REF.WorldMatrix.Forward;
-            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
-            if (angle * rad2deg <= angleTolerance)
+            if (missileType == 2)
             {
-                readyToFire = true;
-            }
-            else
-            {
-                readyToFire = false;
+                Vector3D forwardVec = REF.WorldMatrix.Forward;
+                double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
+                if (angle * rad2deg <= angleTolerance)
+                {
+                    readyToFire = true;
+                }
+                else
+                {
+                    readyToFire = false;
+                }
             }
         }
 
