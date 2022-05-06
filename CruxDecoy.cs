@@ -22,7 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //built decoy at the end of the procedure
+        //build decoy at the end of the procedure
         //DECOY
 
         readonly string projectorsDecoyName = "Decoy";
