@@ -63,6 +63,7 @@ namespace IngameScript
         readonly bool useRoll = true;
         bool idleThrusters = false;
         readonly float maxSpeed = 105f;
+        readonly float minSpeed = 3f;
         readonly float deadManMinSpeed = 0.1f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
@@ -511,15 +512,15 @@ namespace IngameScript
             Vector3 vel = CONTROLLER.GetShipVelocities().LinearVelocity;
             vel = Vector3.Transform(vel, MatrixD.Transpose(CONTROLLER.WorldMatrix.GetOrientation()));
             vel = dir * maxSpeed - Vector3.Transform(vel, mtrx);
-            if (Math.Abs(vel.X) < deadManMinSpeed)
+            if (Math.Abs(vel.X) < minSpeed)
             {
                 vel.X = 0;
             }
-            if (Math.Abs(vel.Y) < deadManMinSpeed)
+            if (Math.Abs(vel.Y) < minSpeed)
             {
                 vel.Y = 0;
             }
-            if (Math.Abs(vel.Z) < deadManMinSpeed)
+            if (Math.Abs(vel.Z) < minSpeed)
             {
                 vel.Z = 0;
             }
