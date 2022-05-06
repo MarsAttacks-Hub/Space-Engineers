@@ -758,14 +758,14 @@ namespace IngameScript
             double distanceFromTarget = Vector3D.Distance(targetPos, REF.GetPosition());
             if (distanceFromTarget > gunsMaxRange)
             {
-                aimDirection = ComputeInterceptWithLeading(targetPos, targetVelocity, (float)CONTROLLER.GetShipSpeed(), REF);
+                aimDirection = targetPos - REF.GetPosition();
             }
             else
             {
                 switch (weaponType)
                 {
                     case 0://none
-                        aimDirection = ComputeInterceptWithLeading(targetPos, targetVelocity, (float)CONTROLLER.GetShipSpeed(), REF);
+                        aimDirection = targetPos - REF.GetPosition();
                         break;
                     case 1://rockets
                         aimDirection = ComputeInterceptWithLeading(targetPos, targetVelocity, rocketProjectileMaxSpeed, REF);
