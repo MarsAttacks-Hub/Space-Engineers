@@ -30,7 +30,7 @@ namespace IngameScript
         readonly string gatlingsName = "Gatling";
         readonly string turretsName = "Turret";
         readonly string forwardThrustersName = "Frw";
-        readonly string sideThrustersName = "Lwr";
+        readonly string sideThrustersName = "Lwr";//Drone 1 Rrw - Drone 2 Lrw
         readonly string backwardThrustersName = "Bkw";
         readonly string upwardThrustersName = "Upw";
         readonly string downwardThrustersName = "Dnw";
@@ -41,25 +41,34 @@ namespace IngameScript
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";
         const string commandLost = "Lost";
+        const string commandSpiral = "Spiral";
 
         readonly string statusLost = "Lost";
         readonly string statusCruising = "Cruising";
         readonly string statusLaunched = "Launched";
 
-        int missileType = 0;//0 kinetic - 1 explosive - 2 drone
+        int missileType = 1;//0 kinetic - 1 explosive - 2 drone
         readonly int weaponType = 0;//0 None - 1 Rockets - 2 Gatlings
-        readonly int startThrustersDelay = 50;
-        readonly int startTargetingDelay = 100;
+        readonly int startThrustersDelay = 5;
+        readonly int startTargetingDelay = 10;
         readonly float rocketProjectileMaxSpeed = 200f;
         readonly float gatlingProjectileMaxSpeed = 400f;
         readonly double gunsMaxRange = 800d;
-        readonly int checkLoadDelay = 100;
+        readonly int checkLoadDelay = 100;//delay after wich the drone check if has ammo and ice
+        readonly float spiralStart = 1000f;//distance to target at which missile starts to spiral
+        readonly float spiralSafe = 200f;//safe distance from ship at which missile starts to spiral
+        readonly double spiralDegrees = 15d;//radius of the spiral pattern
+        readonly double timeMaxSpiral = 3d;//time it takes the missile to complete a full spiral cycle
+        readonly double navConstant = 5d;//Recommended value is 3-5 Higher values make the missile compensate faster but can lead to more overshoot/instability
+        readonly double navAccelConstant = 0d;
+        readonly float globalTimestep = 10.0f / 60.0f;//UpdateFrequency.Update10
 
+        const double updatesPerSecond = 10.0;//UpdateFrequency.Update10
+        const double deg2Rad = Math.PI / 180;
         const double rad2deg = 180 / Math.PI;
         const double angleTolerance = 2;//degrees
 
         double fuseDistance = 7d;
-        float globalTimestep = 1.0f / 60.0f;
         int currentTick = 1;
         double maxSpeed = 99d;
         bool isLargeGrid = false;
@@ -75,7 +84,6 @@ namespace IngameScript
         bool startThrustersOnce = true;
         bool launchOnce = true;
         bool lostOnce = true;
-
         bool updateOnce = true;
         bool approaching = true;
         bool rightDistance = true;
@@ -87,11 +95,14 @@ namespace IngameScript
         bool readyToFire = false;
         bool readyToFireOnce = true;
         int checkLoad = 0;
-        bool creative = false;
+        bool creative = true;
+        bool useSpiral = false;
+        double timeSpiral = 0d;
 
         Vector3D platformPosition;
         Vector3D targetPosition;
         Vector3 targetVelocity;
+        Vector3 prevTargetVelocity = new Vector3();
 
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
@@ -187,8 +198,10 @@ namespace IngameScript
 
                         UpdateBroadcastRange(platformPosition);
                     }
-                    else if (launched && (command.Equals(commandUpdate)))
+                    else if (launched && (command.Equals(commandUpdate)) || command.Equals(commandSpiral))
                     {
+                        if (command.Equals(commandSpiral)) { useSpiral = !useSpiral; }
+
                         if (updateOnce)
                         {
                             InitiateUpdate();
@@ -211,7 +224,9 @@ namespace IngameScript
                             ManageMissileType();
 
                             currentTick++;
-                            //prevTargetVelocity = targetVelocity;
+                            prevTargetVelocity = targetVelocity;
+                            //prevTargetPosition = targetPosition;
+                            //prevPosition = CONTROLLER.CubeGrid.WorldVolume.Center;
                         }
                     }
                     else if (launched && command.Equals(commandLost))
@@ -374,8 +389,8 @@ namespace IngameScript
 
         void InitiateLaunch()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            UpdateGlobalTimeStep();
+            //Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            //UpdateGlobalTimeStep();
             SendUnicastMessage();
             PrepareForLaunch();
 
@@ -398,9 +413,8 @@ namespace IngameScript
 
         void InitiateUpdate()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            UpdateGlobalTimeStep();
-
+            //Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            //UpdateGlobalTimeStep();
             currentTick = 1;
 
             if (missileType == 1)
@@ -428,9 +442,8 @@ namespace IngameScript
 
         void InitiateLost()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
-            UpdateGlobalTimeStep();
-
+            //Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            //UpdateGlobalTimeStep();
             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
             foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
             foreach (IMyThrust block in ALLTHRUSTERS) { block.ThrustOverride = 0f; }
@@ -488,17 +501,49 @@ namespace IngameScript
         {
             if (missileType == 0)//kinetic
             {
-                LockOnTarget(CONTROLLER);
+                double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
+                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
+                {
+                    MissileGuidance();
+                }
+                else
+                {
+                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
+                    {
+                        SpiralGuidance();
+                    }
+                    else
+                    {
+                        MissileGuidance();
+                    }
+                }
             }
             else if (missileType == 1)//explosive
             {
                 double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
                 if (distanceFromTarget <= fuseDistance)
                 {
                     foreach (IMyWarhead block in WARHEADS) { block.Detonate(); }
                 }
-
-                LockOnTarget(CONTROLLER);
+                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
+                {
+                    MissileGuidance();
+                }
+                else
+                {
+                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
+                    {
+                        SpiralGuidance();
+                    }
+                    else
+                    {
+                        MissileGuidance();
+                    }
+                }
             }
             else if (missileType == 2)//drone
             {
@@ -688,7 +733,7 @@ namespace IngameScript
                 double rollAngle = VectorMath.AngleBetween(grav, downVector);
                 if (rollAngle != 0)
                 {
-                    double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+                    double rollSpeed = rollController.Control(rollAngle);
                     Vector3D rotationVec = new Vector3D(0, 0, rollSpeed);
                     MatrixD refMatrix = CONTROLLER.WorldMatrix;
                     Vector3D relativeRotationVec = Vector3D.TransformNormal(rotationVec, refMatrix);
@@ -735,9 +780,9 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(-velocityVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle, globalTimestep);
-            double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
-            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
 
@@ -748,6 +793,168 @@ namespace IngameScript
                 CONTROLLER.DampenersOverride = true;
             }
             //} else { if (CONTROLLER.DampenersOverride) { CONTROLLER.DampenersOverride = false; } }
+        }
+
+        public static double VectorProjectionScalar(Vector3D IN, Vector3D Axis_norm)//Use For Magnitudes Of Vectors In Directions (0-IN.length)
+        {
+            double OUT = Vector3D.Dot(IN, Axis_norm);
+            if (OUT == double.NaN)
+            { OUT = 0; }
+            return OUT;
+        }
+
+        //readonly double missileSpinRPM = 0d;//this specifies how fast the missile will spin when flying(only in space)
+        //const double rpm2Rad = Math.PI / 30;
+        //const double gyroSlowdownAngle = Math.PI / 36;
+        void MissileGuidance()
+        {
+            float elapsedTime = currentTick * globalTimestep;
+            Vector3D targetVel = targetVelocity;//(targetPosition - prevTargetPosition) / elapsedTime;
+            Vector3D targetPos = targetPosition + targetVelocity * elapsedTime;//targetPosition + (targetVelocity * elapsedTime);
+            Vector3D targetAcceleration = (targetVelocity - prevTargetVelocity) * (float)updatesPerSecond;
+            double missileThrust = CalculateMissileThrust(THRUSTERS);
+            double missileMass = CONTROLLER.CalculateShipMass().PhysicalMass;
+            double missileAcceleration = missileThrust / missileMass;
+            Vector3D gravityVec = CONTROLLER.GetNaturalGravity();
+            Vector3D headingVec = GetPointingVector(CONTROLLER.CenterOfMass, CONTROLLER.GetShipVelocities().LinearVelocity, missileAcceleration, targetPos, targetVel, targetAcceleration, gravityVec);
+
+            if (status.Equals(statusCruising))
+            {
+                var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
+                ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
+            }
+
+            Vector3D UpVector;
+            if (Vector3D.IsZero(gravityVec)) { UpVector = CONTROLLER.WorldMatrix.Up; }
+            else { UpVector = -gravityVec; }
+            double yawAngle, pitchAngle, rollAngle;
+            GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
+
+            /*double rollSpeed;
+            if (Math.Abs(missileSpinRPM) > 1e-3 && status.Equals(statusCruising) && Vector3D.IsZero(gravityVec)) { rollSpeed = missileSpinRPM * rpm2Rad;//converts RPM to rad/s }
+            else { rollSpeed = rollAngle; }
+            if (Math.Abs(yawAngle) < gyroSlowdownAngle) { yawSpeed = updatesPerSecond * .5 * yawAngle; }
+            if (Math.Abs(pitchAngle) < gyroSlowdownAngle) { pitchSpeed = updatesPerSecond * .5 * pitchAngle; }*/
+
+            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+        }
+
+        void SpiralGuidance()
+        {
+            float elapsedTime = currentTick * globalTimestep;
+            Vector3D targetVel = targetVelocity;//(targetPosition - prevTargetPosition) / elapsedTime;
+            Vector3D targetPos = targetPosition + targetVelocity * elapsedTime;//targetPosition + (targetVelocity * elapsedTime);
+            Vector3D targetAcceleration = (targetVelocity - prevTargetVelocity) * (float)updatesPerSecond;
+            double missileThrust = CalculateMissileThrust(THRUSTERS);
+            double missileMass = CONTROLLER.CalculateShipMass().PhysicalMass;
+            double missileAcceleration = missileThrust / missileMass;
+            Vector3D gravityVec = CONTROLLER.GetNaturalGravity();
+            Vector3D headingVec = GetPointingVector(CONTROLLER.CenterOfMass, CONTROLLER.GetShipVelocities().LinearVelocity, missileAcceleration, targetPos, targetVel, targetAcceleration, gravityVec);
+
+            Vector3D UpVector;
+            if (Vector3D.IsZero(gravityVec)) { UpVector = CONTROLLER.WorldMatrix.Up; }
+            else { UpVector = -gravityVec; }
+            headingVec = missileAcceleration * SpiralTrajectory(headingVec, UpVector);
+
+            if (status.Equals(statusCruising))
+            {
+                var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
+                ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
+            }
+
+            double yawAngle;
+            double pitchAngle;
+            double rollAngle;
+            GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
+
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
+
+            /*double rollSpeed;
+            if (Math.Abs(missileSpinRPM) > 1e-3 && status.Equals(statusCruising) && Vector3D.IsZero(gravityVec)) { rollSpeed = missileSpinRPM * rpm2Rad;//converts RPM to rad/s }
+            else { rollSpeed = rollAngle; }
+            if (Math.Abs(yawAngle) < gyroSlowdownAngle) { yawSpeed = updatesPerSecond * .5 * yawAngle; }
+            if (Math.Abs(pitchAngle) < gyroSlowdownAngle) { pitchSpeed = updatesPerSecond * .5 * pitchAngle; }*/
+
+            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+        }
+
+        Vector3D SpiralTrajectory(Vector3D desiredForwardVector, Vector3D desiredUpVector)
+        {
+            if (timeSpiral > timeMaxSpiral)
+                timeSpiral = 0;
+
+            double angle = 2 * Math.PI * timeSpiral / timeMaxSpiral;
+
+            Vector3D forward = VectorMath.SafeNormalize(desiredForwardVector);
+            Vector3D right = VectorMath.SafeNormalize(Vector3D.Cross(forward, desiredUpVector));
+            Vector3D up = Vector3D.Cross(right, forward);
+
+            double lateralProportion = Math.Sin(spiralDegrees * deg2Rad);
+            double forwardProportion = Math.Sqrt(1 - lateralProportion * lateralProportion);
+
+            return forward * forwardProportion + lateralProportion * (Math.Sin(angle) * up + Math.Cos(angle) * right);
+        }
+
+        Vector3D GetPointingVector(Vector3D missilePosition, Vector3D missileVelocity, double missileAcceleration, Vector3D targetPosition, Vector3D targetVelocity, Vector3D targetAcceleration, Vector3D gravity)
+        {
+            Vector3D missileToTarget = targetPosition - missilePosition;
+            Vector3D missileToTargetNorm = Vector3D.Normalize(missileToTarget);
+            Vector3D relativeVelocity = targetVelocity - missileVelocity;
+            Vector3D lateralTargetAcceleration = (targetAcceleration - Vector3D.Dot(targetAcceleration, missileToTargetNorm) * missileToTargetNorm);
+            Vector3D gravityCompensationTerm = 1.1 * -(gravity - Vector3D.Dot(gravity, missileToTargetNorm) * missileToTargetNorm);
+
+            Vector3D lateralAcceleration = GetLatax(missileToTarget, missileToTargetNorm, relativeVelocity, lateralTargetAcceleration, gravityCompensationTerm);
+
+            if (Vector3D.IsZero(lateralAcceleration))
+                return missileToTarget;
+
+            double diff = missileAcceleration * missileAcceleration - lateralAcceleration.LengthSquared();
+            if (diff < 0)
+                return lateralAcceleration;//fly parallel to the target
+            return lateralAcceleration + Math.Sqrt(diff) * missileToTargetNorm;
+        }
+
+        Vector3D GetLatax(Vector3D missileToTarget, Vector3D missileToTargetNorm, Vector3D relativeVelocity, Vector3D lateralTargetAcceleration, Vector3D gravityCompensationTerm)
+        {
+            Vector3D omega = Vector3D.Cross(missileToTarget, relativeVelocity) / Math.Max(missileToTarget.LengthSquared(), 1);//to combat instability at close range
+            return navConstant * relativeVelocity.Length() * Vector3D.Cross(omega, missileToTargetNorm)
+                 + navAccelConstant * lateralTargetAcceleration
+                 + gravityCompensationTerm;//normal to LOS
+        }
+
+        double CalculateMissileThrust(List<IMyThrust> mainThrusters)
+        {
+            double thrust = 0;
+            foreach (var block in mainThrusters)
+            {
+                if (block.Closed)
+                    continue;
+                thrust += block.IsFunctional ? block.MaxEffectiveThrust : 0;
+                //compensate for grav later
+            }
+            return thrust;
+        }
+
+        void ApplyThrustOverride(List<IMyThrust> thrusters, float overrideValue, bool turnOn = true)
+        {
+            float thrustProportion = overrideValue * 0.01f;
+            foreach (IMyThrust thisThrust in thrusters)
+            {
+                if (thisThrust.Closed)
+                    continue;
+
+                if (thisThrust.Enabled != turnOn)
+                    thisThrust.Enabled = turnOn;
+
+                if (thrustProportion != thisThrust.ThrustOverridePercentage)
+                    thisThrust.ThrustOverridePercentage = thrustProportion;
+            }
         }
 
         void LockOnTarget(IMyTerminalBlock REF)
@@ -784,9 +991,9 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle, globalTimestep);
-            double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
-            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
 
@@ -951,14 +1158,6 @@ namespace IngameScript
             }
         }
 
-        void UpdateGlobalTimeStep()
-        {
-            float tick = 1.0f / 60.0f;
-            if ((Runtime.UpdateFrequency & UpdateFrequency.Update1) != 0) { globalTimestep = tick; }
-            else if ((Runtime.UpdateFrequency & UpdateFrequency.Update10) != 0) { globalTimestep = tick * 10; }
-            else if ((Runtime.UpdateFrequency & UpdateFrequency.Update100) != 0) { globalTimestep = tick * 100; }
-        }
-
         void UpdateBroadcastRange(Vector3D platformPosition)
         {
             var distance = Vector3.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
@@ -1011,7 +1210,7 @@ namespace IngameScript
         {
             double aimP, aimI, aimD;
             double integralWindupLimit = 0;
-            float second = 60f;
+            //float second = 60f;
 
             if (block.CubeGrid.GridSizeEnum == MyCubeSize.Large)
             {
@@ -1021,14 +1220,14 @@ namespace IngameScript
             }
             else
             {
-                aimP = 40;
+                aimP = 10;// 40;
                 aimI = 0;
-                aimD = 13;
+                aimD = 10;// 13;
             }
 
-            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
-            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
-            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
+            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
         public class PID
@@ -1185,87 +1384,77 @@ namespace IngameScript
         }
 
         /*
-        
-        //const string commandSpiral = "Spiral";
-        //const string commandBeamRide = "BeamRide";
-        //readonly float spiralStart = 1000f;// distance to target at which missile starts to spiral
-        //readonly float spiralSafe = 200f;// safe distance from ship at which missile starts to spiral
-        //readonly double missileSpinRPM = 0d;//this specifies how fast the missile will spin when flying(only in space)
-        //readonly double spiralDegrees = 15d;// radius of the spiral pattern
-        //readonly double timeMaxSpiral = 3d;// time it takes the missile to complete a full spiral cycle
-        //readonly double navConstant = 5d;//Recommended value is 3-5 Higher values make the missile compensate faster but can lead to more overshoot/instability
-        //readonly double navAccelConstant = 0d;
-        //const double rpm2Rad = Math.PI / 30;
-        //const double deg2Rad = Math.PI / 180;
-        //const double updatesPerSecond = 10.0;
-        //const double gyroSlowdownAngle = Math.PI / 36;
-        //bool useSpiral = false;
-        //bool hasPassed = false;
-        //double timeSpiral = 0d;
-        //bool beamRideOnce = true;
-        //MatrixD platformMatrix;
-        //Vector3 prevTargetVelocity = new Vector3();
+        void UpdateGlobalTimeStep()
+        {
+            float tick = 1.0f / 60.0f;
+            if ((Runtime.UpdateFrequency & UpdateFrequency.Update1) != 0) { globalTimestep = tick; }
+            else if ((Runtime.UpdateFrequency & UpdateFrequency.Update10) != 0) { globalTimestep = tick * 10; }
+            else if ((Runtime.UpdateFrequency & UpdateFrequency.Update100) != 0) { globalTimestep = tick * 100; }
+        }
+
+        const string commandBeamRide = "BeamRide";
+        readonly double navAccelConstant = 0d;
+        const double rpm2Rad = Math.PI / 30;
+        const double updatesPerSecond = 10.0;
+        const double gyroSlowdownAngle = Math.PI / 36;
+        bool hasPassed = false;
+        bool beamRideOnce = true;
+        MatrixD platformMatrix;
+        Vector3 prevTargetVelocity = new Vector3();
 
         //MAIN
-
-        else if (launched && (command.Equals(commandUpdate)))// || command.Equals(commandSpiral)
-                    {
-                        //if (command.Equals(commandSpiral)) { useSpiral = !useSpiral; }
-
-
         else if (launched && command.Equals(commandBeamRide))
-                    {
-                        if (beamRideOnce)
-                        {
-                            InitiateBeamRide();
-                        }
+        {
+            if (beamRideOnce)
+            {
+                InitiateBeamRide();
+            }
 
-                        if (!startTargeting)
-                        {
-                            InitiateThrusters();
-                        }
-                        else
-                        {
-                            BeamRide();
-                        }
+            if (!startTargeting)
+            {
+                InitiateThrusters();
+            }
+            else
+            {
+                BeamRide();
+            }
 
-                        UpdateBroadcastRange(platformPosition);
+            UpdateBroadcastRange(platformPosition);
 
-                        SendUnicastMessage();
-                    }
-                    else if (!launched && command.Equals(commandBeamRide))
-                    {
-                        if (!init)
-                        {
-                            GetAntenna();
-                            GetBlocks();
-                            init = true;
-                        }
+            SendUnicastMessage();
+        }
+        else if (!launched && command.Equals(commandBeamRide))
+        {
+            if (!init)
+            {
+                GetAntenna();
+                GetBlocks();
+                init = true;
+            }
 
-                        if (launchOnce)
-                        {
-                            InitiateLaunch();
-                        }
+            if (launchOnce)
+            {
+                InitiateLaunch();
+            }
 
-                        if (beamRideOnce)
-                        {
-                            InitiateBeamRide();
-                        }
+            if (beamRideOnce)
+            {
+                InitiateBeamRide();
+            }
 
-                        if (!startTargeting)
-                        {
-                            InitiateThrusters();
-                        }
-                        else
-                        {
-                            BeamRide();
-                        }
+            if (!startTargeting)
+            {
+                InitiateThrusters();
+            }
+            else
+            {
+                BeamRide();
+            }
 
-                        UpdateBroadcastRange(platformPosition);
+            UpdateBroadcastRange(platformPosition);
 
-                        SendUnicastMessage();
-                    }
-        
+            SendUnicastMessage();
+        }
         
         void InitiateBeamRide()
         {
@@ -1286,180 +1475,6 @@ namespace IngameScript
             tooBelow = true;
 
             status = statusCruising;
-        }
-
-        
-        void ManageMissileType()
-        {
-            if (missileType == 0)//kinetic
-            {
-                double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-                double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-                double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
-                //if (distanceShip2Target <= spiralStart + spiralSafe)
-                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
-                {
-                    MissileGuidance();
-                }
-                else
-                {
-                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
-                    {
-                        SpiralGuidance();
-                    }
-                    else
-                    {
-                        MissileGuidance();
-                    }
-                }
-            }
-            else if (missileType == 1)//explosive
-            {
-                double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-                double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-                double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
-                if (distanceFromTarget <= fuseDistance)
-                {
-                    foreach (IMyWarhead block in WARHEADS) { block.Detonate(); }
-                }
-                //if (distanceShip2Target <= spiralStart + spiralSafe)
-                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
-                {
-                    MissileGuidance();
-                }
-                else
-                {
-                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
-                    {
-                        SpiralGuidance();
-                    }
-                    else
-                    {
-                        MissileGuidance();
-                    }
-                }
-            }
-            else if (missileType == 2)//drone
-            {
-                LockOnTarget(CONTROLLER);
-
-                ManageDrone();
-
-                if (!creative)
-                {
-                    if (checkLoad >= checkLoadDelay)
-                    {
-                        bool hasAmmo = CheckAmmo();
-                        double hasIce = CheckIce();
-                        if (!hasAmmo || hasIce < 5d)
-                        {
-                            missileType = 0;//suicide
-                        }
-                        checkLoad = 0;
-                    }
-                    checkLoad++;
-                }
-            }
-        }
-        
-        
-        void MissileGuidance()
-        {
-            float elapsedTime = currentTick * globalTimestep;
-            Vector3D targetVel = targetVelocity;//(targetPosition - prevTargetPosition) / elapsedTime;
-            Vector3D targetPos = targetPosition + targetVelocity * elapsedTime;//targetPosition + (targetVelocity * elapsedTime);
-            Vector3D targetAcceleration = (targetVelocity - prevTargetVelocity) * (float)updatesPerSecond;
-            double missileThrust = CalculateMissileThrust(THRUSTERS);
-            double missileMass = CONTROLLER.CalculateShipMass().PhysicalMass;
-            double missileAcceleration = missileThrust / missileMass;
-            Vector3D gravityVec = CONTROLLER.GetNaturalGravity();
-            Vector3D headingVec = GetPointingVector(CONTROLLER.CenterOfMass, CONTROLLER.GetShipVelocities().LinearVelocity, missileAcceleration, targetPos, targetVel, targetAcceleration, gravityVec);
-
-            if (status.Equals(statusCruising))
-            {
-                var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
-                ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
-            }
-
-            Vector3D UpVector;
-            if (Vector3D.IsZero(gravityVec)) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -gravityVec; }
-            double yawAngle, pitchAngle, rollAngle;
-            GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
-            double yawSpeed = yawController.Control(yawAngle);
-            double pitchSpeed = pitchController.Control(pitchAngle);
-
-            double rollSpeed;
-            if (Math.Abs(missileSpinRPM) > 1e-3 && status.Equals(statusCruising) && Vector3D.IsZero(gravityVec))
-            {
-                rollSpeed = missileSpinRPM * rpm2Rad;//converts RPM to rad/s
-            }
-            else
-            {
-                rollSpeed = rollAngle;
-            }
-            if (Math.Abs(yawAngle) < gyroSlowdownAngle)
-            {
-                yawSpeed = updatesPerSecond * .5 * yawAngle;
-            }
-            if (Math.Abs(pitchAngle) < gyroSlowdownAngle)
-            {
-                pitchSpeed = updatesPerSecond * .5 * pitchAngle;
-            }
-
-            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
-        }
-
-        void SpiralGuidance()
-        {
-            float elapsedTime = currentTick * globalTimestep;
-            Vector3D targetVel = targetVelocity;//(targetPosition - prevTargetPosition) / elapsedTime;
-            Vector3D targetPos = targetPosition + targetVelocity * elapsedTime;//targetPosition + (targetVelocity * elapsedTime);
-            Vector3D targetAcceleration = (targetVelocity - prevTargetVelocity) * (float)updatesPerSecond;
-            double missileThrust = CalculateMissileThrust(THRUSTERS);
-            double missileMass = CONTROLLER.CalculateShipMass().PhysicalMass;
-            double missileAcceleration = missileThrust / missileMass;
-            Vector3D gravityVec = CONTROLLER.GetNaturalGravity();
-            Vector3D headingVec = GetPointingVector(CONTROLLER.CenterOfMass, CONTROLLER.GetShipVelocities().LinearVelocity, missileAcceleration, targetPos, targetVel, targetAcceleration, gravityVec);
-
-            Vector3D UpVector;
-            if (Vector3D.IsZero(gravityVec)) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -gravityVec; }
-            headingVec = missileAcceleration * SpiralTrajectory(headingVec, UpVector);
-
-            if (status.Equals(statusCruising))
-            {
-                var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
-                ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
-            }
-
-            double yawAngle;
-            double pitchAngle;
-            double rollAngle;
-            GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
-
-            double yawSpeed = yawController.Control(yawAngle);
-            double pitchSpeed = pitchController.Control(pitchAngle);
-            double rollSpeed;
-            if (Math.Abs(missileSpinRPM) > 1e-3 && status.Equals(statusCruising) && Vector3D.IsZero(gravityVec))
-            {
-                rollSpeed = missileSpinRPM * rpm2Rad;//converts RPM to rad/s
-            }
-            else
-            {
-                rollSpeed = rollAngle;
-            }
-            if (Math.Abs(yawAngle) < gyroSlowdownAngle)
-            {
-                yawSpeed = updatesPerSecond * .5 * yawAngle;
-            }
-            if (Math.Abs(pitchAngle) < gyroSlowdownAngle)
-            {
-                pitchSpeed = updatesPerSecond * .5 * pitchAngle;
-            }
-
-            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
         void BeamRide()
@@ -1552,50 +1567,6 @@ namespace IngameScript
             return headingVec;
         }
 
-        Vector3D SpiralTrajectory(Vector3D desiredForwardVector, Vector3D desiredUpVector)
-        {
-            if (timeSpiral > timeMaxSpiral)
-                timeSpiral = 0;
-
-            double angle = 2 * Math.PI * timeSpiral / timeMaxSpiral;
-
-            Vector3D forward = VectorMath.SafeNormalize(desiredForwardVector);
-            Vector3D right = VectorMath.SafeNormalize(Vector3D.Cross(forward, desiredUpVector));
-            Vector3D up = Vector3D.Cross(right, forward);
-
-            double lateralProportion = Math.Sin(spiralDegrees * deg2Rad);
-            double forwardProportion = Math.Sqrt(1 - lateralProportion * lateralProportion);
-
-            return forward * forwardProportion + lateralProportion * (Math.Sin(angle) * up + Math.Cos(angle) * right);
-        }
-
-        Vector3D GetPointingVector(Vector3D missilePosition, Vector3D missileVelocity, double missileAcceleration, Vector3D targetPosition, Vector3D targetVelocity, Vector3D targetAcceleration, Vector3D gravity)
-        {
-            Vector3D missileToTarget = targetPosition - missilePosition;
-            Vector3D missileToTargetNorm = Vector3D.Normalize(missileToTarget);
-            Vector3D relativeVelocity = targetVelocity - missileVelocity;
-            Vector3D lateralTargetAcceleration = (targetAcceleration - Vector3D.Dot(targetAcceleration, missileToTargetNorm) * missileToTargetNorm);
-            Vector3D gravityCompensationTerm = 1.1 * -(gravity - Vector3D.Dot(gravity, missileToTargetNorm) * missileToTargetNorm);
-
-            Vector3D lateralAcceleration = GetLatax(missileToTarget, missileToTargetNorm, relativeVelocity, lateralTargetAcceleration, gravityCompensationTerm);
-
-            if (Vector3D.IsZero(lateralAcceleration))
-                return missileToTarget;
-
-            double diff = missileAcceleration * missileAcceleration - lateralAcceleration.LengthSquared();
-            if (diff < 0)
-                return lateralAcceleration;//fly parallel to the target
-            return lateralAcceleration + Math.Sqrt(diff) * missileToTargetNorm;
-        }
-
-        Vector3D GetLatax(Vector3D missileToTarget, Vector3D missileToTargetNorm, Vector3D relativeVelocity, Vector3D lateralTargetAcceleration, Vector3D gravityCompensationTerm)
-        {
-            Vector3D omega = Vector3D.Cross(missileToTarget, relativeVelocity) / Math.Max(missileToTarget.LengthSquared(), 1);//to combat instability at close range
-            return navConstant * relativeVelocity.Length() * Vector3D.Cross(omega, missileToTargetNorm)
-                 + navAccelConstant * lateralTargetAcceleration
-                 + gravityCompensationTerm;//normal to LOS
-        }
-
         Vector3D CalculateDriftCompensation(Vector3D velocity, Vector3D directHeading, double accel, double timeConstant, Vector3D gravityVec, double maxDriftAngle = 60)
         {
             if (directHeading.LengthSquared() == 0)
@@ -1625,49 +1596,20 @@ namespace IngameScript
             return parallelAccel * parallel - normal * normalAccel;
         }
 
-        double CalculateMissileThrust(List<IMyThrust> mainThrusters)
-        {
-            double thrust = 0;
-            foreach (var block in mainThrusters)
-            {
-                if (block.Closed)
-                    continue;
-                thrust += block.IsFunctional ? block.MaxEffectiveThrust : 0;
-                //compensate for grav later
-            }
-            return thrust;
-        }
+        const double secondsPerUpdate = 1.0 / updatesPerSecond;
+        double prevSpeed = 0d;
+        Vector3D prevTargetPosition = new Vector3D();
+        prevTargetPosition = targetPosition;
+        prevSpeed = CONTROLLER.GetShipSpeed();
+        CalculateAcceleration();
 
-        
-        void ApplyThrustOverride(List<IMyThrust> thrusters, float overrideValue, bool turnOn = true)
-        {
-            float thrustProportion = overrideValue * 0.01f;
-            foreach (IMyThrust thisThrust in thrusters)
-            {
-                if (thisThrust.Closed)
-                    continue;
-
-                if (thisThrust.Enabled != turnOn)
-                    thisThrust.Enabled = turnOn;
-
-                if (thrustProportion != thisThrust.ThrustOverridePercentage)
-                    thisThrust.ThrustOverridePercentage = thrustProportion;
-            }
-        }
-
-
-        //const double secondsPerUpdate = 1.0 / updatesPerSecond;
-        //double prevSpeed = 0d;
-        //Vector3D prevTargetPosition = new Vector3D();
-        //prevTargetPosition = targetPosition;
-        //prevSpeed = CONTROLLER.GetShipSpeed();
-        //CalculateAcceleration();
-        
         const double brakingAngleTolerance = 10; //degrees
         const double rad2deg = 180 / Math.PI;
         double missileAccel = 10d;
         double missileMass = 0d;
         double missileThrust = 0d;
+        readonly double NavConstant = 5;
+        readonly double NavAccelConstant = 0;
 
         void CalculateBaseAcceleration()
         {
@@ -1695,8 +1637,6 @@ namespace IngameScript
             return navConstant * (relativeVelocity.Length() * Vector3D.Cross(omega, missileToTargetNorm) + 0.1 * normalVelocity) + navAccelConstant * lateralTargetAcceleration + gravityCompensationTerm; //normal to LOS
         }
 
-        readonly double NavConstant = 5;
-        readonly double NavAccelConstant = 0;
         Vector3D GetLataxWhip(Vector3D missileToTarget, Vector3D missileToTargetNorm, Vector3D relativeVelocity, Vector3D lateralTargetAcceleration, Vector3D gravityCompensationTerm)
         {
             Vector3D parallelVelocity = relativeVelocity.Dot(missileToTargetNorm) * missileToTargetNorm; //bootleg vector projection

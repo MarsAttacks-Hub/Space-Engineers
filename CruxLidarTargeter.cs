@@ -54,6 +54,7 @@ namespace IngameScript
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";
         const string commandLost = "Lost";
+        const string commandSpiral = "Spiral";
 
         const string argClear = "Clear";
         const string argLock = "Lock";
@@ -84,7 +85,7 @@ namespace IngameScript
         readonly int fudgeAttempts = 8;
 
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings
-        int selectedPayLoad = 1;//0 Missiles - 1 Drones
+        int selectedPayLoad = 0;//0 Missiles - 1 Drones
         bool autoFire = true;
         bool autoMissiles = false;
         bool useAllGuns = true;
@@ -364,7 +365,7 @@ namespace IngameScript
                 case argClear:
                     ResetTargeter();
                     return;
-                //break;
+                    //break;
                 case argSwitchWeapon:
                     weaponType = (weaponType == 1 ? 2 : 1);
                     break;
@@ -378,7 +379,7 @@ namespace IngameScript
                     int blockCount = 0;
                     foreach (IMyProjector proj in TEMPPROJECTORS)
                     {
-                        blockCount += proj.BuildableBlocksCount;// RemainingBlocks;//TODO
+                        blockCount += proj.BuildableBlocksCount;//TODO RemainingBlocks;
                     }
                     if (blockCount == 0)
                     {
@@ -400,6 +401,18 @@ namespace IngameScript
                     break;
                 case argToggleAllGuns:
                     useAllGuns = !useAllGuns;
+                    break;
+                case commandSpiral:
+                    if (targetName != null)
+                    {
+                        foreach (var id in MissileIDs)
+                        {
+                            if (id.Value.Contains(commandUpdate) && !id.Value.Contains("Drone"))
+                            {
+                                SendMissileUnicastMessage(commandSpiral, id.Key);
+                            }
+                        }
+                    }
                     break;
             }
         }
@@ -936,7 +949,7 @@ namespace IngameScript
             foreach (var inf in missilesInfo)
             {
                 missileLog.Append("Status: ").Append(inf.Value.Item3).Append(", Missile ID: ").Append(inf.Key.ToString()).Append("\n");
-                if (inf.Value.Item3.Contains(commandUpdate))
+                if (inf.Value.Item3.Contains(commandUpdate) || inf.Value.Item3.Contains(commandSpiral))
                 {
                     missileLog.Append("Dist. From Target: ").Append(inf.Value.Item1.ToString("0.0")).Append(", ");
                 }
@@ -1781,55 +1794,6 @@ namespace IngameScript
                 _firstRun = true;
             }
         }
-
-        /*
-        bool launchNormal = true;
-
-        if (MissileIDs.Count > 0 && targetName != null)// && missilesLoaded
-        {
-            int count = 0;
-            foreach (var id in MissileIDs)
-            {
-                if (id.Value.Contains(commandLost) && !id.Value.Contains("Drone"))
-                {
-                    SendMissileUnicastMessage(commandBeamRide, id.Key);
-                    count++;
-                }
-            }
-            if (count > 0)
-            {
-                launchNormal = false;
-            }
-            else
-            {
-                launchNormal = true;
-            }
-        }
-        else
-        {
-            launchNormal = true;
-        }
-        if (launchNormal)
-        {
-            foreach (IMyRadioAntenna block in MISSILEANTENNAS)
-            {
-                string antennaName = missileAntennasName + selectedMissile.ToString();
-                if (block.CustomName.Equals(antennaName))
-                {
-                    block.Enabled = true;
-                    block.EnableBroadcasting = true;
-                }
-            }
-            selectedMissile++;
-            if (selectedMissile > missilesCount + 1)
-            {
-                GetMissileAntennas();
-                SetMissileAntennas();
-                selectedMissile = 1;
-            }
-            SendMissileBroadcastMessage(commandLaunch);
-        }
-        */
 
     }
 }
