@@ -828,11 +828,8 @@ namespace IngameScript
                 ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
             }
 
-            Vector3D UpVector;
-            if (Vector3D.IsZero(gravityVec)) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -gravityVec; }
             double yawAngle, pitchAngle, rollAngle;
-            GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+            GetRotationAnglesSimultaneous(headingVec, CONTROLLER.WorldMatrix.Up, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
@@ -859,10 +856,7 @@ namespace IngameScript
             Vector3D gravityVec = CONTROLLER.GetNaturalGravity();
             Vector3D headingVec = GetPointingVector(CONTROLLER.CenterOfMass, CONTROLLER.GetShipVelocities().LinearVelocity, missileAcceleration, targetPos, targetVel, targetAcceleration, gravityVec);
 
-            Vector3D UpVector;
-            if (Vector3D.IsZero(gravityVec)) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -gravityVec; }
-            headingVec = missileAcceleration * SpiralTrajectory(headingVec, UpVector);
+            headingVec = missileAcceleration * SpiralTrajectory(headingVec, CONTROLLER.WorldMatrix.Up);
 
             if (status.Equals(statusCruising))
             {
@@ -873,7 +867,7 @@ namespace IngameScript
             double yawAngle;
             double pitchAngle;
             double rollAngle;
-            GetRotationAnglesSimultaneous(headingVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
+            GetRotationAnglesSimultaneous(headingVec, CONTROLLER.WorldMatrix.Up, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);

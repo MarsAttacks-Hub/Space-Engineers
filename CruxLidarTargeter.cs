@@ -25,7 +25,7 @@ namespace IngameScript
         //TODO when locking on target use roll user inputs
         //if a enemy comes in range (800m) start building decoy
         //automatic fire jolts if not rotating and not moving left or right
-        //lock on target calculate aim vector if is in gravity or not to fire jolts
+        //lockOnTarget calculate aim vector if is in gravity or not to fire jolts
         //LIDAR TARGETER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
