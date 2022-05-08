@@ -67,7 +67,7 @@ namespace IngameScript
         readonly double aimD = 1;
         readonly double integralWindupLimit = 0;
 
-        const double updatesPerSecond = 10.0;//UpdateFrequency.Update10
+        const double updatesPerSecond = 6.0;//UpdateFrequency.Update10
         const double deg2Rad = Math.PI / 180;
         const double rad2deg = 180 / Math.PI;
         const double angleTolerance = 2;//degrees
