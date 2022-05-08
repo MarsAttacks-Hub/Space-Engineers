@@ -273,25 +273,25 @@ namespace IngameScript
 
         public void Init_1()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
 
             if (inittick == 0)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Extend(); }
             }
-            else if (inittick == 100)
+            else if (inittick == 10)
             {
                 foreach (IMyShipMergeBlock merge in MERGES1) { merge.Enabled = false; }
             }
-            else if (inittick == 101)
+            else if (inittick == 11)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Attach(); }
             }
-            else if (inittick == 200)
+            else if (inittick == 20)
             {
                 foreach (IMyShipMergeBlock merge in MERGES2) { merge.Enabled = false; }
             }
-            else if (inittick == 201)
+            else if (inittick == 21)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.Attach(); }
 
@@ -301,7 +301,7 @@ namespace IngameScript
         }
         public void Init_2()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
 
             if (inittick == 0)
             {
@@ -311,7 +311,7 @@ namespace IngameScript
             {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
             }
-            if (inittick == 10)
+            if (inittick == 5)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 7.34f; }
 
@@ -321,17 +321,17 @@ namespace IngameScript
         }
         public void Init_3()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
 
             if (inittick == 0)
             {
                 foreach (IMyMotorBase hinge in HINGESFRONT) { hinge.Attach(); }
             }
-            if (inittick == 30)
+            if (inittick == 3)
             {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Detach(); }
             }
-            if (inittick == 31)
+            if (inittick == 4)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 9.7f; }
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
@@ -340,7 +340,7 @@ namespace IngameScript
                     piston.MaxLimit = 2.34f;
                 }
             }
-            if (inittick == 100)
+            if (inittick == 10)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
                 {
@@ -348,7 +348,7 @@ namespace IngameScript
                     piston.MinLimit = 0f;
                 }
             }
-            if (inittick == 160)
+            if (inittick == 16)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Velocity = 1.25f; }
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Velocity = 1.25f; }

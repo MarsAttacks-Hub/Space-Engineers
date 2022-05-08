@@ -57,7 +57,7 @@ namespace IngameScript
         readonly int checkLoadDelay = 100;//delay after wich the drone check if has ammo and ice
         readonly float spiralStart = 1000f;//distance to target at which missile starts to spiral
         readonly float spiralSafe = 200f;//safe distance from ship at which missile starts to spiral
-        readonly double spiralDegrees = 1d;//radius of the spiral pattern
+        readonly double spiralDegrees = 2d;//radius of the spiral pattern
         readonly double timeMaxSpiral = 3d;//time it takes the missile to complete a full spiral cycle
         readonly double navConstant = 5d;//Recommended value is 3-5 Higher values make the missile compensate faster but can lead to more overshoot/instability
         readonly double navAccelConstant = 0d;

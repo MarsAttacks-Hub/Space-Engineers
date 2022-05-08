@@ -67,7 +67,7 @@ namespace IngameScript
         readonly float deadManMinSpeed = 0.1f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
-        readonly int tickDelay = 100;
+        readonly int tickDelay = 50;
 
         int tickCount = 0;
         bool magneticDriveManOnce = true;
@@ -115,7 +115,7 @@ namespace IngameScript
 
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
             Setup();
         }
 
@@ -253,7 +253,7 @@ namespace IngameScript
                 }
             }
             foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            //Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
 
         void IdleMagneticDrive()
@@ -273,7 +273,7 @@ namespace IngameScript
             {
                 foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
             }
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            //Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
 
         void ProcessArgument(string argument)
