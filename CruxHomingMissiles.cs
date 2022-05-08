@@ -57,11 +57,15 @@ namespace IngameScript
         readonly int checkLoadDelay = 100;//delay after wich the drone check if has ammo and ice
         readonly float spiralStart = 1000f;//distance to target at which missile starts to spiral
         readonly float spiralSafe = 200f;//safe distance from ship at which missile starts to spiral
-        readonly double spiralDegrees = 15d;//radius of the spiral pattern
+        readonly double spiralDegrees = 1d;//radius of the spiral pattern
         readonly double timeMaxSpiral = 3d;//time it takes the missile to complete a full spiral cycle
         readonly double navConstant = 5d;//Recommended value is 3-5 Higher values make the missile compensate faster but can lead to more overshoot/instability
         readonly double navAccelConstant = 0d;
         readonly float globalTimestep = 10.0f / 60.0f;//UpdateFrequency.Update10
+        readonly double aimP = 1;
+        readonly double aimI = 0;
+        readonly double aimD = 1;
+        readonly double integralWindupLimit = 0;
 
         const double updatesPerSecond = 10.0;//UpdateFrequency.Update10
         const double deg2Rad = Math.PI / 180;
@@ -151,7 +155,7 @@ namespace IngameScript
             GetBlocks();
             foreach (IMyThrust block in ALLTHRUSTERS) { block.Enabled = false; }
 
-            InitPIDControllers(CONTROLLER as IMyTerminalBlock);
+            InitPIDControllers();
 
             isLargeGrid = CONTROLLER.CubeGrid.GridSizeEnum == MyCubeSize.Large;
             fuseDistance = isLargeGrid ? 16 : 7;
@@ -1206,25 +1210,8 @@ namespace IngameScript
             CONTROLLER = CONTROLLERS[0];
         }
 
-        void InitPIDControllers(IMyTerminalBlock block)
+        void InitPIDControllers()
         {
-            double aimP, aimI, aimD;
-            double integralWindupLimit = 0;
-            //float second = 60f;
-
-            if (block.CubeGrid.GridSizeEnum == MyCubeSize.Large)
-            {
-                aimP = 15;
-                aimI = 0;
-                aimD = 7;
-            }
-            else
-            {
-                aimP = 10;// 40;
-                aimI = 0;
-                aimD = 10;// 13;
-            }
-
             yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
             pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
             rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);

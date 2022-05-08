@@ -71,11 +71,11 @@ namespace IngameScript
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
 
-        readonly int fireDelay = 50;
+        readonly int fireDelay = 5;
         readonly bool creative = true;
         readonly int missilesCount = 2;
-        readonly int autoMissilesDelay = 91;
-        readonly int writeDelay = 10;
+        readonly int autoMissilesDelay = 9;
+        readonly int writeDelay = 1;
         readonly float joltProjectileMaxSpeed = 933f;
         readonly float rocketProjectileMaxSpeed = 200f;
         double rocketProjectileMaxRange = 500d;
@@ -83,6 +83,10 @@ namespace IngameScript
         readonly double gatlingProjectileMaxRange = 800d;
         readonly double gunsMaxRange = 900d;
         readonly int fudgeAttempts = 8;
+        readonly double aimP = 1;
+        readonly double aimI = 0;
+        readonly double aimD = 1;
+        readonly double integralWindupLimit = 0;
 
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings
         int selectedPayLoad = 0;//0 Missiles - 1 Drones
@@ -117,10 +121,10 @@ namespace IngameScript
         MyDetectedEntityInfo targetInfo;
 
         readonly Random random = new Random();
-        const float globalTimestep = 1.0f / 60.0f;//0.016f;
-        const long ticksScanDelay = 11;
+        const float globalTimestep = 10.0f / 60.0f;
+        const long ticksScanDelay = 1;
         const double rad2deg = 180 / Math.PI;
-        const double angleTolerance = 3;//degrees
+        const double angleTolerance = 1;//degrees
 
         public List<IMyCameraBlock> LIDARS = new List<IMyCameraBlock>();
         public List<IMyLightingBlock> LIGHTS = new List<IMyLightingBlock>();
@@ -183,7 +187,7 @@ namespace IngameScript
             GetMissileAntennas();
             SetMissileAntennas();
 
-            InitPIDControllers(CONTROLLER as IMyTerminalBlock);
+            InitPIDControllers();
 
             if (selectedPayLoad == 0)
             {
@@ -290,7 +294,7 @@ namespace IngameScript
                     TurretsDetection(false);
                 }
 
-                bool completed = CheckProjectors();
+                bool completed = CheckProjectors();//TODO this logic has flaws
                 if (!completed)
                 {
                     missilesLoaded = false;
@@ -343,7 +347,7 @@ namespace IngameScript
                             }
                         }
                         selectedMissile++;
-                        if (selectedMissile > missilesCount + 1)//TODO if (selectedMissile > missilesCount + 1)
+                        if (selectedMissile > missilesCount + 1)
                         {
                             GetMissileAntennas();
                             SetMissileAntennas();
@@ -365,7 +369,7 @@ namespace IngameScript
                 case argClear:
                     ResetTargeter();
                     return;
-                    //break;
+                //break;
                 case argSwitchWeapon:
                     weaponType = (weaponType == 1 ? 2 : 1);
                     break;
@@ -755,13 +759,13 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle, globalTimestep);//elapsedTime
-            double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
-            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
 
-            Vector3D forwardVec = REF.WorldMatrix.Forward;
+            Vector3D forwardVec = CONTROLLER.WorldMatrix.Forward;
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance)
             {
@@ -878,7 +882,6 @@ namespace IngameScript
         {
             var rotationVec = new Vector3D(pitchSpeed, yawSpeed, rollSpeed);
             var relativeRotationVec = Vector3D.TransformNormal(rotationVec, worldMatrix);
-
             foreach (var thisGyro in gyroList)
             {
                 if (thisGyro.Closed)
@@ -1034,7 +1037,7 @@ namespace IngameScript
 
         void ResetTargeter()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            //Runtime.UpdateFrequency = UpdateFrequency.Update10;
 
             UnlockShip();
             TurnAlarmOff();
@@ -1069,7 +1072,7 @@ namespace IngameScript
         {
             if (!doOnce)//things to run once when a enemy is detected
             {
-                Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                //Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
                 TurnAlarmOn();
 
@@ -1115,7 +1118,7 @@ namespace IngameScript
 
         void UnlockShip()
         {
-            foreach (IMyGyro block in GYROS) { block.GyroOverride = false; }
+            foreach (IMyGyro block in GYROS) { block.GyroOverride = false; block.GyroPower = 1; }
         }
 
         void TurnAlarmOn()
@@ -1597,6 +1600,7 @@ namespace IngameScript
                 block.Pitch = 0f;
                 block.Roll = 0f;
                 block.GyroOverride = false;
+                block.GyroPower = 1;
             }
 
             ANTENNA.Enabled = true;
@@ -1682,28 +1686,11 @@ namespace IngameScript
             }
         }
 
-        void InitPIDControllers(IMyTerminalBlock block)
+        void InitPIDControllers()
         {
-            double aimP, aimI, aimD;
-            double integralWindupLimit = 0;
-            float second = 60f;
-
-            if (block.CubeGrid.GridSizeEnum == MyCubeSize.Large)
-            {
-                aimP = 15;
-                aimI = 0;
-                aimD = 7;
-            }
-            else
-            {
-                aimP = 40;
-                aimI = 0;
-                aimD = 13;
-            }
-
-            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
-            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
-            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
+            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
         public class PID

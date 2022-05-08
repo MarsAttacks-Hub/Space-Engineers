@@ -48,8 +48,16 @@ namespace IngameScript
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
 
+        const float globalTimestep = 10.0f / 60.0f;
+        const double rad2deg = 180 / Math.PI;
+        const double angleTolerance = 0.1;//degrees
+
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
+        readonly double aimP = 1;
+        readonly double aimI = 0;
+        readonly double aimD = 1;
+        readonly double integralWindupLimit = 0;
 
         int cockpitRangeFinderSurface = 4;
         bool aimTarget = false;
@@ -63,10 +71,6 @@ namespace IngameScript
         bool sunChaseOff = false;
 
         Vector3D targetPosition = new Vector3D();
-
-        const float globalTimestep = 1.0f / 60.0f;
-        const double rad2deg = 180 / Math.PI;
-        const double angleTolerance = 0.1;//degrees
 
         public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
         public List<IMyJumpDrive> JUMPERS = new List<IMyJumpDrive>();
@@ -231,7 +235,7 @@ namespace IngameScript
                     break;
                 case argIncreaseJump: IncreaseJumpDistance(); break;
                 case argDecreaseJump: DecreaseJumpDistance(); break;
-                case argAimTarget: if (!Vector3D.IsZero(targetPosition)) { aimTarget = true; Runtime.UpdateFrequency = UpdateFrequency.Update1; }; break;
+                case argAimTarget: if (!Vector3D.IsZero(targetPosition)) { aimTarget = true; }; break;
             }
         }
 
@@ -448,16 +452,15 @@ namespace IngameScript
             double rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, REMOTE.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-            double yawSpeed = yawController.Control(yawAngle, globalTimestep);
-            double pitchSpeed = pitchController.Control(pitchAngle, globalTimestep);
-            double rollSpeed = rollController.Control(rollAngle, globalTimestep);
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, REMOTE.WorldMatrix);
 
             Vector3D forwardVec = REMOTE.WorldMatrix.Forward;
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance)
             {
-                Runtime.UpdateFrequency = UpdateFrequency.Update10;
                 aimTarget = false;
                 foreach (var gyro in GYROS)
                 {
@@ -630,26 +633,9 @@ namespace IngameScript
 
         void InitPIDControllers(IMyTerminalBlock block)
         {
-            double aimP, aimI, aimD;
-            double integralWindupLimit = 0;
-            float second = 60f;
-
-            if (block.CubeGrid.GridSizeEnum == MyCubeSize.Large)
-            {
-                aimP = 15;
-                aimI = 0;
-                aimD = 7;
-            }
-            else
-            {
-                aimP = 40;
-                aimI = 0;
-                aimD = 13;
-            }
-
-            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
-            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
-            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, second);
+            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
         public class PID
