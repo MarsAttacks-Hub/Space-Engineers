@@ -24,6 +24,7 @@ namespace IngameScript
         //TODO add security system where if a turret detect a enemy,
         //calculate the enemy trajectory vector and if it's going toward the ship then move away (evasive manouvre)
         //and start building decoy
+        //add magnetic hoover
         //NAVIGATOR
 
         readonly string rotorsName = "Rotor_MD_A";

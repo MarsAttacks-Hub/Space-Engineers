@@ -23,9 +23,8 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         //TODO when locking on target use roll user inputs
-        //if a enemy comes in range (800m) start building decoy
-        //automatic fire jolts if not rotating and not moving left or right
-        //lockOnTarget calculate aim vector if is in gravity or not to fire jolts
+        //the logic used to check if projection build is completed is not consistent because RemainingBlocks should be used instead of BuildableBlocksCount,
+        //BuildableBlocksCount is used beacuse if "payLoad" is switched and the previous projection is already built the missile will never be set on "loaded"
         //LIDAR TARGETER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -47,6 +46,7 @@ namespace IngameScript
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
         readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
+        readonly string decoyName = "[CRX] PB Decoy";
         readonly string managerName = "[CRX] PB Manager";
         readonly string cargoName = "[CRX] Cargo";
         readonly string debugPanelName = "[CRX] Debug";
@@ -67,6 +67,7 @@ namespace IngameScript
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
+        const string argFireDecoy = "Launch";
 
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
@@ -77,6 +78,7 @@ namespace IngameScript
         readonly int autoMissilesDelay = 9;
         readonly int writeDelay = 1;
         readonly float joltProjectileMaxSpeed = 933f;
+        readonly double joltProjectileMaxAcceleration = 508.9d;//622.0 559.8 508.90909 466.5 430.61538
         readonly float rocketProjectileMaxSpeed = 200f;
         double rocketProjectileMaxRange = 500d;
         readonly float gatlingProjectileMaxSpeed = 400f;
@@ -114,6 +116,7 @@ namespace IngameScript
         bool readyToFireOnce = true;
         bool gatlingAmmoFound = true;
         bool missileAmmoFound = true;
+        bool decoyRan = false;
 
         Vector3D targetPosition;
         string targetName = null;
@@ -148,6 +151,7 @@ namespace IngameScript
         IMyRadioAntenna ANTENNA;
         IMyProgrammableBlock MAGNETICDRIVEPB;
         IMyProgrammableBlock MANAGERPB;
+        IMyProgrammableBlock DECOYPB;
         IMyTextPanel DEBUG;
 
         IMyUnicastListener UNILISTENER;
@@ -294,7 +298,7 @@ namespace IngameScript
                     TurretsDetection(false);
                 }
 
-                bool completed = CheckProjectors();//TODO this logic has flaws
+                bool completed = CheckProjectors();
                 if (!completed)
                 {
                     missilesLoaded = false;
@@ -383,7 +387,7 @@ namespace IngameScript
                     int blockCount = 0;
                     foreach (IMyProjector proj in TEMPPROJECTORS)
                     {
-                        blockCount += proj.BuildableBlocksCount;//TODO RemainingBlocks;
+                        blockCount += proj.BuildableBlocksCount;//RemainingBlocks;
                     }
                     if (blockCount == 0)
                     {
@@ -734,6 +738,10 @@ namespace IngameScript
             if (distanceFromTarget > gunsMaxRange)
             {
                 aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
+                if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity()))
+                {
+                    aimDirection = GravityCompensation(joltProjectileMaxAcceleration, aimDirection, CONTROLLER.GetNaturalGravity());
+                }
             }
             else
             {
@@ -741,6 +749,10 @@ namespace IngameScript
                 {
                     case 0:
                         aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity()))
+                        {
+                            aimDirection = GravityCompensation(joltProjectileMaxAcceleration, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
                         break;
                     case 1:
                         aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, rocketProjectileMaxSpeed, REF);
@@ -753,11 +765,8 @@ namespace IngameScript
                         break;
                 }
             }
-            Vector3D UpVector;
-            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -CONTROLLER.GetNaturalGravity(); }
             double yawAngle, pitchAngle, rollAngle;
-            GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+            GetRotationAnglesSimultaneous(aimDirection, CONTROLLER.WorldMatrix.Up, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
@@ -824,6 +833,12 @@ namespace IngameScript
             //Vector3 bulletPath = predictedPosition - muzzlePosition;
             //timeToHit = bulletPath.Length() / projectileSpeed;
             return predictedPosition;
+        }
+
+        Vector3D GravityCompensation(double maxAccel, Vector3D desiredDirection, Vector3D gravity)
+        {
+            desiredDirection = Vector3D.Normalize(desiredDirection) * maxAccel;
+            return desiredDirection - gravity;
         }
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll)
@@ -1231,6 +1246,10 @@ namespace IngameScript
                     double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                     if (distanceFromTarget < gunsMaxRange)
                     {
+                        if (!decoyRan)
+                        {
+                            decoyRan = DECOYPB.TryRun(argFireDecoy);
+                        }
                         if (useAllGuns)
                         {
                             if (distanceFromTarget < rocketProjectileMaxRange && missileAmmoFound)
@@ -1263,6 +1282,7 @@ namespace IngameScript
                                 shootOnce = false;
                                 farShootOnce = false;
                                 sequenceWeapons = false;
+                                decoyRan = false;
                             }
                         }
                         else
@@ -1293,6 +1313,7 @@ namespace IngameScript
                                 shootOnce = false;
                                 farShootOnce = false;
                                 sequenceWeapons = false;
+                                decoyRan = false;
                             }
                         }
                     }
@@ -1305,6 +1326,7 @@ namespace IngameScript
                             shootOnce = false;
                             farShootOnce = false;
                             sequenceWeapons = false;
+                            decoyRan = false;
                         }
                     }
                 }
@@ -1318,6 +1340,7 @@ namespace IngameScript
                         shootOnce = false;
                         farShootOnce = false;
                         sequenceWeapons = false;
+                        decoyRan = false;
                     }
                 }
             }
@@ -1582,6 +1605,7 @@ namespace IngameScript
             CONTROLLER = CONTROLLERS[0];
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
+            DECOYPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
             DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 

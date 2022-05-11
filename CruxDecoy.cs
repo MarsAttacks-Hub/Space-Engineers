@@ -22,7 +22,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //build decoy at the end of the procedure
+        //TODO build decoy at the end of the procedure
+        //check speed and roll be4 detaching the decoy
         //DECOY
 
         readonly string projectorsDecoyName = "Decoy";
