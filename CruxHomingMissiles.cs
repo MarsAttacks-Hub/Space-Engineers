@@ -22,6 +22,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+
+        //TODO add gravityConpensation
         //HOMING MISSILE
 
         readonly string antennaName = "A [M]1";
@@ -1364,7 +1366,27 @@ namespace IngameScript
             }
         }
 
+
         /*
+        Vector3D GravityCompensation(double maxAccel, Vector3D desiredDirection, Vector3D gravity)
+        {
+            desiredDirection = Vector3D.Normalize(desiredDirection) * maxAccel;
+            return desiredDirection - gravity;
+        }
+
+        Vector3D GravityCompensation(double missileAcceleration, Vector3D desiredDirection, Vector3D gravity)
+        {
+            Vector3D directionNorm = VectorMath.SafeNormalize(desiredDirection);
+            Vector3D gravityCompensationVec = -(VectorMath.Rejection(gravity, desiredDirection));
+
+            double diffSq = missileAcceleration * missileAcceleration - gravityCompensationVec.LengthSquared();
+            if (diffSq < 0) // Impossible to hover
+            {
+                return desiredDirection - gravity; // We will sink, but at least approach the target.
+            }
+            return directionNorm * Math.Sqrt(diffSq) + gravityCompensationVec;
+        }
+        
         void UpdateGlobalTimeStep()
         {
             float tick = 1.0f / 60.0f;

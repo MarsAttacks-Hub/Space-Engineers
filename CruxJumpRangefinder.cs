@@ -22,18 +22,23 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //RANGE FINDER
 
+        //NAVIGATOR
+
+        readonly string controllersName = "[CRX] Controller";
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
         readonly string jumpersName = "[CRX] Jump";
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string gyrosName = "[CRX] Gyro";
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
-        readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
         readonly string alarmsName = "[CRX] Alarm Lidar";
-        readonly string managerName = "[CRX] PB Manager";
         readonly string debugPanelName = "[CRX] Debug";
+        readonly string turretsName = "[CRX] Turret";
+        readonly string targeterName = "[CRX] PB Targeter";
+        readonly string decoyName = "[CRX] PB Decoy";
+        readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
+        readonly string managerName = "[CRX] PB Manager";
 
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
@@ -47,18 +52,28 @@ namespace IngameScript
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
+        const string argUnlockFromTarget = "Clear";
+        const string argLaunchDecoy = "Launch";
 
         const float globalTimestep = 10.0f / 60.0f;
         const double rad2deg = 180 / Math.PI;
         const double angleTolerance = 0.1;//degrees
 
+        readonly double escapeDistance = 250d;
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
-        readonly double aimP = 1;
-        readonly double aimI = 0;
-        readonly double aimD = 1;
-        readonly double integralWindupLimit = 0;
+        readonly double aimP = 1d;
+        readonly double aimI = 0d;
+        readonly double aimD = 1d;
+        readonly double integralWindupLimit = 0d;
+        readonly int escapeDelay = 10;
+        readonly double targetStopDistance = 150d;
+        readonly double escapeStopDistance = 30d;
+        readonly double returnStopDistance = 50d;
+        readonly int impactDetectionDelay = 5;
 
+        int impactDetectionCount = 5;
+        int escapeCount = 10;
         int cockpitRangeFinderSurface = 4;
         bool aimTarget = false;
         double maxScanRange = 0d;
@@ -69,9 +84,13 @@ namespace IngameScript
         bool MDOff = false;
         bool runMDOnce = false;
         bool sunChaseOff = false;
+        bool returnOnce = true;
 
-        Vector3D targetPosition = new Vector3D();
+        Vector3D targetPosition = Vector3D.Zero;
+        Vector3D returnPosition = Vector3D.Zero;
+        Vector3D escapePosition = Vector3D.Zero;
 
+        public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
         public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
         public List<IMyJumpDrive> JUMPERS = new List<IMyJumpDrive>();
         public List<IMyCameraBlock> LIDARS = new List<IMyCameraBlock>();
@@ -79,15 +98,20 @@ namespace IngameScript
         public List<IMyTextSurface> SURFACES = new List<IMyTextSurface>();
         public List<IMyRemoteControl> REMOTES = new List<IMyRemoteControl>();
         public List<IMySoundBlock> ALARMS = new List<IMySoundBlock>();
+        public List<IMyLargeTurretBase> TURRETS = new List<IMyLargeTurretBase>();
         IMyRemoteControl REMOTE;
         IMyProgrammableBlock MAGNETICDRIVEPB;
         IMyProgrammableBlock MANAGERPB;
+        IMyProgrammableBlock TARGETERPB;
+        IMyProgrammableBlock DECOYPB;
 
         PID yawController;
         PID pitchController;
         PID rollController;
 
         readonly MyIni myIni = new MyIni();
+
+        MyDetectedEntityInfo targetInfo;
 
         public StringBuilder jumpersLog = new StringBuilder("");
         public StringBuilder lidarsLog = new StringBuilder("");
@@ -120,7 +144,7 @@ namespace IngameScript
 
             REMOTE = REMOTES[0];
 
-            InitPIDControllers(REMOTE);
+            InitPIDControllers();
         }
 
         public void Main(string arg)
@@ -188,15 +212,41 @@ namespace IngameScript
                     {
                         MDOn = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
                     }
-                    //if (MDOn) { Echo("Magnetic drive turned ON"); } else { Echo("Magnetic drive failed to turn ON"); }
                 }
 
-                if (REMOTE.IsAutoPilotEnabled && targetPosition != null)
+                if (!IsPiloted())
+                {
+                    TurretsImpactDetection();
+                }
+
+                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition))
                 {
                     double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
-                    if (dist < 150)
+                    if (dist < targetStopDistance)
                     {
                         REMOTE.SetAutoPilotEnabled(false);
+                        targetPosition = Vector3D.Zero;
+                    }
+                }
+
+                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition))
+                {
+                    double dist = Vector3D.Distance(escapePosition, REMOTE.GetPosition());
+                    if (dist < escapeStopDistance)
+                    {
+                        REMOTE.SetAutoPilotEnabled(false);
+                        escapePosition = Vector3D.Zero;
+                    }
+                }
+
+                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition))
+                {
+                    double dist = Vector3D.Distance(returnPosition, REMOTE.GetPosition());
+                    if (dist < returnStopDistance)
+                    {
+                        REMOTE.SetAutoPilotEnabled(false);
+                        returnPosition = Vector3D.Zero;
+                        returnOnce = true;
                     }
                 }
 
@@ -605,6 +655,107 @@ namespace IngameScript
             }
         }
 
+        void TurretsImpactDetection()
+        {
+            if (impactDetectionCount == impactDetectionDelay)
+            {
+                bool targetFound = false;
+                foreach (IMyLargeTurretBase turret in TURRETS)
+                {
+                    MyDetectedEntityInfo targ = turret.GetTargetedEntity();
+                    if (!targ.IsEmpty())
+                    {
+                        if (IsValidTarget(ref targ))
+                        {
+                            targetInfo = targ;
+                            CheckCollisions(targetInfo.Position, targetInfo.Velocity);
+                            targetFound = true;
+                            break;
+                        }
+                    }
+                }
+                if (!targetFound)
+                {
+                    if (!Vector3D.IsZero(returnPosition))
+                    {
+                        REMOTE.ClearWaypoints();
+                        REMOTE.AddWaypoint(returnPosition, "returnPosition");
+                        REMOTE.SetAutoPilotEnabled(true);
+                        returnOnce = true;
+                    }
+                }
+                impactDetectionCount = 0;
+            }
+            impactDetectionCount++;
+        }
+
+        void CheckCollisions(Vector3D targetPos, Vector3D targetVelocity)
+        {
+            BoundingBoxD gridLocalBB = new BoundingBoxD(Me.CubeGrid.Min * Me.CubeGrid.GridSize, Me.CubeGrid.Max * Me.CubeGrid.GridSize);
+            MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, Me.CubeGrid.WorldMatrix);
+            //Vector3 halfExtents = (Vector3)(Me.CubeGrid.Max - Me.CubeGrid.Min) * Me.CubeGrid.GridSize;
+            //MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(Me.CubeGrid.WorldMatrix.Translation, halfExtents, Quaternion.CreateFromRotationMatrix(Me.CubeGrid.WorldMatrix));
+            double time = 8.0;
+            Vector3D targetFuturePosition = targetPos + (targetVelocity * time);
+            LineD line = new LineD(targetPos, targetFuturePosition);
+            double? hitDist = obb.Intersects(ref line);
+            if (hitDist.HasValue)
+            {
+                if (returnOnce)
+                {
+                    TARGETERPB.TryRun(argUnlockFromTarget);
+                    DECOYPB.TryRun(argLaunchDecoy);
+                    returnPosition = REMOTE.GetPosition();
+                    returnOnce = false;
+                }
+
+                if (escapeCount == escapeDelay)
+                {
+                    Vector3D escapePosition = targetPos - (Vector3D.Normalize(targetPos - REMOTE.GetPosition()) * escapeDistance);
+                    REMOTE.ClearWaypoints();
+                    REMOTE.AddWaypoint(escapePosition, "escapePosition");
+                    REMOTE.SetAutoPilotEnabled(true);
+                    escapeCount = 0;
+                }
+                escapeCount++;
+            }
+        }
+
+        bool IsValidTarget(ref MyDetectedEntityInfo entityInfo)
+        {
+            if (entityInfo.Type == MyDetectedEntityType.LargeGrid || entityInfo.Type == MyDetectedEntityType.SmallGrid)
+            {
+                if (entityInfo.Relationship == MyRelationsBetweenPlayerAndBlock.Enemies
+                || entityInfo.Relationship == MyRelationsBetweenPlayerAndBlock.Neutral)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool IsPiloted()
+        {
+            bool isPiloted = false;
+            foreach (IMyShipController block in CONTROLLERS)
+            {
+                if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters)
+                {
+                    isPiloted = true;
+                    break;
+                }
+                /*if (block is IMyRemoteControl)
+                {
+                    if ((block as IMyRemoteControl).IsAutoPilotEnabled)
+                    {
+                        isPiloted = true;
+                        break;
+                    }
+                }*/
+            }
+            return isPiloted;
+        }
+
         void GetBlocks()
         {
             REMOTES.Clear();
@@ -619,19 +770,21 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyGyro>(GYROS, block => block.CustomName.Contains(gyrosName));
             ALARMS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySoundBlock>(ALARMS, block => block.CustomName.Contains(alarmsName));
+            TURRETS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyLargeTurretBase>(TURRETS, b => b.CustomName.Contains(turretsName));
+            CONTROLLERS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyShipController>(CONTROLLERS, b => b.CustomName.Contains(controllersName));
             SURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdsRangeFinderName));
-            foreach (IMyTextPanel panel in panels)
-            {
-                SURFACES.Add(panel as IMyTextSurface);
-            }
-
+            foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
+            TARGETERPB = GridTerminalSystem.GetBlockWithName(targeterName) as IMyProgrammableBlock;
             MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
+            DECOYPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
         }
 
-        void InitPIDControllers(IMyTerminalBlock block)
+        void InitPIDControllers()
         {
             yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
             pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);

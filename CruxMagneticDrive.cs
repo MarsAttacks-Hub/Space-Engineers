@@ -21,11 +21,11 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO add security system where if a turret detect a enemy,
-        //calculate the enemy trajectory vector and if it's going toward the ship then move away (evasive manouvre)
-        //and start building decoy
-        //add magnetic hoover
-        //NAVIGATOR
+
+        //TODO add magnetic hoover
+        //magnetic dampeners on gravity
+        //activate dampeners if dampeners are off, velocity is bigger than 2 and isControlled
+        //DRIVER
 
         readonly string rotorsName = "Rotor_MD_A";
         readonly string rotorsInvName = "Rotor_MD_B";
@@ -190,7 +190,7 @@ namespace IngameScript
                         if (REMOTE.IsAutoPilotEnabled)
                         {
                             AutoMagneticDrive();
-                            GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
+                            GyroStabilize(true, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);//TODO GyroStabilize(false, REMOTE, REMOTE.RotationIndicator, REMOTE.RollIndicator);
                         }
                         else
                         {
@@ -201,7 +201,7 @@ namespace IngameScript
                             }
 
                             MagneticDrive();
-                            GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
+                            GyroStabilize(true, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);//TODO GyroStabilize(false, CONTROLLER, CONTROLLER.RotationIndicator, CONTROLLER.RollIndicator);
                         }
                     }
                 }
@@ -600,7 +600,7 @@ namespace IngameScript
                 if (!useRoll) { lastUpVector = Vector3D.Zero; };
                 GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, reference.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-                var updatesPerSecond = 10;
+                var updatesPerSecond = 6;//10;//TODO
                 var timeMaxCycle = 1 / updatesPerSecond;
 
                 var localAngularDeviation = new Vector3D(-pitchAngle, yawAngle, rollAngle);
@@ -625,7 +625,7 @@ namespace IngameScript
                         block.Yaw = (float)Math.Round(gyroAngularVelocity.Y, 2);
                         block.Roll = (float)Math.Round(gyroAngularVelocity.Z, 2);
                         block.GyroOverride = true;
-                        //block.GyroPower = 100f;//im assuming this is a percentage
+                        //block.GyroPower = 1f;
                     }
                     else
                     {
@@ -634,7 +634,7 @@ namespace IngameScript
                 }
 
                 lastForwardVector = reference.WorldMatrix.Forward;
-                if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { lastUpVector = CONTROLLER.WorldMatrix.Up; }
+                if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { lastUpVector = CONTROLLER.WorldMatrix.Up; }//TODO
                 else { lastUpVector = -CONTROLLER.GetNaturalGravity(); }
             }
         }

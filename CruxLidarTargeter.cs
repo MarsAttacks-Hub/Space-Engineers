@@ -77,8 +77,7 @@ namespace IngameScript
         readonly int missilesCount = 2;
         readonly int autoMissilesDelay = 9;
         readonly int writeDelay = 1;
-        readonly float joltProjectileMaxSpeed = 933f;
-        readonly double joltProjectileMaxAcceleration = 508.9d;//622.0 559.8 508.90909 466.5 430.61538
+        readonly float joltProjectileMaxSpeed = 958.21f;
         readonly float rocketProjectileMaxSpeed = 200f;
         double rocketProjectileMaxRange = 500d;
         readonly float gatlingProjectileMaxSpeed = 400f;
@@ -740,7 +739,7 @@ namespace IngameScript
                 aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
                 if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity()))
                 {
-                    aimDirection = GravityCompensation(joltProjectileMaxAcceleration, aimDirection, CONTROLLER.GetNaturalGravity());
+                    aimDirection = BulletDrop(distanceFromTarget, aimDirection, CONTROLLER.GetNaturalGravity());
                 }
             }
             else
@@ -751,7 +750,7 @@ namespace IngameScript
                         aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
                         if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity()))
                         {
-                            aimDirection = GravityCompensation(joltProjectileMaxAcceleration, aimDirection, CONTROLLER.GetNaturalGravity());
+                            aimDirection = BulletDrop(distanceFromTarget, aimDirection, CONTROLLER.GetNaturalGravity());
                         }
                         break;
                     case 1:
@@ -835,10 +834,11 @@ namespace IngameScript
             return predictedPosition;
         }
 
-        Vector3D GravityCompensation(double maxAccel, Vector3D desiredDirection, Vector3D gravity)
+        Vector3D BulletDrop(double distanceFromTarget, Vector3D desiredDirection, Vector3D gravity)
         {
-            desiredDirection = Vector3D.Normalize(desiredDirection) * maxAccel;
-            return desiredDirection - gravity;
+            double timeToTarget = distanceFromTarget / joltProjectileMaxSpeed;
+            desiredDirection -= 0.5 * gravity * timeToTarget * timeToTarget;
+            return desiredDirection;
         }
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll)
@@ -1805,6 +1805,7 @@ namespace IngameScript
                 _firstRun = true;
             }
         }
+
 
     }
 }
