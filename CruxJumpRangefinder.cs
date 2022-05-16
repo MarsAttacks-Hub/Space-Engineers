@@ -22,7 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-
+        //TODO add orbital function
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -494,13 +494,10 @@ namespace IngameScript
         {
             Vector3D aimDirection = targetPosition - REMOTE.GetPosition();
 
-            Vector3D UpVector;
-            if (Vector3D.IsZero(REMOTE.GetNaturalGravity())) { UpVector = REMOTE.WorldMatrix.Up; }
-            else { UpVector = -REMOTE.GetNaturalGravity(); }
             double yawAngle;
             double pitchAngle;
             double rollAngle;
-            GetRotationAnglesSimultaneous(aimDirection, UpVector, REMOTE.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+            GetRotationAnglesSimultaneous(aimDirection, REMOTE.WorldMatrix.Up, REMOTE.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
@@ -756,6 +753,63 @@ namespace IngameScript
             return isPiloted;
         }
 
+        void AlignToGround(IMyShipController controller)
+        {
+            Vector3D gravityVec = controller.GetNaturalGravity();
+            if (!Vector3D.IsZero(gravityVec))
+            {
+                var matrix = controller.WorldMatrix;
+                Vector3D leftVec = Vector3D.Cross(matrix.Forward, gravityVec);
+                Vector3D horizonVec = Vector3D.Cross(gravityVec, leftVec);
+                double pitchAngle, rollAngle, yawAngle;
+                GetRotationAnglesSimultaneous(horizonVec, -gravityVec, matrix, out pitchAngle, out yawAngle, out rollAngle);
+                double mouseYaw = controller.RotationIndicator.Y;
+                double mousePitch = controller.RotationIndicator.X;
+                double mouseRoll = controller.RollIndicator;
+
+                if (mouseYaw != 0)
+                {
+                    mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
+                }
+                if (mouseYaw == 0)
+                {
+                    yawController.Reset();
+                }
+                else
+                {
+                    mouseYaw = yawController.Control(mouseYaw);
+                }
+
+                if (mousePitch != 0)
+                {
+                    mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
+                }
+                if (mousePitch == 0)
+                {
+                    mousePitch = pitchController.Control(pitchAngle);
+                }
+                else
+                {
+                    mousePitch = yawController.Control(mousePitch);
+                }
+
+                if (mouseRoll != 0)
+                {
+                    mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
+                }
+                if (mouseRoll == 0)
+                {
+                    mouseRoll = pitchController.Control(pitchAngle);
+                }
+                else
+                {
+                    mouseRoll = yawController.Control(mouseRoll);
+                }
+
+                ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, matrix);
+            }
+        }
+
         void GetBlocks()
         {
             REMOTES.Clear();
@@ -943,6 +997,167 @@ namespace IngameScript
                     return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
             }
         }
+
+        /*
+        // This multiplier allows for faster reaction when a ship encounters a hill. Higher values will cause the ship to pitch up / down faster
+        // Small / light ships (such as a hover bike), use 1. Really big / heavy ships (land cruiser), use a higher number (ie 10)
+        // Play with it until you're happy
+        const double DAMPING_MULTIPLIER = 1;
+
+        // This is max angle deviation from the horizon the ship is allowed to pitch and roll (in degrees)
+        // This value ensures that the ship doesn't become pitched or tilted too steep when going down a hill, for instance
+        // NOTE: This will not correct pitch when going UP a hill so as to keep from driving the nose into the ground
+        const int ANGLE_TOLERANCE = 20;
+        void CalculateGyroOverrides(MatrixD shipMatrix, Vector3D alignVec, Vector3D gravityVec, IMyShipController controller, out double pitch, out double roll)
+        {
+            double angleFwd = 90;
+            double angleLft = 90;
+            if (alignVec != gravityVec)
+            {
+                angleFwd = MathHelper.ToDegrees(VectorMath.AngleBetween(shipMatrix.Forward, gravityVec));
+                angleLft = MathHelper.ToDegrees(VectorMath.AngleBetween(shipMatrix.Left, gravityVec));
+            }
+            var localAlignVec = Vector3D.TransformNormal(alignVec, MatrixD.Transpose(shipMatrix));
+            
+            pitch = -localAlignVec.Z * DAMPING_MULTIPLIER; // pitch < 0 if pitching down
+            var deviation = 90 - angleFwd;
+            var velocityDir = controller.GetShipVelocities().LinearVelocity.Dot(shipMatrix.Forward);
+            if (velocityDir > 0 && deviation > ANGLE_TOLERANCE)
+            {
+                pitch = MathHelper.PiOver4;
+            }
+            else if (velocityDir < 0 && deviation < -ANGLE_TOLERANCE)
+            {
+                pitch = -MathHelper.PiOver4;
+            }
+            else if (Math.Abs(pitch) < 0.015 * DAMPING_MULTIPLIER)
+            {
+                pitch = 0;
+            }
+            pitch = pitchController.Control(pitch);
+            
+            roll = -2 * localAlignVec.X; // roll < 0 if rolling right
+            if (shipMatrix.Down.Dot(alignVec) < 0)
+            {
+                roll = Math.PI * Math.Sign(shipMatrix.Left.Dot(alignVec));
+            }
+            else if (Math.Abs(90 - angleLft) > ANGLE_TOLERANCE)
+            {
+                roll = MathHelper.PiOver4 * Math.Sign(shipMatrix.Left.Dot(gravityVec));
+            }
+            else if (Math.Abs(roll) < 0.015 * DAMPING_MULTIPLIER)
+            {
+                roll = 0;
+            }
+            roll = rollController.Control(roll);
+        }
+        
+        you want the direction?
+        or the actual magnitude?
+        var leftVec = Vector3D.Cross(shipForward, gravity);
+        var horizonVec = Vector3D.Cross(gravity, left);
+        // Then you can normalize horizonVec or whatever
+        Or alternatively...
+        var horizonVec = Vector3D.Reject(shipForward, gravity);
+        // Then you can normalize horizonVec or whatever
+        I use the latter in my gravity compensation methods
+        
+        // Gravity Variables 
+        bool shouldAlign = true; //If the script should attempt to stabilize by default	   
+        const double angleTolerance = 3; //How many degrees the code will allow before it overrides user control 
+        bool gyroToggle;
+        bool firstToggle;
+        void AlignWithGravity()
+        {
+            //---Set appropriate gyro override
+            double rollSpeed;
+            double pitchSpeed;
+            bool canTolerate = CanTolerate(out pitchSpeed, out rollSpeed);
+            if (shouldAlign && !canTolerate)
+            {
+                ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, GYROS, REMOTE.WorldMatrix);
+                gyroToggle = true;
+            }
+            else if (gyroToggle)
+            {
+                gyroToggle = false;
+                foreach (IMyGyro gyro in GYROS)
+                {
+                    gyro.GyroOverride = false;
+                }
+            }
+        }
+
+        //---PID Constants 
+        const double proportionalConstant = 10;
+        const double derivativeConstant = 5;
+        double lastAngleRoll;
+        double lastAnglePitch;
+        bool CanTolerate(out double pitchSpeed, out double rollSpeed)
+        {
+            pitchSpeed = 0;
+            rollSpeed = 0;
+            if (!shouldAlign)
+            {
+                return true;
+            }
+            //---Get gravity vector 
+            var referenceOrigin = REMOTE.GetPosition();
+            var gravityVec = REMOTE.GetNaturalGravity();
+            if (!Vector3D.IsZero(REMOTE.GetNaturalGravity()))
+            {
+                if (firstToggle)
+                {
+                    foreach (IMyGyro thisGyro in GYROS)
+                    {
+                        thisGyro.SetValue("Override", false);
+                    }
+                }
+                firstToggle = false;
+                return true;
+            }
+            firstToggle = true;
+            //---Dir'n vectors of the reference block 
+            var referenceForward = REMOTE.WorldMatrix.Forward;
+            var referenceLeft = REMOTE.WorldMatrix.Left;
+            var referenceUp = REMOTE.WorldMatrix.Up;
+
+            //---Get Roll and Pitch Angles  
+            double anglePitch = Math.Acos(MathHelper.Clamp(gravityVec.Dot(referenceForward) / gravityVec.Length(), -1, 1)) - Math.PI / 2;
+
+            Vector3D planetRelativeLeftVec = referenceForward.Cross(gravityVec);
+            double angleRoll = VectorMath.AngleBetween(referenceLeft, planetRelativeLeftVec);
+            angleRoll *= Math.Sign(VectorMath.Projection(referenceLeft, gravityVec).Dot(gravityVec));
+
+            anglePitch *= -1;
+            angleRoll *= -1;
+
+            //---Get Raw Deviation angle	 
+            double rawDevAngle = Math.Acos(MathHelper.Clamp(gravityVec.Dot(referenceForward) / gravityVec.Length() * 180 / Math.PI, -1, 1));
+
+            //---Angle controller	 
+            rollSpeed = Math.Round(angleRoll * proportionalConstant + (angleRoll - lastAngleRoll) / globalTimestep * derivativeConstant, 2);
+            pitchSpeed = Math.Round(anglePitch * proportionalConstant + (anglePitch - lastAnglePitch) / globalTimestep * derivativeConstant, 2);                                                                                                                                                          //w.H]i\p 
+
+            rollSpeed /= GYROS.Count;
+            pitchSpeed /= GYROS.Count;
+
+            //store old angles   
+            lastAngleRoll = angleRoll;
+            lastAnglePitch = anglePitch;
+
+            //---Check if we are inside our tolerances   
+            if (Math.Abs(anglePitch * 180 / Math.PI) > angleTolerance)
+            {
+                return false;
+            }
+            if (Math.Abs(angleRoll * 180 / Math.PI) > angleTolerance)
+            {
+                return false;
+            }
+            return true;
+        }
+        */
 
     }
 }

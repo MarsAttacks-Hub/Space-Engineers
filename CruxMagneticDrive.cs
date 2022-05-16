@@ -24,7 +24,6 @@ namespace IngameScript
 
         //TODO add magnetic hoover
         //magnetic dampeners on gravity
-        //activate dampeners if dampeners are off, velocity is bigger than 2 and isControlled
         //DRIVER
 
         readonly string rotorsName = "Rotor_MD_A";
