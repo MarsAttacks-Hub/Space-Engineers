@@ -251,14 +251,14 @@ namespace IngameScript
                         Me.CustomData = "GyroStabilize=false";
                         if (MANAGERPB != null)
                         {
-                            if (MANAGERPB.CustomData.Contains("SunChaser=true"))//TODO
+                            if (MANAGERPB.CustomData.Contains("SunChaser=true"))
                             {
                                 sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                             }
                         }
                         runMDOnce = true;
                     }
-                    if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))//TODO
+                    if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
                     {
                         sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                     }
@@ -339,9 +339,16 @@ namespace IngameScript
                         if (setOnce)
                         {
                             InitMagneticDrive();
+                            if (MANAGERPB != null)
+                            {
+                                if (MANAGERPB.CustomData.Contains("SunChaser=true"))
+                                {
+                                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                                }
+                            }
                             setOnce = false;
                         }
-                        if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))//TODO
+                        if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
                         {
                             sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                         }
@@ -497,9 +504,9 @@ namespace IngameScript
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0 && distance != 0)
+                    if (maxDistance != 0)
                     {
-                        JUMPERS[0].SetValueFloat("JumpDistance", (float)(distance / maxDistance * 100d));//TODO
+                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
                     }
 
                     targetPosition = safeJumpPosition;
@@ -533,9 +540,9 @@ namespace IngameScript
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0d && distance != 0d)
+                    if (maxDistance != 0d)
                     {
-                        JUMPERS[0].SetValueFloat("JumpDistance", (float)(distance / maxDistance * 100d));//TODO
+                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
                     }
 
                     targetPosition = safeJumpPosition;
@@ -558,9 +565,9 @@ namespace IngameScript
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0d && distance != 0d)
+                    if (maxDistance != 0d)
                     {
-                        JUMPERS[0].SetValueFloat("JumpDistance", (float)(distance / maxDistance * 100d));//TODO
+                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
                     }
 
                     targetPosition = safeJumpPosition;
@@ -586,9 +593,9 @@ namespace IngameScript
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0d && distance != 0d)
+                    if (maxDistance != 0d)
                     {
-                        JUMPERS[0].SetValueFloat("JumpDistance", (float)(distance / maxDistance * 100d));//TODO
+                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
                     }
 
                     targetPosition = safeJumpPosition;
@@ -816,7 +823,7 @@ namespace IngameScript
             {
                 foreach (IMyShipController block in CONTROLLERS)
                 {
-                    if (block.IsFunctional && block.IsUnderControl && block.CanControlShip && block.ControlThrusters && !(block is IMyRemoteControl))
+                    if (block.IsUnderControl && block.IsFunctional && block.CanControlShip && block.ControlThrusters && !(block is IMyRemoteControl))
                     {
                         CONTROLLER = block;
                     }
@@ -830,7 +837,7 @@ namespace IngameScript
                 IMyShipController controller = null;
                 foreach (IMyShipController contr in CONTROLLERS)
                 {
-                    if (contr.IsFunctional && contr.CanControlShip && contr.ControlThrusters && !(contr is IMyRemoteControl))//TODO
+                    if (contr.IsFunctional && contr.CanControlShip && contr.ControlThrusters && !(contr is IMyRemoteControl))
                     {
                         controller = contr;
                     }
@@ -898,13 +905,6 @@ namespace IngameScript
         {
             foreach (IMyMotorStator block in ROTORS) { block.Enabled = true; }
             foreach (IMyMotorStator block in ROTORSINV) { block.Enabled = true; }
-            if (MANAGERPB != null)
-            {
-                if (MANAGERPB.CustomData.Contains("SunChaser=true"))
-                {
-                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                }
-            }
             foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
         }
 
@@ -1595,7 +1595,7 @@ namespace IngameScript
                 GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, reference.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
 
-                var updatesPerSecond = 6;//10;//TODO
+                var updatesPerSecond = 6;//10;
                 var timeMaxCycle = 1 / updatesPerSecond;
 
                 var localAngularDeviation = new Vector3D(-pitchAngle, yawAngle, rollAngle);
