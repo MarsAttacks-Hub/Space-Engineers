@@ -45,7 +45,7 @@ namespace IngameScript
         readonly string missilePrefix = "[M]";
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
-        readonly string magneticDriveName = "[CRX] PB Magnetic Drive";
+        readonly string navigatorName = "[CRX] PB Navigator";
         readonly string decoyName = "[CRX] PB Decoy";
         readonly string managerName = "[CRX] PB Manager";
         readonly string cargoName = "[CRX] Cargo";
@@ -148,7 +148,7 @@ namespace IngameScript
 
         IMyShipController CONTROLLER;
         IMyRadioAntenna ANTENNA;
-        IMyProgrammableBlock MAGNETICDRIVEPB;
+        IMyProgrammableBlock NAVIGATORPB;
         IMyProgrammableBlock MANAGERPB;
         IMyProgrammableBlock DECOYPB;
         IMyTextPanel DEBUG;
@@ -767,11 +767,26 @@ namespace IngameScript
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, CONTROLLER.WorldMatrix.Up, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
+
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
-            double rollSpeed = rollController.Control(rollAngle);
+            //double rollSpeed = rollController.Control(rollAngle);
 
-            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+            double mouseRoll = CONTROLLER.RollIndicator;
+            if (mouseRoll != 0)
+            {
+                mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
+            }
+            if (mouseRoll == 0)
+            {
+                mouseRoll = rollController.Control(rollAngle);
+            }
+            else
+            {
+                mouseRoll = rollController.Control(mouseRoll);
+            }
+
+            ApplyGyroOverride(pitchSpeed, yawSpeed, mouseRoll, GYROS, CONTROLLER.WorldMatrix);
 
             Vector3D forwardVec = CONTROLLER.WorldMatrix.Forward;
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
@@ -1093,11 +1108,11 @@ namespace IngameScript
 
                 doOnce = true;
 
-                if (MAGNETICDRIVEPB != null)
+                if (NAVIGATORPB != null)
                 {
-                    if (MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+                    if (NAVIGATORPB.CustomData.Contains("GyroStabilize=true"))
                     {
-                        MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                        MDOff = NAVIGATORPB.TryRun(argMDGyroStabilizeOff);
                     }
                 }
                 if (MANAGERPB != null)
@@ -1112,18 +1127,18 @@ namespace IngameScript
 
         void ActivateOtherScriptsGyros()
         {
-            if (MDOff && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+            if (MDOff && NAVIGATORPB.CustomData.Contains("GyroStabilize=true"))
             {
-                bool mdRun = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOn);
+                bool mdRun = NAVIGATORPB.TryRun(argMDGyroStabilizeOn);
                 MDOff = !mdRun;
             }
         }
 
         void DeactivateOtherScriptsGyros()
         {
-            if (!MDOff && MAGNETICDRIVEPB.CustomData.Contains("GyroStabilize=true"))
+            if (!MDOff && NAVIGATORPB.CustomData.Contains("GyroStabilize=true"))
             {
-                MDOff = MAGNETICDRIVEPB.TryRun(argMDGyroStabilizeOff);
+                MDOff = NAVIGATORPB.TryRun(argMDGyroStabilizeOff);
             }
             if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true"))
             {
@@ -1603,7 +1618,7 @@ namespace IngameScript
             foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             ANTENNA = GridTerminalSystem.GetBlockWithName(antennasName) as IMyRadioAntenna;
             CONTROLLER = CONTROLLERS[0];
-            MAGNETICDRIVEPB = GridTerminalSystem.GetBlockWithName(magneticDriveName) as IMyProgrammableBlock;
+            NAVIGATORPB = GridTerminalSystem.GetBlockWithName(navigatorName) as IMyProgrammableBlock;
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
             DECOYPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
             DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;

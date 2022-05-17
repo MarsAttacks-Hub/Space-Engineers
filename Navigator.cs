@@ -25,6 +25,8 @@ namespace IngameScript
         //TODO add orbital function
         //add magnetic hoover and alignment
         //magnetic dampeners on gravity
+        //magnetic drive keep altitude
+        //automatically calculate atmosphere range instead of iterating a list
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -54,7 +56,7 @@ namespace IngameScript
         readonly string idleThrusterPanelName = "[CRX] LCD IdleThrusters Toggle";
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
         readonly string debugPanelName = "[CRX] Debug";
-        readonly string targeterName = "[CRX] PB Targeter";
+        readonly string painterName = "[CRX] PB Painter";
         readonly string decoyName = "[CRX] PB Decoy";
         readonly string managerName = "[CRX] PB Manager";
 
@@ -157,7 +159,7 @@ namespace IngameScript
         IMyThrust FORWARDTHRUST;
         IMyThrust BACKWARDTHRUST;
         IMyProgrammableBlock MANAGERPB;
-        IMyProgrammableBlock TARGETERPB;
+        IMyProgrammableBlock PAINTERPB;
         IMyProgrammableBlock DECOYPB;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
@@ -275,9 +277,14 @@ namespace IngameScript
                     }
                 }
 
-                if (!IsPiloted(false))
+                if (!IsPiloted(true))
                 {
                     TurretsImpactDetection();
+
+                    if (!Vector3D.IsZero(REMOTE.GetNaturalGravity()))
+                    {
+                        AlignToGround(REMOTE);
+                    }
                 }
 
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition))
@@ -506,7 +513,7 @@ namespace IngameScript
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0)
                     {
-                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
+                        JUMPERS[0].JumpDistanceMeters = (float)distance;
                     }
 
                     targetPosition = safeJumpPosition;
@@ -542,7 +549,7 @@ namespace IngameScript
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0d)
                     {
-                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
+                        JUMPERS[0].JumpDistanceMeters = (float)distance;
                     }
 
                     targetPosition = safeJumpPosition;
@@ -567,7 +574,7 @@ namespace IngameScript
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0d)
                     {
-                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
+                        JUMPERS[0].JumpDistanceMeters = (float)distance;
                     }
 
                     targetPosition = safeJumpPosition;
@@ -595,7 +602,7 @@ namespace IngameScript
                     double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
                     if (maxDistance != 0d)
                     {
-                        JUMPERS[0].JumpDistanceMeters = (float)(distance / maxDistance);
+                        JUMPERS[0].JumpDistanceMeters = (float)distance;
                     }
 
                     targetPosition = safeJumpPosition;
@@ -637,13 +644,7 @@ namespace IngameScript
             if (angle * rad2deg <= angleTolerance)
             {
                 aimTarget = false;
-                foreach (var gyro in GYROS)
-                {
-                    gyro.Pitch = 0f;
-                    gyro.Yaw = 0f;
-                    gyro.Roll = 0f;
-                    gyro.GyroOverride = false;
-                }
+                UnlockGyros();
             }
         }
 
@@ -695,7 +696,7 @@ namespace IngameScript
             {
                 if (returnOnce)
                 {
-                    TARGETERPB.TryRun(argUnlockFromTarget);
+                    PAINTERPB.TryRun(argUnlockFromTarget);
                     DECOYPB.TryRun(argLaunchDecoy);
                     returnPosition = REMOTE.GetPosition();
                     returnOnce = false;
@@ -723,50 +724,30 @@ namespace IngameScript
                 Vector3D horizonVec = Vector3D.Cross(gravityVec, leftVec);
                 double pitchAngle, rollAngle, yawAngle;
                 GetRotationAnglesSimultaneous(horizonVec, -gravityVec, matrix, out pitchAngle, out yawAngle, out rollAngle);
-                double mouseYaw = controller.RotationIndicator.Y;
-                double mousePitch = controller.RotationIndicator.X;
-                double mouseRoll = controller.RollIndicator;
 
-                if (mouseYaw != 0)
-                {
-                    mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
-                }
-                if (mouseYaw == 0)
-                {
-                    yawController.Reset();
-                }
-                else
-                {
-                    mouseYaw = yawController.Control(mouseYaw);
-                }
+                yawController.Reset();
+                double pitchSpeed = pitchController.Control(pitchAngle);
+                double rollSpeed = rollController.Control(rollAngle);
 
-                if (mousePitch != 0)
+                ApplyGyroOverride(pitchSpeed, 0, rollSpeed, GYROS, matrix);
+
+                bool forwardAligned = false;
+                bool upAligned = false;
+                double angle = VectorMath.AngleBetween(matrix.Forward, horizonVec);
+                if (angle * rad2deg <= angleTolerance)
                 {
-                    mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
+                    forwardAligned = true;
                 }
-                if (mousePitch == 0)
+                angle = VectorMath.AngleBetween(matrix.Up, -gravityVec);
+                if (angle * rad2deg <= angleTolerance)
                 {
-                    mousePitch = pitchController.Control(pitchAngle);
-                }
-                else
-                {
-                    mousePitch = pitchController.Control(mousePitch);
+                    upAligned = true;
                 }
 
-                if (mouseRoll != 0)
+                if (forwardAligned && upAligned)
                 {
-                    mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
+                    UnlockGyros();
                 }
-                if (mouseRoll == 0)
-                {
-                    mouseRoll = rollController.Control(rollAngle);
-                }
-                else
-                {
-                    mouseRoll = rollController.Control(mouseRoll);
-                }
-
-                ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, matrix);
             }
         }
 
@@ -1234,6 +1215,17 @@ namespace IngameScript
             }
         }
 
+        void UnlockGyros()
+        {
+            foreach (var gyro in GYROS)
+            {
+                gyro.Pitch = 0f;
+                gyro.Yaw = 0f;
+                gyro.Roll = 0f;
+                gyro.GyroOverride = false;
+            }
+        }
+
         bool IsPiloted(bool autopiloted)
         {
             bool isPiloted = false;
@@ -1414,7 +1406,7 @@ namespace IngameScript
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
             REMOTE = REMOTES[0];
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
-            TARGETERPB = GridTerminalSystem.GetBlockWithName(targeterName) as IMyProgrammableBlock;
+            PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
             DECOYPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
         }
 
@@ -1579,6 +1571,89 @@ namespace IngameScript
         }
 
         /*
+        public Planet(String InternalPlanetName, Vector3D InternalPlanetPos, double InternalPlanetRadius, double InternalPlanetGravDist)
+        //Earth\\
+        Planets.Add(new Planet("earth", new Vector3D(0,0,0), 61250, 103093.4)); //Sea level = 60000
+        //Moon\\
+        Planets.Add(new Planet("moon", new Vector3D(16384, 136384, -113616), 9500, 12314.416)); //Sea level = 9500
+        //Triton\\
+        Planets.Add(new Planet("triton", new Vector3D(-284463.5, -2434463.5, 365536.5), 40127.5, 73862.89)); //Sea level = 40127.5
+        //Mars\\
+        Planets.Add(new Planet("mars", new Vector3D(1031072, 131072, 1631072), 61500, 101553.3)); //Sea level = 60000
+        //Titan\\
+        Planets.Add(new Planet("europa", new Vector3D(916384, 16384, 1616384), 9600, 12673.088)); //Sea level = 9500
+        //Alien\\
+        Planets.Add(new Planet("alien", new Vector3D(131072, 131072, 5731072), 60000, 104506.7)); //Sea level = 60000
+        //Europa\\
+        Planets.Add(new Planet("titan", new Vector3D(36384, 226384, 5796384), 9500, 12314.416)); //Sea level = 9500
+        //Pertam\\
+        Planets.Add(new Planet("pertam", new Vector3D(-3967231.5,-32231.5,-767231.5), 30000, 48500));
+        }
+
+        void Land(double altitude, IMyShipController controller)
+        {
+            double planetAltitude;
+            bool altitudeFound = controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out planetAltitude);
+            if (altitudeFound)
+            {
+                
+            }
+
+            var distanceToGround = GetAltitude(controller) - GetShipEdgeVector(controller, Base6Directions.Direction.Down).Length() - 10;// altitudeSafetyCushion;
+            var target = CalculateDistanceVector(controller, distanceToGround, Base6Directions.Direction.Down);
+
+        }
+        double GetAltitude(IMyShipController refBlock)
+        {
+            var altitude = 0.0;
+            refBlock.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
+            return altitude;
+        }
+
+        Vector3D GetShipEdgeVector(IMyTerminalBlock reference, Base6Directions.Direction directionFrom = Base6Directions.Direction.Forward)
+        {
+            var direction = DirConvert(reference, directionFrom);
+            var gridSize = reference.CubeGrid.GridSize;//get dimension of grid cubes 
+            var gridMatrix = reference.CubeGrid.WorldMatrix;//get worldmatrix for the grid 
+            var worldMinimum = Vector3D.Transform(reference.CubeGrid.Min * gridSize, gridMatrix);//convert grid coordinates to world coords 
+            var worldMaximum = Vector3D.Transform(reference.CubeGrid.Max * gridSize, gridMatrix);
+            var origin = reference.GetPosition();//get reference position 
+            var minRelative = worldMinimum - origin;//compute max and min relative vectors 
+            var maxRelative = worldMaximum - origin;
+            var minProjected = Vector3D.Dot(minRelative, direction) / direction.LengthSquared() * direction;//project relative vectors on desired direction 
+            var maxProjected = Vector3D.Dot(maxRelative, direction) / direction.LengthSquared() * direction;
+            if (Vector3D.Dot(minProjected, direction) > 0)//check direction of the projections to determine which is correct 
+                return minProjected;
+            else
+                return maxProjected;
+        }
+
+        Vector3D DirConvert(IMyTerminalBlock block, Base6Directions.Direction direction = Base6Directions.Direction.Forward)
+        {
+            MatrixD wM = block.WorldMatrix;
+            switch (direction)
+            {
+                case Base6Directions.Direction.Up:
+                    return wM.Up;
+                case Base6Directions.Direction.Down:
+                    return wM.Down;
+                case Base6Directions.Direction.Backward:
+                    return wM.Backward;
+                case Base6Directions.Direction.Left:
+                    return wM.Left;
+                case Base6Directions.Direction.Right:
+                    return wM.Right;
+                default:
+                    return wM.Forward;
+            }
+        }
+
+        Vector3D CalculateDistanceVector(IMyTerminalBlock reference, double depth, Base6Directions.Direction directionFrom = Base6Directions.Direction.Forward)
+        {
+            return reference.GetPosition() + depth * DirConvert(reference, directionFrom);
+        }
+
+        
         void GyroStabilize(bool overrideOn, IMyShipController reference, Vector2 mouseInput, float rollInput)
         {
             if (useGyrosToStabilize)
