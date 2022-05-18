@@ -305,11 +305,11 @@ namespace IngameScript
 
                     foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
                 }
-                if (fireTick == 2)
+                else if (fireTick == 2)
                 {
                     foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Attach(); }
                 }
-                if (fireTick == 3)
+                else if (fireTick == 3)
                 {
                     foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Retract(); }
                     foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
@@ -454,11 +454,11 @@ namespace IngameScript
             {
                 foreach (IMyShipMergeBlock merge in MERGES3) { merge.Enabled = false; }
             }
-            if (buildTick == 1)
+            else if (buildTick == 1)
             {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
             }
-            if (buildTick == 5)
+            else if (buildTick == 5)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 7.34f; }
 
@@ -475,11 +475,11 @@ namespace IngameScript
             {
                 foreach (IMyMotorBase hinge in HINGESFRONT) { hinge.Attach(); }
             }
-            if (buildTick == 3)
+            else if (buildTick == 3)
             {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Detach(); }
             }
-            if (buildTick == 4)
+            else if (buildTick == 4)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 9.7f; }
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
@@ -488,7 +488,7 @@ namespace IngameScript
                     piston.MaxLimit = 2.34f;
                 }
             }
-            if (buildTick == 10)
+            else if (buildTick == 10)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
                 {
@@ -496,7 +496,7 @@ namespace IngameScript
                     piston.MinLimit = 0f;
                 }
             }
-            if (buildTick == 16)
+            else if (buildTick == 16)
             {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Velocity = 1.25f; }
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Velocity = 1.25f; }

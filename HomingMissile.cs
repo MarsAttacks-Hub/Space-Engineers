@@ -22,7 +22,6 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-
         //TODO add gravityConpensation
         //HOMING MISSILE
 

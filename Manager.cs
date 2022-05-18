@@ -22,6 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        //TODO check damaged/destroyed blocks
         //MANAGER
 
         readonly string solarsName = "[CRX] Solar";

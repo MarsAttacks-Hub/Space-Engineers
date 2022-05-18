@@ -22,9 +22,6 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO when locking on target use roll user inputs
-        //the logic used to check if projection build is completed is not consistent because RemainingBlocks should be used instead of BuildableBlocksCount,
-        //BuildableBlocksCount is used beacuse if "payLoad" is switched and the previous projection is already built the missile will never be set on "loaded"
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";

@@ -22,11 +22,9 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        //TODO add orbital function
-        //add magnetic hoover and alignment
-        //magnetic dampeners on gravity
-        //magnetic drive keep altitude
-        //automatically calculate atmosphere range instead of iterating a list
+        //TODO add generate orbital gps function
+        //generate orbital gps above target 
+        //land function
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -65,10 +63,11 @@ namespace IngameScript
 
         const string argRangeFinder = "RangeFinder";
         const string argAimTarget = "AimTarget";
-        const string argChangeSafetyOffset = "ChangeSafetyOffset";
+        const string argChangePlanet = "ChangePlanet";
         const string argDeadMan = "DeadMan";
         const string argMagneticDrive = "ToggleMagneticDrive";
         const string argIdleThrusters = "ToggleIdleThrusters";
+        const string argSetPlanet = "SetPlanet";
 
         const string argSunchaseOff = "SunchaseOff";
         const string argUnlockFromTarget = "Clear";
@@ -103,7 +102,6 @@ namespace IngameScript
         double maxScanRange = 0d;
         int planetSelector = 0;
         string selectedPlanet = "";
-        double planetAtmosphereRange = 0d;
         int tickCount = 0;
         bool magneticDriveManOnce = true;
         bool deadManOnce = false;
@@ -118,6 +116,8 @@ namespace IngameScript
         bool controlDampeners = true;
         bool useGyrosToStabilize = true;//If the script will override gyros to try and combat torque
         bool idleThrusters = false;
+        bool keepAltitude = false;
+        double altitudeToKeep = 0d;
 
         const float globalTimestep = 10.0f / 60.0f;
         const double rad2deg = 180 / Math.PI;
@@ -181,12 +181,17 @@ namespace IngameScript
 
         readonly MyIni myIni = new MyIni();
 
-        public Dictionary<string, double> planetsDict = new Dictionary<string, double>()
+        readonly Dictionary<String, MyTuple<Vector3D, double, double>> planetsList = new Dictionary<String, MyTuple<Vector3D, double, double>>()
         {
-           {"Earth", 42860d},
-           {"Moon", 2678d},
-           {"Mars ", 39311d},
-           {"Alien planet", 39870d}
+            //string PlanetName, Vector3D PlanetPosition, double PlanetRadius, double AtmosphereDistance
+            { "Earth",  MyTuple.Create(new Vector3D(0,          0,          0),         61250d,     41843.4d) },
+            { "Moon",   MyTuple.Create(new Vector3D(16384,      136384,     -113616),   9500d,      2814.416d) },
+            { "Triton", MyTuple.Create(new Vector3D(-284463.5,  -2434463.5, 365536.5),  40127.5d,   33735.39d) },
+            { "Mars",   MyTuple.Create(new Vector3D(1031072,    131072,     1631072),   61500d,     40053.3d) },
+            { "Europa", MyTuple.Create(new Vector3D(916384,     16384,      1616384),   9600d,      12673.088d) },
+            { "Alien",  MyTuple.Create(new Vector3D(131072,     131072,     5731072),   60000d,     44506.7d) },
+            { "Titan",  MyTuple.Create(new Vector3D(36384,      226384,     5796384),   9500d,      2814.416d) },
+            { "Pertam", MyTuple.Create(new Vector3D(-3967231.5, -32231.5,   -767231.5), 30000d,     18500d) }
         };
 
         Program()
@@ -203,8 +208,7 @@ namespace IngameScript
 
             maxScanRange = LIDARS[0].RaycastDistanceLimit;
 
-            planetAtmosphereRange = planetsDict.ElementAt(0).Value;
-            selectedPlanet = planetsDict.ElementAt(0).Key;
+            selectedPlanet = planetsList.ElementAt(0).Key;
 
             InitPIDControllers();
 
@@ -422,14 +426,13 @@ namespace IngameScript
             switch (argument)
             {
                 case argRangeFinder: RangeFinder(); break;
-                case argChangeSafetyOffset:
+                case argChangePlanet:
                     planetSelector++;
-                    if (planetSelector > planetsDict.Count())
+                    if (planetSelector > planetsList.Count())
                     {
                         planetSelector = 0;
                     }
-                    planetAtmosphereRange = planetsDict.ElementAt(planetSelector).Value;
-                    selectedPlanet = planetsDict.ElementAt(planetSelector).Key;
+                    selectedPlanet = planetsList.ElementAt(planetSelector).Key;
                     break;
                 case argAimTarget: if (!Vector3D.IsZero(targetPosition)) { aimTarget = true; }; break;
                 case argIdleThrusters:
@@ -467,6 +470,37 @@ namespace IngameScript
                 case argMagneticDrive:
                     magneticDrive = !magneticDrive;
                     break;
+                case argSetPlanet:
+                    if (!aimTarget)
+                    {
+                        MyTuple<Vector3D, double, double> planet;
+                        planetsList.TryGetValue(selectedPlanet, out planet);
+                        double planetSize = planet.Item2 + planet.Item3 + 1000d;
+                        Vector3D safeJumpPosition = planet.Item1 - (Vector3D.Normalize(planet.Item1 - REMOTE.GetPosition()) * planetSize);
+
+                        REMOTE.ClearWaypoints();
+                        REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
+
+                        double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
+
+                        JUMPERS[0].JumpDistanceMeters = (float)distance;
+
+                        targetPosition = safeJumpPosition;
+
+                        targetLog.Clear();
+                        targetLog.Append("Safe Dist. for: ").Append(selectedPlanet).Append("\n");
+
+                        string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
+                        targetLog.Append(safeJumpGps).Append("\n");
+
+                        targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
+
+                        targetLog.Append("Radius: ").Append(planet.Item2.ToString("0.0")).Append(", ");
+                        targetLog.Append("Diameter: ").Append((planet.Item2 * 2d).ToString("0.0")).Append("\n");
+
+                        targetLog.Append("Atmo. Height: ").Append(planet.Item3.ToString("0.0")).Append("\n");
+                    }
+                    break;
             }
         }
 
@@ -503,18 +537,34 @@ namespace IngameScript
                 }
                 if (TARGET.Type == MyDetectedEntityType.Planet)
                 {
+                    Vector3D planetCenter = TARGET.Position;
                     Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * planetAtmosphereRange);
+                    double planetRadius = Vector3D.Distance(planetCenter, hitPosition);
+                    string planetName = "Earth";
+                    MyTuple<Vector3D, double, double> planet;
+                    planetsList.TryGetValue(planetName, out planet);
+                    double aRadius = Math.Abs(planet.Item2 - planetRadius);
+                    foreach (var planetElement in planetsList)
+                    {
+                        double dictPlanetRadius = planetElement.Value.Item2;
+                        double bRadius = Math.Abs(dictPlanetRadius - planetRadius);
+                        if (bRadius < aRadius)
+                        {
+                            planetName = planetElement.Key;
+                            aRadius = bRadius;
+                        }
+                    }
+                    planetsList.TryGetValue(planetName, out planet);
+                    double atmosphereRange = planet.Item3 + 1000d;
+
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * atmosphereRange);
 
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                    double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0)
-                    {
-                        JUMPERS[0].JumpDistanceMeters = (float)distance;
-                    }
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
 
                     targetPosition = safeJumpPosition;
 
@@ -523,13 +573,12 @@ namespace IngameScript
                     string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
                     targetLog.Append(safeJumpGps).Append("\n");
 
-                    targetLog.Append("Atmo. Dist.: ").Append(distance.ToString("0.0")).Append("\n");
-
-                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
-                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
+                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
 
                     double targetRadius = Vector3D.Distance(TARGET.Position, hitPosition);
-                    targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
+                    targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append(", ");
+                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
+                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
 
                     double targetGroundDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
                     targetLog.Append("Ground Dist.: ").Append(targetGroundDistance.ToString("0.0")).Append("\n");
@@ -546,18 +595,15 @@ namespace IngameScript
                     REMOTE.AddWaypoint(safeJumpPosition, "Asteroid");
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                    double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0d)
-                    {
-                        JUMPERS[0].JumpDistanceMeters = (float)distance;
-                    }
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
 
                     targetPosition = safeJumpPosition;
 
                     string safeJumpGps = $"GPS:Asteroid:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
                     targetLog.Append(safeJumpGps).Append("\n");
 
-                    targetLog.Append("Dist.: ").Append(distance.ToString("0.0")).Append("\n");
+                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
 
                     double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
                     targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
@@ -571,11 +617,8 @@ namespace IngameScript
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                    double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0d)
-                    {
-                        JUMPERS[0].JumpDistanceMeters = (float)distance;
-                    }
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
 
                     targetPosition = safeJumpPosition;
 
@@ -585,7 +628,7 @@ namespace IngameScript
                     targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
 
                     double targetDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
-                    targetLog.Append("Dist: ").Append(targetDistance.ToString("0.0")).Append("\n");
+                    targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
 
                     double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
                     targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
@@ -599,11 +642,8 @@ namespace IngameScript
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
 
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                    double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-                    if (maxDistance != 0d)
-                    {
-                        JUMPERS[0].JumpDistanceMeters = (float)distance;
-                    }
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
 
                     targetPosition = safeJumpPosition;
 
@@ -613,7 +653,7 @@ namespace IngameScript
                     targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
 
                     double targetDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
-                    targetLog.Append("Dist: ").Append(targetDistance.ToString("0.0")).Append("\n");
+                    targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
 
                     double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
                     targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
@@ -751,6 +791,39 @@ namespace IngameScript
             }
         }
 
+        Vector3 KeepAltitude(Vector3 dir)//TODO doesn't take in consideration the ship orientation
+        {
+            if (!Vector3D.IsZero(REMOTE.GetNaturalGravity()))
+            {
+                if (dir.X != 0 || dir.Y != 0 || dir.Z != 0)
+                {
+                    keepAltitude = false;
+                }
+                if (keepAltitude)
+                {
+                    double altitude;
+                    REMOTE.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
+                    if (altitudeToKeep == 0d)
+                    {
+                        altitudeToKeep = altitude;
+                    }
+                    if (altitude < altitudeToKeep - 10d)
+                    {
+                        dir.Y = 1;
+                    }
+                    else if (altitude > altitudeToKeep + 10d)
+                    {
+                        dir.Y = -1;
+                    }
+                }
+                else
+                {
+                    altitudeToKeep = 0d;
+                }
+            }
+            return dir;
+        }
+
         void DeadMan()
         {
             bool undercontrol = IsPiloted(true);
@@ -833,6 +906,12 @@ namespace IngameScript
                     Vector3D velocityVec = controller.GetShipVelocities().LinearVelocity;
                     double speed = velocityVec.Length();
                     if (speed > 1)
+                    {
+                        CONTROLLER = controller;
+                        controlled = true;
+                    }
+
+                    if (!Vector3D.IsZero(REMOTE.GetNaturalGravity()))
                     {
                         CONTROLLER = controller;
                         controlled = true;
@@ -1004,7 +1083,7 @@ namespace IngameScript
                     switchOnce = false;
                 }
             }
-            if (!CONTROLLER.DampenersOverride && dir.LengthSquared() == 0)
+            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity()) && !CONTROLLER.DampenersOverride && dir.LengthSquared() == 0)
             {
                 SetPow(Vector3.Zero);
                 return;
@@ -1026,6 +1105,9 @@ namespace IngameScript
             {
                 vel.Z = 0;
             }
+
+            vel = KeepAltitude(vel);
+
             SetPow(vel);
         }
 
@@ -1350,7 +1432,7 @@ namespace IngameScript
                 StringBuilder text = new StringBuilder();
                 text.Append(lidarsLog.ToString());
                 text.Append(jumpersLog.ToString());
-                text.Append("Selected Planet Safety: " + selectedPlanet + "(" + planetAtmosphereRange + ")\n");
+                text.Append("Selected Planet: " + selectedPlanet + "\n");
                 text.Append(targetLog.ToString());
                 surface.WriteText(text);
             }
