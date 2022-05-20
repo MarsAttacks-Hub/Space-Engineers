@@ -18,10 +18,8 @@ using VRage;
 using VRageMath;
 using System.Collections.Immutable;
 
-namespace IngameScript
-{
-    partial class Program : MyGridProgram
-    {
+namespace IngameScript {
+    partial class Program : MyGridProgram {
         //TODO add gravityConpensation
         //HOMING MISSILE
 
@@ -140,14 +138,12 @@ namespace IngameScript
         PID pitchController;
         PID rollController;
 
-        Program()
-        {
+        Program() {
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
             Setup();
         }
 
-        void Setup()
-        {
+        void Setup() {
             BROADCASTLISTENER = IGC.RegisterBroadcastListener(antennaTag);
             UNICASTLISTENER = IGC.UnicastListener;
 
@@ -162,10 +158,8 @@ namespace IngameScript
             fuseDistance = isLargeGrid ? 16 : 7;
         }
 
-        public void Main()
-        {
-            try
-            {
+        public void Main() {
+            try {
                 Echo($"TBLOCKS:{TBLOCKS.Count}");
                 Echo($"CONTROLLERS:{CONTROLLERS.Count}");
                 Echo($"GYROS:{GYROS.Count}");
@@ -183,32 +177,25 @@ namespace IngameScript
                 Echo($"GATLINGS:{GATLINGS.Count}");
                 Echo($"TURRETS:{TURRETS.Count}");
 
-                if (ANTENNA.Enabled)
-                {
+                if (ANTENNA.Enabled) {
                     GetMessages();
 
-                    if (!launched && command.Equals(commandLaunch))
-                    {
-                        if (!init)
-                        {
+                    if (!launched && command.Equals(commandLaunch)) {
+                        if (!init) {
                             GetAntenna();
                             GetBlocks();
                             init = true;
                         }
 
-                        if (launchOnce)
-                        {
+                        if (launchOnce) {
                             InitiateLaunch();
                         }
 
                         UpdateBroadcastRange(platformPosition);
-                    }
-                    else if (launched && (command.Equals(commandUpdate)) || command.Equals(commandSpiral))
-                    {
+                    } else if (launched && (command.Equals(commandUpdate)) || command.Equals(commandSpiral)) {
                         if (command.Equals(commandSpiral)) { useSpiral = !useSpiral; }
 
-                        if (updateOnce)
-                        {
+                        if (updateOnce) {
                             InitiateUpdate();
                         }
 
@@ -216,12 +203,9 @@ namespace IngameScript
 
                         SendUnicastMessage();
 
-                        if (!startTargeting)
-                        {
+                        if (!startTargeting) {
                             InitiateThrusters();
-                        }
-                        else
-                        {
+                        } else {
                             UpdateMaxSpeed();
 
                             bool targetFound = TurretsDetection();
@@ -233,11 +217,8 @@ namespace IngameScript
                             //prevTargetPosition = targetPosition;
                             //prevPosition = CONTROLLER.CubeGrid.WorldVolume.Center;
                         }
-                    }
-                    else if (launched && command.Equals(commandLost))
-                    {
-                        if (lostOnce)
-                        {
+                    } else if (launched && command.Equals(commandLost)) {
+                        if (lostOnce) {
                             InitiateLost();
                         }
 
@@ -248,26 +229,20 @@ namespace IngameScript
                         ManageBrakes();
                     }
                 }
-            }
-            catch (Exception e)
-            {
+            } catch (Exception e) {
                 StringBuilder debugLog = new StringBuilder("");
                 debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                 SendErrorMessage(debugLog.ToString());
             }
         }
 
-        void GetMessages()
-        {
-            if (UNICASTLISTENER.HasPendingMessage)
-            {
-                while (UNICASTLISTENER.HasPendingMessage)
-                {
+        void GetMessages() {
+            if (UNICASTLISTENER.HasPendingMessage) {
+                while (UNICASTLISTENER.HasPendingMessage) {
                     var msg = UNICASTLISTENER.AcceptMessage();
 
                     if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
-                            MyTuple<Vector3, Vector3D>>>)
-                    {
+                            MyTuple<Vector3, Vector3D>>>) {
 
                         var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                                     MyTuple<Vector3, Vector3D>>>)msg.Data;
@@ -276,8 +251,7 @@ namespace IngameScript
 
                         platFormId = msg.Source;//platformTag = msg.Tag;
 
-                        for (int i = 0; i < data.Length; i++)
-                        {
+                        for (int i = 0; i < data.Length; i++) {
                             var temp = data[i];
 
                             var tup1 = temp.Item1;
@@ -295,15 +269,12 @@ namespace IngameScript
                 }
             }
             //else 
-            if (BROADCASTLISTENER.HasPendingMessage)
-            {
-                while (BROADCASTLISTENER.HasPendingMessage)
-                {
+            if (BROADCASTLISTENER.HasPendingMessage) {
+                while (BROADCASTLISTENER.HasPendingMessage) {
                     var msg = BROADCASTLISTENER.AcceptMessage();
 
                     if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
-                            MyTuple<Vector3, Vector3D>>>)
-                    {
+                            MyTuple<Vector3, Vector3D>>>) {
 
                         var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                                     MyTuple<Vector3, Vector3D>>>)msg.Data;
@@ -312,8 +283,7 @@ namespace IngameScript
 
                         platFormId = msg.Source;//platformTag = msg.Tag;
 
-                        for (int i = 0; i < data.Length; i++)
-                        {
+                        for (int i = 0; i < data.Length; i++) {
                             var temp = data[i];
 
                             var tup1 = temp.Item1;
@@ -321,8 +291,7 @@ namespace IngameScript
 
                             long myId = tup1.Item1;
                             string cmd = tup1.Item2;
-                            if (cmd.Equals(commandLaunch) && !launched)
-                            {
+                            if (cmd.Equals(commandLaunch) && !launched) {
                                 command = tup1.Item2;
                                 platformPosition = tup1.Item3;
                                 //platformMatrix = tup1.Item4;
@@ -332,8 +301,7 @@ namespace IngameScript
                                 targetPosition = tup2.Item2;
                             }
                             //else 
-                            if (myId == Me.EntityId)
-                            {
+                            if (myId == Me.EntityId) {
                                 command = tup1.Item2;
                                 platformPosition = tup1.Item3;
                                 //platformMatrix = tup1.Item4;
@@ -348,8 +316,7 @@ namespace IngameScript
             }
         }
 
-        bool SendUnicastMessage()
-        {
+        bool SendUnicastMessage() {
             Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center;
             double distanceFromTarget = Vector3D.Distance(targetPosition, position);
             double speed = CONTROLLER.GetShipSpeed();
@@ -357,13 +324,9 @@ namespace IngameScript
             if (missileType == 0)//0 kinetic - 1 explosive - 2 drone
             {
                 type = "Kinetic";
-            }
-            else if (missileType == 1)
-            {
+            } else if (missileType == 1) {
                 type = "Explosive";
-            }
-            else if (missileType == 2)
-            {
+            } else if (missileType == 2) {
                 type = "Drone";
             }
             string info = command + "," + status + "," + type;
@@ -379,8 +342,7 @@ namespace IngameScript
             return messageSent;
         }
 
-        bool SendErrorMessage(String msg)
-        {
+        bool SendErrorMessage(String msg) {
             var immArray = ImmutableArray.CreateBuilder<MyTuple<string>>();
 
             var tuple = MyTuple.Create(msg);
@@ -392,8 +354,7 @@ namespace IngameScript
             return messageSent;
         }
 
-        void InitiateLaunch()
-        {
+        void InitiateLaunch() {
             //Runtime.UpdateFrequency = UpdateFrequency.Update1;
             //UpdateGlobalTimeStep();
             SendUnicastMessage();
@@ -416,16 +377,13 @@ namespace IngameScript
             status = statusLaunched;
         }
 
-        void InitiateUpdate()
-        {
+        void InitiateUpdate() {
             //Runtime.UpdateFrequency = UpdateFrequency.Update1;
             //UpdateGlobalTimeStep();
             currentTick = 1;
 
-            if (missileType == 1)
-            {
-                foreach (IMyWarhead warHead in WARHEADS)
-                {
+            if (missileType == 1) {
+                foreach (IMyWarhead warHead in WARHEADS) {
                     warHead.IsArmed = true;
                 }
             }
@@ -445,8 +403,7 @@ namespace IngameScript
             status = statusCruising;
         }
 
-        void InitiateLost()
-        {
+        void InitiateLost() {
             //Runtime.UpdateFrequency = UpdateFrequency.Update10;
             //UpdateGlobalTimeStep();
             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
@@ -468,32 +425,24 @@ namespace IngameScript
             status = statusLost;
         }
 
-        void InitiateThrusters()
-        {
-            if (startThrusters)
-            {
-                if (startThrustersOnce)
-                {
+        void InitiateThrusters() {
+            if (startThrusters) {
+                if (startThrustersOnce) {
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     startThrustersOnce = false;
                 }
-                if (!startTargeting)
-                {
+                if (!startTargeting) {
                     if (countStartTargeting > startTargetingDelay) { startTargeting = true; }
                     countStartTargeting++;
                 }
-            }
-            else
-            {
+            } else {
                 if (countStartThrusters > startThrustersDelay) { startThrusters = true; }
                 countStartThrusters++;
             }
         }
 
-        void PrepareForLaunch()
-        {
-            foreach (IMyPowerProducer block in GENERATORS)
-            {
+        void PrepareForLaunch() {
+            foreach (IMyPowerProducer block in GENERATORS) {
                 block.Enabled = true;
                 if (block is IMyBatteryBlock) { (block as IMyBatteryBlock).ChargeMode = ChargeMode.Discharge; }
             }
@@ -502,68 +451,49 @@ namespace IngameScript
             foreach (IMyThrust item in ALLTHRUSTERS) { item.Enabled = true; }
         }
 
-        void ManageMissileType()
-        {
+        void ManageMissileType() {
             if (missileType == 0)//kinetic
             {
                 double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                 double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                 double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
-                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
-                {
+                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe) {
                     MissileGuidance();
-                }
-                else
-                {
-                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
-                    {
+                } else {
+                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe) {
                         SpiralGuidance();
-                    }
-                    else
-                    {
+                    } else {
                         MissileGuidance();
                     }
                 }
-            }
-            else if (missileType == 1)//explosive
-            {
+            } else if (missileType == 1)//explosive
+              {
                 double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                 double distanceFromShip = Vector3D.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                 double distanceShip2Target = Vector3D.Distance(platformPosition, targetPosition);
-                if (distanceFromTarget <= fuseDistance)
-                {
+                if (distanceFromTarget <= fuseDistance) {
                     foreach (IMyWarhead block in WARHEADS) { block.Detonate(); }
                 }
-                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe)
-                {
+                if (distanceFromTarget > spiralStart && distanceFromShip < spiralSafe) {
                     MissileGuidance();
-                }
-                else
-                {
-                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe)
-                    {
+                } else {
+                    if (useSpiral && distanceFromTarget < spiralStart && distanceFromShip > spiralSafe) {
                         SpiralGuidance();
-                    }
-                    else
-                    {
+                    } else {
                         MissileGuidance();
                     }
                 }
-            }
-            else if (missileType == 2)//drone
-            {
+            } else if (missileType == 2)//drone
+              {
                 LockOnTarget(CONTROLLER);
 
                 ManageDrone();
 
-                if (!creative)
-                {
-                    if (checkLoad >= checkLoadDelay)
-                    {
+                if (!creative) {
+                    if (checkLoad >= checkLoadDelay) {
                         bool hasAmmo = CheckAmmo();
                         double hasIce = CheckIce();
-                        if (!hasAmmo || hasIce < 5d)
-                        {
+                        if (!hasAmmo || hasIce < 5d) {
                             missileType = 0;//suicide
                         }
                         checkLoad = 0;
@@ -573,17 +503,14 @@ namespace IngameScript
             }
         }
 
-        bool CheckAmmo()
-        {
+        bool CheckAmmo() {
             bool gatlingAmmoFound = false;
             List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
             GATLINGSINVENTORIES.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-            foreach (IMyInventory sourceInventory in GATLINGSINVENTORIES)
-            {
+            foreach (IMyInventory sourceInventory in GATLINGSINVENTORIES) {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 sourceInventory.GetItems(items, item => item.Type.TypeId == gatlingAmmo.TypeId.ToString());
-                if (items.Count > 0)
-                {
+                if (items.Count > 0) {
                     gatlingAmmoFound = true;
                     break;
                 }
@@ -591,39 +518,32 @@ namespace IngameScript
             return gatlingAmmoFound;
         }
 
-        double CheckIce()
-        {
+        double CheckIce() {
             double currentVolume = 0d;
             double maxVolume = 0d;
             //double iceAmount = 0d;
             List<IMyInventory> GENERATORSINVENTORIES = new List<IMyInventory>();
             GENERATORSINVENTORIES.AddRange(GENERATORS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-            foreach (IMyInventory sourceInventory in GENERATORSINVENTORIES)
-            {
+            foreach (IMyInventory sourceInventory in GENERATORSINVENTORIES) {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 sourceInventory.GetItems(items, item => item.Type.TypeId == iceOre.TypeId.ToString());
-                if (items.Count > 0)
-                {
+                if (items.Count > 0) {
                     currentVolume += (double)sourceInventory.CurrentVolume;
                     maxVolume += (double)sourceInventory.MaxVolume;
                     //foreach (var item in items) { iceAmount += (double)item.Amount; }
                 }
             }
             double percent = 0;
-            if (maxVolume > 0 && currentVolume > 0)
-            {
+            if (maxVolume > 0 && currentVolume > 0) {
                 percent = currentVolume / maxVolume * 100;
             }
             return percent;
         }
 
-        void ManageDrone()
-        {
+        void ManageDrone() {
             double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-            if (distanceFromTarget >= 600 && distanceFromTarget < 800)
-            {
-                if (approaching)
-                {
+            if (distanceFromTarget >= 600 && distanceFromTarget < 800) {
+                if (approaching) {
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = 0f; }
@@ -632,11 +552,8 @@ namespace IngameScript
                     tooClose = true;
                     tooFar = true;
                 }
-            }
-            else if (distanceFromTarget > 400 && distanceFromTarget < 600)
-            {
-                if (rightDistance)
-                {
+            } else if (distanceFromTarget > 400 && distanceFromTarget < 600) {
+                if (rightDistance) {
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = 0f; }
@@ -645,11 +562,8 @@ namespace IngameScript
                     tooClose = true;
                     tooFar = true;
                 }
-            }
-            else if (distanceFromTarget <= 400)
-            {
-                if (tooClose)
-                {
+            } else if (distanceFromTarget <= 400) {
+                if (tooClose) {
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
@@ -658,11 +572,8 @@ namespace IngameScript
                     tooClose = false;
                     tooFar = true;
                 }
-            }
-            else
-            {
-                if (tooFar)
-                {
+            } else {
+                if (tooFar) {
                     foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                     foreach (IMyThrust block in SIDETHRUSTERS) { block.ThrustOverride = 0f; }
                     foreach (IMyThrust block in BACKWARDTHRUSTERS) { block.ThrustOverride = 0f; }
@@ -673,19 +584,14 @@ namespace IngameScript
                 }
             }
 
-            if (readyToFire && distanceFromTarget < 800)
-            {
-                if (readyToFireOnce)
-                {
+            if (readyToFire && distanceFromTarget < 800) {
+                if (readyToFireOnce) {
                     readyToFireOnce = false;
                     foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
                     foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; }
                 }
-            }
-            else
-            {
-                if (!readyToFireOnce)
-                {
+            } else {
+                if (!readyToFireOnce) {
                     readyToFireOnce = true;
                     foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
                     foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
@@ -693,38 +599,29 @@ namespace IngameScript
             }
 
             Vector3D planetPosition;
-            if (CONTROLLER.TryGetPlanetPosition(out planetPosition))
-            {
+            if (CONTROLLER.TryGetPlanetPosition(out planetPosition)) {
                 Vector3D myAltitude = CONTROLLER.CubeGrid.WorldVolume.Center - planetPosition;
                 Vector3D targetAltitude = targetPosition - planetPosition;
                 double altitude = myAltitude.LengthSquared();
                 double targAltitude = targetAltitude.LengthSquared();
-                if (altitude < targAltitude - 3.0)
-                {
-                    if (tooBelow)
-                    {
+                if (altitude < targAltitude - 3.0) {
+                    if (tooBelow) {
                         foreach (IMyThrust block in UPWARDTHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                         foreach (IMyThrust block in DOWNWARDTHRUSTERS) { block.ThrustOverride = 0f; }
                         tooBelow = false;
                         tooAbove = true;
                         rightAltitude = true;
                     }
-                }
-                else if (altitude > targAltitude + 3.0)
-                {
-                    if (tooAbove)
-                    {
+                } else if (altitude > targAltitude + 3.0) {
+                    if (tooAbove) {
                         foreach (IMyThrust block in UPWARDTHRUSTERS) { block.ThrustOverride = 0f; }
                         foreach (IMyThrust block in DOWNWARDTHRUSTERS) { block.ThrustOverride = block.MaxThrust; }
                         tooBelow = true;
                         tooAbove = false;
                         rightAltitude = true;
                     }
-                }
-                else
-                {
-                    if (rightAltitude)
-                    {
+                } else {
+                    if (rightAltitude) {
                         foreach (IMyThrust block in UPWARDTHRUSTERS) { block.ThrustOverride = 0f; }
                         foreach (IMyThrust block in DOWNWARDTHRUSTERS) { block.ThrustOverride = 0f; }
                         tooBelow = true;
@@ -736,20 +633,17 @@ namespace IngameScript
                 Vector3D grav = CONTROLLER.GetNaturalGravity();
                 Vector3D downVector = CONTROLLER.WorldMatrix.Down;
                 double rollAngle = VectorMath.AngleBetween(grav, downVector);
-                if (rollAngle != 0)
-                {
+                if (rollAngle != 0) {
                     double rollSpeed = rollController.Control(rollAngle);
                     Vector3D rotationVec = new Vector3D(0, 0, rollSpeed);
                     MatrixD refMatrix = CONTROLLER.WorldMatrix;
                     Vector3D relativeRotationVec = Vector3D.TransformNormal(rotationVec, refMatrix);
-                    foreach (IMyGyro gyro in GYROS)
-                    {
+                    foreach (IMyGyro gyro in GYROS) {
                         Vector3D transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(gyro.WorldMatrix));
                         gyro.Pitch = (float)transformedRotationVec.X;
                         gyro.Yaw = (float)transformedRotationVec.Y;
                         gyro.Roll = (float)transformedRotationVec.Z;
-                        if (!gyro.GyroOverride)
-                        {
+                        if (!gyro.GyroOverride) {
                             gyro.GyroOverride = true;
                         }
                     }
@@ -757,18 +651,13 @@ namespace IngameScript
             }
         }
 
-        void ManageBrakes()
-        {
+        void ManageBrakes() {
             Vector3D velocityVec = CONTROLLER.GetShipVelocities().LinearVelocity;
             double speed = velocityVec.Length();
-            if (speed > 1)
-            {
+            if (speed > 1) {
                 StartBraking(velocityVec);
-            }
-            else
-            {
-                foreach (IMyGyro gyro in GYROS)
-                {
+            } else {
+                foreach (IMyGyro gyro in GYROS) {
                     gyro.Yaw = 0f;
                     gyro.Pitch = 0f;
                     gyro.Roll = 0f;
@@ -777,11 +666,9 @@ namespace IngameScript
             }
         }
 
-        void StartBraking(Vector3D velocityVec)
-        {
+        void StartBraking(Vector3D velocityVec) {
             Vector3D UpVector;
-            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -CONTROLLER.GetNaturalGravity(); }
+            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; } else { UpVector = -CONTROLLER.GetNaturalGravity(); }
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(-velocityVec, UpVector, CONTROLLER.WorldMatrix, out yawAngle, out pitchAngle, out rollAngle);
 
@@ -793,8 +680,7 @@ namespace IngameScript
 
             //double brakingAngle = VectorMath.AngleBetween(CONTROLLER.WorldMatrix.Forward, -velocityVec);
             //if (brakingAngle * rad2deg <= brakingAngleTolerance) {
-            if (!CONTROLLER.DampenersOverride)
-            {
+            if (!CONTROLLER.DampenersOverride) {
                 CONTROLLER.DampenersOverride = true;
             }
             //} else { if (CONTROLLER.DampenersOverride) { CONTROLLER.DampenersOverride = false; } }
@@ -803,16 +689,14 @@ namespace IngameScript
         public static double VectorProjectionScalar(Vector3D IN, Vector3D Axis_norm)//Use For Magnitudes Of Vectors In Directions (0-IN.length)
         {
             double OUT = Vector3D.Dot(IN, Axis_norm);
-            if (OUT == double.NaN)
-            { OUT = 0; }
+            if (OUT == double.NaN) { OUT = 0; }
             return OUT;
         }
 
         //readonly double missileSpinRPM = 0d;//this specifies how fast the missile will spin when flying(only in space)
         //const double rpm2Rad = Math.PI / 30;
         //const double gyroSlowdownAngle = Math.PI / 36;
-        void MissileGuidance()
-        {
+        void MissileGuidance() {
             float elapsedTime = currentTick * globalTimestep;
             Vector3D targetVel = targetVelocity;//(targetPosition - prevTargetPosition) / elapsedTime;
             Vector3D targetPos = targetPosition + targetVelocity * elapsedTime;//targetPosition + (targetVelocity * elapsedTime);
@@ -823,8 +707,7 @@ namespace IngameScript
             Vector3D gravityVec = CONTROLLER.GetNaturalGravity();
             Vector3D headingVec = GetPointingVector(CONTROLLER.CenterOfMass, CONTROLLER.GetShipVelocities().LinearVelocity, missileAcceleration, targetPos, targetVel, targetAcceleration, gravityVec);
 
-            if (status.Equals(statusCruising))
-            {
+            if (status.Equals(statusCruising)) {
                 var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
                 ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
             }
@@ -845,8 +728,7 @@ namespace IngameScript
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
-        void SpiralGuidance()
-        {
+        void SpiralGuidance() {
             float elapsedTime = currentTick * globalTimestep;
             Vector3D targetVel = targetVelocity;//(targetPosition - prevTargetPosition) / elapsedTime;
             Vector3D targetPos = targetPosition + targetVelocity * elapsedTime;//targetPosition + (targetVelocity * elapsedTime);
@@ -859,8 +741,7 @@ namespace IngameScript
 
             headingVec = missileAcceleration * SpiralTrajectory(headingVec, CONTROLLER.WorldMatrix.Up);
 
-            if (status.Equals(statusCruising))
-            {
+            if (status.Equals(statusCruising)) {
                 var headingDeviation = VectorMath.CosBetween(headingVec, CONTROLLER.WorldMatrix.Forward);
                 ApplyThrustOverride(THRUSTERS, (float)MathHelper.Clamp(headingDeviation, 0.25f, 1f) * 100f);
             }
@@ -883,8 +764,7 @@ namespace IngameScript
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
         }
 
-        Vector3D SpiralTrajectory(Vector3D desiredForwardVector, Vector3D desiredUpVector)
-        {
+        Vector3D SpiralTrajectory(Vector3D desiredForwardVector, Vector3D desiredUpVector) {
             if (timeSpiral > timeMaxSpiral)
                 timeSpiral = 0;
 
@@ -900,8 +780,7 @@ namespace IngameScript
             return forward * forwardProportion + lateralProportion * (Math.Sin(angle) * up + Math.Cos(angle) * right);
         }
 
-        Vector3D GetPointingVector(Vector3D missilePosition, Vector3D missileVelocity, double missileAcceleration, Vector3D targetPosition, Vector3D targetVelocity, Vector3D targetAcceleration, Vector3D gravity)
-        {
+        Vector3D GetPointingVector(Vector3D missilePosition, Vector3D missileVelocity, double missileAcceleration, Vector3D targetPosition, Vector3D targetVelocity, Vector3D targetAcceleration, Vector3D gravity) {
             Vector3D missileToTarget = targetPosition - missilePosition;
             Vector3D missileToTargetNorm = Vector3D.Normalize(missileToTarget);
             Vector3D relativeVelocity = targetVelocity - missileVelocity;
@@ -919,19 +798,16 @@ namespace IngameScript
             return lateralAcceleration + Math.Sqrt(diff) * missileToTargetNorm;
         }
 
-        Vector3D GetLatax(Vector3D missileToTarget, Vector3D missileToTargetNorm, Vector3D relativeVelocity, Vector3D lateralTargetAcceleration, Vector3D gravityCompensationTerm)
-        {
+        Vector3D GetLatax(Vector3D missileToTarget, Vector3D missileToTargetNorm, Vector3D relativeVelocity, Vector3D lateralTargetAcceleration, Vector3D gravityCompensationTerm) {
             Vector3D omega = Vector3D.Cross(missileToTarget, relativeVelocity) / Math.Max(missileToTarget.LengthSquared(), 1);//to combat instability at close range
             return navConstant * relativeVelocity.Length() * Vector3D.Cross(omega, missileToTargetNorm)
                  + navAccelConstant * lateralTargetAcceleration
                  + gravityCompensationTerm;//normal to LOS
         }
 
-        double CalculateMissileThrust(List<IMyThrust> mainThrusters)
-        {
+        double CalculateMissileThrust(List<IMyThrust> mainThrusters) {
             double thrust = 0;
-            foreach (var block in mainThrusters)
-            {
+            foreach (var block in mainThrusters) {
                 if (block.Closed)
                     continue;
                 thrust += block.IsFunctional ? block.MaxEffectiveThrust : 0;
@@ -940,11 +816,9 @@ namespace IngameScript
             return thrust;
         }
 
-        void ApplyThrustOverride(List<IMyThrust> thrusters, float overrideValue, bool turnOn = true)
-        {
+        void ApplyThrustOverride(List<IMyThrust> thrusters, float overrideValue, bool turnOn = true) {
             float thrustProportion = overrideValue * 0.01f;
-            foreach (IMyThrust thisThrust in thrusters)
-            {
+            foreach (IMyThrust thisThrust in thrusters) {
                 if (thisThrust.Closed)
                     continue;
 
@@ -956,20 +830,15 @@ namespace IngameScript
             }
         }
 
-        void LockOnTarget(IMyTerminalBlock REF)
-        {
+        void LockOnTarget(IMyTerminalBlock REF) {
             float elapsedTime = currentTick * globalTimestep;
             Vector3D targetPos = targetPosition + (targetVelocity * elapsedTime);
             Vector3D aimDirection;
             double distanceFromTarget = Vector3D.Distance(targetPos, REF.GetPosition());
-            if (distanceFromTarget > gunsMaxRange)
-            {
+            if (distanceFromTarget > gunsMaxRange) {
                 aimDirection = targetPos - REF.GetPosition();
-            }
-            else
-            {
-                switch (weaponType)
-                {
+            } else {
+                switch (weaponType) {
                     case 0://none
                         aimDirection = targetPos - REF.GetPosition();
                         break;
@@ -985,8 +854,7 @@ namespace IngameScript
                 }
             }
             Vector3D UpVector;
-            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; }
-            else { UpVector = -CONTROLLER.GetNaturalGravity(); }
+            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) { UpVector = CONTROLLER.WorldMatrix.Up; } else { UpVector = -CONTROLLER.GetNaturalGravity(); }
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, UpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
@@ -996,23 +864,18 @@ namespace IngameScript
 
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
 
-            if (missileType == 2)
-            {
+            if (missileType == 2) {
                 Vector3D forwardVec = REF.WorldMatrix.Forward;
                 double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
-                if (angle * rad2deg <= angleTolerance)
-                {
+                if (angle * rad2deg <= angleTolerance) {
                     readyToFire = true;
-                }
-                else
-                {
+                } else {
                     readyToFire = false;
                 }
             }
         }
 
-        Vector3D ComputeInterceptWithLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, IMyTerminalBlock muzzle)
-        {
+        Vector3D ComputeInterceptWithLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, IMyTerminalBlock muzzle) {
             MatrixD refWorldMatrix = muzzle.WorldMatrix;
             //MatrixD refLookAtMatrix = MatrixD.CreateLookAt(Vector3D.Zero, refWorldMatrix.Forward, refWorldMatrix.Up);
             Vector3D aimDirection = GetPredictedTargetPosition(muzzle, CONTROLLER, targetPosition, targetVelocity, projectileSpeed);
@@ -1021,8 +884,7 @@ namespace IngameScript
             return aimDirection;
         }
 
-        public Vector3D GetPredictedTargetPosition(IMyTerminalBlock gun, IMyShipController shooter, Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed)
-        {
+        public Vector3D GetPredictedTargetPosition(IMyTerminalBlock gun, IMyShipController shooter, Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed) {
             float shootDelay = 0;
             Vector3D muzzlePosition = gun.GetPosition();
             Vector3D toTarget = targetPosition - muzzlePosition;
@@ -1036,8 +898,7 @@ namespace IngameScript
             float t1 = p - q;
             float t2 = p + q;
             float t;
-            if (t1 > t2 && t2 > 0) { t = t2; }
-            else { t = t1; }
+            if (t1 > t2 && t2 > 0) { t = t2; } else { t = t1; }
             t += shootDelay;
             Vector3D predictedPosition = targetPosition + diffVelocity * t;
             //Vector3 bulletPath = predictedPosition - muzzlePosition;
@@ -1045,8 +906,7 @@ namespace IngameScript
             return predictedPosition;
         }
 
-        void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll)
-        {
+        void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
             desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
 
             MatrixD transposedWm;
@@ -1057,13 +917,10 @@ namespace IngameScript
             Vector3D leftVector = Vector3D.Cross(desiredUpVector, desiredForwardVector);
             Vector3D axis;
             double angle;
-            if (Vector3D.IsZero(desiredUpVector) || Vector3D.IsZero(leftVector))
-            {
+            if (Vector3D.IsZero(desiredUpVector) || Vector3D.IsZero(leftVector)) {
                 axis = new Vector3D(desiredForwardVector.Y, -desiredForwardVector.X, 0);
                 angle = Math.Acos(MathHelper.Clamp(-desiredForwardVector.Z, -1.0, 1.0));
-            }
-            else
-            {
+            } else {
                 leftVector = VectorMath.SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
 
@@ -1081,8 +938,7 @@ namespace IngameScript
                 angle = Math.Acos(MathHelper.Clamp((trace - 1) * 0.5, -1, 1));
             }
 
-            if (Vector3D.IsZero(axis))
-            {
+            if (Vector3D.IsZero(axis)) {
                 angle = desiredForwardVector.Z < 0 ? 0 : Math.PI;
                 yaw = angle;
                 pitch = 0;
@@ -1097,13 +953,11 @@ namespace IngameScript
             roll = -axis.Z * angle;
         }
 
-        void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed, List<IMyGyro> gyroList, MatrixD worldMatrix)
-        {
+        void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed, List<IMyGyro> gyroList, MatrixD worldMatrix) {
             var rotationVec = new Vector3D(pitchSpeed, yawSpeed, rollSpeed);
             var relativeRotationVec = Vector3D.TransformNormal(rotationVec, worldMatrix);
 
-            foreach (var thisGyro in gyroList)
-            {
+            foreach (var thisGyro in gyroList) {
                 if (thisGyro.Closed)
                     continue;
                 var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(thisGyro.WorldMatrix));
@@ -1114,16 +968,12 @@ namespace IngameScript
             }
         }
 
-        bool TurretsDetection()
-        {
+        bool TurretsDetection() {
             bool targetFound = false;
-            foreach (IMyLargeTurretBase turret in TURRETS)
-            {
+            foreach (IMyLargeTurretBase turret in TURRETS) {
                 MyDetectedEntityInfo targ = turret.GetTargetedEntity();
-                if (!targ.IsEmpty())
-                {
-                    if (IsValidTarget(ref targ))
-                    {
+                if (!targ.IsEmpty()) {
+                    if (IsValidTarget(ref targ)) {
                         targetPosition = targ.Position;
                         targetVelocity = targ.Velocity;
                         currentTick = 1;
@@ -1135,41 +985,33 @@ namespace IngameScript
             return targetFound;
         }
 
-        bool IsValidTarget(ref MyDetectedEntityInfo entityInfo)
-        {
-            if (entityInfo.Type == MyDetectedEntityType.LargeGrid || entityInfo.Type == MyDetectedEntityType.SmallGrid)
-            {
+        bool IsValidTarget(ref MyDetectedEntityInfo entityInfo) {
+            if (entityInfo.Type == MyDetectedEntityType.LargeGrid || entityInfo.Type == MyDetectedEntityType.SmallGrid) {
                 if (entityInfo.Relationship == MyRelationsBetweenPlayerAndBlock.Enemies
-                || entityInfo.Relationship == MyRelationsBetweenPlayerAndBlock.Neutral)
-                {
+                || entityInfo.Relationship == MyRelationsBetweenPlayerAndBlock.Neutral) {
                     return true;
                 }
             }
             return false;
         }
 
-        void UpdateMaxSpeed()
-        {
+        void UpdateMaxSpeed() {
             double speed = CONTROLLER.GetShipSpeed();
-            if (speed > maxSpeed)
-            {
+            if (speed > maxSpeed) {
                 maxSpeed = speed;
             }
         }
 
-        void UpdateBroadcastRange(Vector3D platformPosition)
-        {
+        void UpdateBroadcastRange(Vector3D platformPosition) {
             var distance = Vector3.Distance(platformPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
             ANTENNA.Radius = distance + 100;
         }
 
-        void GetAntenna()
-        {
+        void GetAntenna() {
             ANTENNA = GridTerminalSystem.GetBlockWithName(antennaName) as IMyRadioAntenna;
         }
 
-        void GetBlocks()
-        {
+        void GetBlocks() {
             TBLOCKS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(TBLOCKS, b => b.CustomName.Contains(missileTag));
             CONTROLLERS.Clear();
@@ -1205,15 +1047,13 @@ namespace IngameScript
             CONTROLLER = CONTROLLERS[0];
         }
 
-        void InitPIDControllers()
-        {
+        void InitPIDControllers() {
             yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
             pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
             rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
-        public class PID
-        {
+        public class PID {
             public double _kP = 0;
             public double _kI = 0;
             public double _kD = 0;
@@ -1228,8 +1068,7 @@ namespace IngameScript
             public bool _integralDecay = false;
             public double Value { get; private set; }
 
-            public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep)
-            {
+            public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep) {
                 _kP = kP;
                 _kI = kI;
                 _kD = kD;
@@ -1240,8 +1079,7 @@ namespace IngameScript
                 _integralDecay = false;
             }
 
-            public PID(double kP, double kI, double kD, double integralDecayRatio, double timeStep)
-            {
+            public PID(double kP, double kI, double kD, double integralDecayRatio, double timeStep) {
                 _kP = kP;
                 _kI = kI;
                 _kD = kD;
@@ -1251,20 +1089,17 @@ namespace IngameScript
                 _integralDecay = true;
             }
 
-            public double Control(double error)
-            {
+            public double Control(double error) {
                 //Compute derivative term
                 var errorDerivative = (error - _lastError) * _inverseTimeStep;
 
-                if (_firstRun)
-                {
+                if (_firstRun) {
                     errorDerivative = 0;
                     _firstRun = false;
                 }
 
                 //Compute integral term
-                if (!_integralDecay)
-                {
+                if (!_integralDecay) {
                     _errorSum += error * _timeStep;
 
                     //Clamp integral term
@@ -1272,9 +1107,7 @@ namespace IngameScript
                         _errorSum = _upperBound;
                     else if (_errorSum < _lowerBound)
                         _errorSum = _lowerBound;
-                }
-                else
-                {
+                } else {
                     _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
                 }
 
@@ -1286,25 +1119,21 @@ namespace IngameScript
                 return this.Value;
             }
 
-            public double Control(double error, double timeStep)
-            {
+            public double Control(double error, double timeStep) {
                 _timeStep = timeStep;
                 _inverseTimeStep = 1 / _timeStep;
                 return Control(error);
             }
 
-            public void Reset()
-            {
+            public void Reset() {
                 _errorSum = 0;
                 _lastError = 0;
                 _firstRun = true;
             }
         }
 
-        public static class VectorMath
-        {
-            public static Vector3D SafeNormalize(Vector3D a)
-            {
+        public static class VectorMath {
+            public static Vector3D SafeNormalize(Vector3D a) {
                 if (Vector3D.IsZero(a))
                     return Vector3D.Zero;
 
@@ -1329,16 +1158,14 @@ namespace IngameScript
                 return a - a.Dot(b) / b.LengthSquared() * b;
             }
 
-            public static Vector3D Projection(Vector3D a, Vector3D b)
-            {
+            public static Vector3D Projection(Vector3D a, Vector3D b) {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return Vector3D.Zero;
 
                 return a.Dot(b) / b.LengthSquared() * b;
             }
 
-            public static double ScalarProjection(Vector3D a, Vector3D b)
-            {
+            public static double ScalarProjection(Vector3D a, Vector3D b) {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
 

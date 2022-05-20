@@ -18,10 +18,8 @@ using VRage;
 using VRageMath;
 using System.Collections.Immutable;
 
-namespace IngameScript
-{
-    partial class Program : MyGridProgram
-    {
+namespace IngameScript {
+    partial class Program : MyGridProgram {
         //TODO build decoy at the end of the procedure
         //check speed and roll be4 detaching the decoy
         //SHOOTER
@@ -87,27 +85,21 @@ namespace IngameScript
         public List<IMyShipMergeBlock> MERGES2 = new List<IMyShipMergeBlock>();
         public List<IMyShipMergeBlock> MERGES3 = new List<IMyShipMergeBlock>();
 
-        Program()
-        {
+        Program() {
             GetBlocks();
-            if (selectedDrop == 0)
-            {
+            if (selectedDrop == 0) {
                 TEMPPROJECTORS = PROJECTORSDECOY;
                 foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = true; }
                 foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = false; }
-            }
-            else if (selectedDrop == 1)
-            {
+            } else if (selectedDrop == 1) {
                 TEMPPROJECTORS = PROJECTORSBOMB;
                 foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = false; }
                 foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = true; }
             }
         }
 
-        public void Main(string arg, UpdateType updateSource)
-        {
-            try
-            {
+        public void Main(string arg, UpdateType updateSource) {
+            try {
                 Echo($"PROJECTORSDECOY:{PROJECTORSDECOY.Count}");
                 Echo($"PROJECTORSBOMB:{PROJECTORSBOMB.Count}");
                 Echo($"MERGESDECOY:{MERGESDECOY.Count}");
@@ -123,47 +115,34 @@ namespace IngameScript
                 Echo($"PROJECTORS:{PROJECTORS.Count}");
                 Echo($"WELDERSJOLT:{WELDERSJOLT.Count}");
 
-                if (!string.IsNullOrEmpty(arg))
-                {
+                if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
                 }
 
-                if (updateSource == UpdateType.Update1) { launchDelay = 250; }
-                else { launchDelay = 25; }
+                if (updateSource == UpdateType.Update1) { launchDelay = 250; } else { launchDelay = 25; }
 
-                if (launchOnce)
-                {
+                if (launchOnce) {
                     LaunchDecoy();
                 }
 
-                if (firing)
-                {
+                if (firing) {
                     FireJolt();
                 }
 
-                if (build1)
-                {
+                if (build1) {
                     Build_1();
-                }
-                else if (build2)
-                {
+                } else if (build2) {
                     Build_2();
-                }
-                else if (build3)
-                {
+                } else if (build3) {
                     Build_3();
                 }
 
-                if (!launchOnce && !firing && !build1 && !build2 && !build3)
-                {
+                if (!launchOnce && !firing && !build1 && !build2 && !build3) {
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                 }
-            }
-            catch (Exception e)
-            {
+            } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
-                if (DEBUG != null)
-                {
+                if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
                     DEBUG.ReadText(debugLog, true);
@@ -173,25 +152,19 @@ namespace IngameScript
             }
         }
 
-        void ProcessArgument(string argument)
-        {
-            switch (argument)
-            {
+        void ProcessArgument(string argument) {
+            switch (argument) {
                 case argToggleDecoy:
                     toggleDecoy = !toggleDecoy;
                     break;
                 case argSwitch:
-                    if (!launchOnce && launchTick == 0)
-                    {
-                        if (selectedDrop == 1)
-                        {
+                    if (!launchOnce && launchTick == 0) {
+                        if (selectedDrop == 1) {
                             selectedDrop = 0;
                             TEMPPROJECTORS = PROJECTORSDECOY;
                             foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = true; }
                             foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = false; }
-                        }
-                        else if (selectedDrop == 0)
-                        {
+                        } else if (selectedDrop == 0) {
                             selectedDrop = 1;
                             TEMPPROJECTORS = PROJECTORSBOMB;
                             foreach (IMyProjector block in PROJECTORSBOMB) { block.Enabled = true; }
@@ -200,8 +173,7 @@ namespace IngameScript
                     }
                     break;
                 case argLaunchOne:
-                    if (!launchOnce && launchTick == 0)
-                    {
+                    if (!launchOnce && launchTick == 0) {
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                         launchOnce = true;
                         launchTick = 0;
@@ -211,8 +183,7 @@ namespace IngameScript
                     toggleJolt = !toggleJolt;
                     break;
                 case argFireJolt:
-                    if (!firing && fireTick == 0)
-                    {
+                    if (!firing && fireTick == 0) {
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                         firing = true;
                         fireTick = 0;
@@ -236,137 +207,100 @@ namespace IngameScript
             }
         }
 
-        void LaunchDecoy()
-        {
-            if (launchTick == 0)
-            {
+        void LaunchDecoy() {
+            if (launchTick == 0) {
                 foreach (IMyShipWelder block in WELDERSDECOY) { block.Enabled = true; }
                 launchTick++;
             }
 
-            if (!readyDecoy)
-            {
+            if (!readyDecoy) {
                 readyDecoy = CheckProjectors(TEMPPROJECTORS, WELDERSDECOY);
             }
-            if (readyDecoy)
-            {
-                if (launchTick == 1)
-                {
-                    if (selectedDrop == 0)
-                    {
+            if (readyDecoy) {
+                if (launchTick == 1) {
+                    if (selectedDrop == 0) {
                         foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = true; }
-                    }
-                    else if (selectedDrop == 1)
-                    {
+                    } else if (selectedDrop == 1) {
                         List<IMyWarhead> warHeads = new List<IMyWarhead>();
                         GridTerminalSystem.GetBlocksOfType<IMyWarhead>(warHeads, block => block.CustomName.Contains(warHeadsName));
                         foreach (IMyWarhead war in warHeads) { war.IsArmed = true; }
                     }
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = false; }
-                }
-                else if (launchTick >= launchDelay)
-                {
+                } else if (launchTick >= launchDelay) {
                     foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = false; }
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = true; }
-                    if (toggleDecoy)
-                    {
+                    if (toggleDecoy) {
                         launchOnce = false;
                     }
                     readyDecoy = false;
                     launchTick = -1;
                 }
-                if (launchTick <= launchDelay)
-                {
+                if (launchTick <= launchDelay) {
                     launchTick++;
                 }
             }
         }
 
-        void FireJolt()
-        {
-            if (fireTick == 0)
-            {
+        void FireJolt() {
+            if (fireTick == 0) {
                 Runtime.UpdateFrequency = UpdateFrequency.Update10;
                 foreach (IMyShipWelder block in WELDERSJOLT) { block.Enabled = true; }
                 fireTick++;
             }
 
-            if (!readyJolt)
-            {
+            if (!readyJolt) {
                 readyJolt = CheckProjectors(PROJECTORS, WELDERSJOLT);
             }
-            if (readyJolt)
-            {
-                if (fireTick == 1)
-                {
+            if (readyJolt) {
+                if (fireTick == 1) {
                     Runtime.UpdateFrequency = UpdateFrequency.Update1;
 
                     GetJoltAmmoBlocks();
 
                     foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
-                }
-                else if (fireTick == 2)
-                {
+                } else if (fireTick == 2) {
                     foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Attach(); }
-                }
-                else if (fireTick == 3)
-                {
+                } else if (fireTick == 3) {
                     foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Retract(); }
                     foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
-                }
-                else if (fireTick == 120)
-                {
+                } else if (fireTick == 120) {
                     foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Detach(); }
                     foreach (IMyWarhead warhead in WARHEADS) { warhead.IsArmed = true; }
                     foreach (IMyBatteryBlock battery in BATTERIES) { battery.Enabled = true; }
-                }
-                else if (fireTick == 121)
-                {
+                } else if (fireTick == 121) {
                     foreach (IMyShipMergeBlock merge in MERGESJOLT) { merge.Enabled = false; }
-                }
-                else if (fireTick == 140)
-                {
+                } else if (fireTick == 140) {
                     foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Extend(); }
                     foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Detach(); }
-                }
-                else if (fireTick == 200)
-                {
+                } else if (fireTick == 200) {
                     foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
-                }
-                else if (fireTick >= 260)
-                {
-                    if (toggleJolt)
-                    {
+                } else if (fireTick >= 260) {
+                    if (toggleJolt) {
                         firing = false;
                     }
                     readyJolt = false;
                     fireTick = -1;
                 }
-                if (fireTick < 261)
-                {
+                if (fireTick < 261) {
                     fireTick++;
                 }
             }
         }
 
-        bool CheckProjectors(List<IMyProjector> projectors, List<IMyShipWelder> welders)
-        {
+        bool CheckProjectors(List<IMyProjector> projectors, List<IMyShipWelder> welders) {
             bool completed = false;
             int blocksCount = 0;
-            foreach (IMyProjector block in projectors)
-            {
+            foreach (IMyProjector block in projectors) {
                 blocksCount += block.RemainingBlocks;
             }
-            if (blocksCount == 0)
-            {
+            if (blocksCount == 0) {
                 foreach (IMyShipWelder block in welders) { block.Enabled = false; }
                 completed = true;
             }
             return completed;
         }
 
-        void GetJoltAmmoBlocks()
-        {
+        void GetJoltAmmoBlocks() {
             WARHEADS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyWarhead>(WARHEADS, block => block.CustomName.Contains(ammoName));
             BATTERIES.Clear();
@@ -375,8 +309,7 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESJOLT, battery => battery.CustomName.Contains(ammoName));
         }
 
-        void GetBlocks()
-        {
+        void GetBlocks() {
             PROJECTORSDECOY.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORSDECOY, block => block.CustomName.Contains(projectorsDecoyName));
             PROJECTORSBOMB.Clear();
@@ -419,26 +352,16 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES3, block => block.CustomName.Contains(merges3Name));
         }
 
-        void Build_1()
-        {
-            if (buildTick == 0)
-            {
+        void Build_1() {
+            if (buildTick == 0) {
                 foreach (IMyExtendedPistonBase piston in PISTONSJOLT) { piston.Extend(); }
-            }
-            else if (buildTick == 10)
-            {
+            } else if (buildTick == 10) {
                 foreach (IMyShipMergeBlock merge in MERGES1) { merge.Enabled = false; }
-            }
-            else if (buildTick == 11)
-            {
+            } else if (buildTick == 11) {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Attach(); }
-            }
-            else if (buildTick == 20)
-            {
+            } else if (buildTick == 20) {
                 foreach (IMyShipMergeBlock merge in MERGES2) { merge.Enabled = false; }
-            }
-            else if (buildTick == 21)
-            {
+            } else if (buildTick == 21) {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.Attach(); }
 
                 build1 = false;
@@ -448,18 +371,12 @@ namespace IngameScript
             buildTick++;
         }
 
-        void Build_2()
-        {
-            if (buildTick == 0)
-            {
+        void Build_2() {
+            if (buildTick == 0) {
                 foreach (IMyShipMergeBlock merge in MERGES3) { merge.Enabled = false; }
-            }
-            else if (buildTick == 1)
-            {
+            } else if (buildTick == 1) {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Attach(); }
-            }
-            else if (buildTick == 5)
-            {
+            } else if (buildTick == 5) {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 7.34f; }
 
                 build2 = false;
@@ -469,35 +386,23 @@ namespace IngameScript
             buildTick++;
         }
 
-        void Build_3()
-        {
-            if (buildTick == 0)
-            {
+        void Build_3() {
+            if (buildTick == 0) {
                 foreach (IMyMotorBase hinge in HINGESFRONT) { hinge.Attach(); }
-            }
-            else if (buildTick == 3)
-            {
+            } else if (buildTick == 3) {
                 foreach (IMyMotorBase hinge in HINGESDETACH) { hinge.Detach(); }
-            }
-            else if (buildTick == 4)
-            {
+            } else if (buildTick == 4) {
                 foreach (IMyExtendedPistonBase piston in PISTONSFRONT) { piston.MaxLimit = 9.7f; }
-                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
-                {
+                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) {
                     piston.Retract();
                     piston.MaxLimit = 2.34f;
                 }
-            }
-            else if (buildTick == 10)
-            {
-                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER)
-                {
+            } else if (buildTick == 10) {
+                foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) {
                     piston.Extend();
                     piston.MinLimit = 0f;
                 }
-            }
-            else if (buildTick == 16)
-            {
+            } else if (buildTick == 16) {
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEINNER) { piston.Velocity = 1.25f; }
                 foreach (IMyExtendedPistonBase piston in PISTONSDOUBLEOUTER) { piston.Velocity = 1.25f; }
                 foreach (IMyMotorBase hinge in HINGESJOLT) { hinge.ApplyAction("ShareInertiaTensor"); }
