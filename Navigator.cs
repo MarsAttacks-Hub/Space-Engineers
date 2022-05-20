@@ -53,7 +53,7 @@ namespace IngameScript {
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
         readonly string debugPanelName = "[CRX] Debug";
         readonly string painterName = "[CRX] PB Painter";
-        readonly string decoyName = "[CRX] PB Decoy";
+        readonly string decoyName = "[CRX] PB Shooter";
         readonly string managerName = "[CRX] PB Manager";
 
         readonly string sectionTag = "RangeFinderSettings";
@@ -69,7 +69,7 @@ namespace IngameScript {
 
         const string argSunchaseOff = "SunchaseOff";
         const string argUnlockFromTarget = "Clear";
-        const string argLaunchDecoy = "Launch";
+        const string argLaunchDecoy = "LaunchDecoy";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
@@ -87,7 +87,7 @@ namespace IngameScript {
         readonly int impactDetectionDelay = 5;
         readonly bool useRoll = true;
         readonly float maxSpeed = 105f;
-        readonly float minSpeed = 1f;//TODO
+        readonly float minSpeed = 2f;//TODO
         readonly float deadManMinSpeed = 0.1f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
@@ -106,7 +106,6 @@ namespace IngameScript {
         bool switchOnce = false;
         bool setOnce = false;
         bool initAutoThrustOnce = true;
-        bool hasVector = false;
         bool runMDOnce = false;
         bool sunChaseOff = false;
         bool returnOnce = true;
@@ -115,6 +114,7 @@ namespace IngameScript {
         bool useGyrosToStabilize = true;//If the script will override gyros to try and combat torque
         bool idleThrusters = false;
         double altitudeToKeep = 0d;
+        bool unlockOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
         const double rad2deg = 180 / Math.PI;
@@ -330,7 +330,7 @@ namespace IngameScript {
                             AutoMagneticDrive();
                             GyroStabilize(REMOTE);
                         } else {
-                            if (!initAutoThrustOnce && !idleThrusters) {
+                            if (!initAutoThrustOnce) {//TODO
                                 foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                                 initAutoThrustOnce = true;
                             }
@@ -731,7 +731,7 @@ namespace IngameScript {
                         cntrllr.DampenersOverride = true;
                     } else {
                         if (!deadManOnce) {
-                            if (idleThrusters) {
+                            if (idleThrusters) {//TODO
                                 foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; }
                             }
                             deadManOnce = true;
@@ -760,24 +760,24 @@ namespace IngameScript {
             bool controlled;
             if (CONTROLLER == null) {
                 controlled = false;
-
-                IMyShipController controller = null;
-                foreach (IMyShipController contr in CONTROLLERS) {
-                    if (contr.IsFunctional && contr.CanControlShip && contr.ControlThrusters && !(contr is IMyRemoteControl)) {
-                        controller = contr;
-                    }
-                }
                 if (REMOTE.IsAutoPilotEnabled) {
-                    CONTROLLER = controller;
+                    CONTROLLER = REMOTE;
                     controlled = true;
                 } else {
+                    IMyShipController controller = null;
+                    foreach (IMyShipController contr in CONTROLLERS) {
+                        if (contr.IsFunctional && contr.CanControlShip && contr.ControlThrusters && !(contr is IMyRemoteControl)) {
+                            controller = contr;
+                        }
+                    }
+                    if (CONTROLLER == null) { controller = REMOTE; }
                     Vector3D velocityVec = controller.GetShipVelocities().LinearVelocity;
                     double speed = velocityVec.Length();
                     if (speed > 1) {
                         CONTROLLER = controller;
                         controlled = true;
                     }
-                    if (!Vector3D.IsZero(REMOTE.GetNaturalGravity())) {
+                    if (!Vector3D.IsZero(controller.GetNaturalGravity())) {
                         CONTROLLER = controller;
                         controlled = true;
                     }
@@ -817,7 +817,7 @@ namespace IngameScript {
         void InitMagneticDrive() {
             foreach (IMyMotorStator block in ROTORS) { block.Enabled = true; }
             foreach (IMyMotorStator block in ROTORSINV) { block.Enabled = true; }
-            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }//TODO
         }
 
         void IdleMagneticDrive() {
@@ -830,7 +830,7 @@ namespace IngameScript {
                 block.TargetVelocityRPM = 0;
                 block.Enabled = false;
             }
-            if (idleThrusters) {
+            if (idleThrusters) {//TODO
                 foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
             }
         }
@@ -949,52 +949,61 @@ namespace IngameScript {
         }
 
         void GyroStabilize(IMyShipController controller) {
-            if (useGyrosToStabilize) {
-                if (!hasVector) {
-                    hasVector = true;
+            double speed = controller.GetShipSpeed();
+            if (useGyrosToStabilize && speed > minSpeed) {
+                if (Vector3D.IsZero(lastForwardVector) || Vector3D.IsZero(lastUpVector)) {
                     lastForwardVector = controller.WorldMatrix.Forward;
                     lastUpVector = controller.WorldMatrix.Up;
-                }
-
-                double pitchAngle, yawAngle, rollAngle;
-                if (!useRoll) { lastUpVector = Vector3D.Zero; };
-                GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
-                double mouseYaw = controller.RotationIndicator.Y;
-                double mousePitch = controller.RotationIndicator.X;
-                double mouseRoll = controller.RollIndicator;
-
-                if (mouseYaw != 0) {
-                    mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
-                }
-                if (mouseYaw == 0) {
-                    mouseYaw = yawController.Control(yawAngle);
                 } else {
-                    mouseYaw = yawController.Control(mouseYaw);
-                }
+                    double pitchAngle, yawAngle, rollAngle;
+                    if (!useRoll) { lastUpVector = Vector3D.Zero; };
+                    GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-                if (mousePitch != 0) {
-                    mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
-                }
-                if (mousePitch == 0) {
-                    mousePitch = pitchController.Control(pitchAngle);
-                } else {
-                    mousePitch = pitchController.Control(mousePitch);
-                }
+                    double mouseYaw = controller.RotationIndicator.Y;
+                    double mousePitch = controller.RotationIndicator.X;
+                    double mouseRoll = controller.RollIndicator;
 
-                if (mouseRoll != 0) {
-                    mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
-                }
-                if (mouseRoll == 0) {
-                    mouseRoll = rollController.Control(rollAngle);
-                } else {
-                    mouseRoll = rollController.Control(mouseRoll);
-                }
+                    if (mouseYaw != 0) {
+                        mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
+                    }
+                    if (mouseYaw == 0) {
+                        mouseYaw = yawController.Control(yawAngle);
+                    } else {
+                        mouseYaw = yawController.Control(mouseYaw);
+                    }
 
-                ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
+                    if (mousePitch != 0) {
+                        mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
+                    }
+                    if (mousePitch == 0) {
+                        mousePitch = pitchController.Control(pitchAngle);
+                    } else {
+                        mousePitch = pitchController.Control(mousePitch);
+                    }
 
-                lastForwardVector = controller.WorldMatrix.Forward;
-                lastUpVector = controller.WorldMatrix.Up;
+                    if (mouseRoll != 0) {
+                        mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
+                    }
+                    if (mouseRoll == 0) {
+                        mouseRoll = rollController.Control(rollAngle);
+                    } else {
+                        mouseRoll = rollController.Control(mouseRoll);
+                    }
+
+                    ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
+
+                    lastForwardVector = controller.WorldMatrix.Forward;
+                    lastUpVector = controller.WorldMatrix.Up;
+
+                    unlockOnce = true;
+                }
+            } else {
+                if (unlockOnce) {
+                    UnlockGyros();
+                    lastForwardVector = Vector3D.Zero;
+                    lastUpVector = Vector3D.Zero;
+                    unlockOnce = false;
+                }
             }
         }
 
@@ -1369,6 +1378,56 @@ namespace IngameScript {
         }
 
         /*
+        void GyroStabilize(IMyShipController controller) {
+            if (useGyrosToStabilize) {
+                if (!hasVector) {
+                    hasVector = true;
+                    lastForwardVector = controller.WorldMatrix.Forward;
+                    lastUpVector = controller.WorldMatrix.Up;
+                }
+
+                double mouseYaw = controller.RotationIndicator.Y;
+                double mousePitch = controller.RotationIndicator.X;
+                double mouseRoll = controller.RollIndicator;
+
+                double pitchAngle, yawAngle, rollAngle;
+                if (!useRoll) { lastUpVector = Vector3D.Zero; };
+                GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+
+                if (mouseYaw != 0) {
+                    mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
+                }
+                if (mouseYaw == 0) {
+                    mouseYaw = yawController.Control(yawAngle);
+                } else {
+                    mouseYaw = yawController.Control(mouseYaw);
+                }
+
+                if (mousePitch != 0) {
+                    mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
+                }
+                if (mousePitch == 0) {
+                    mousePitch = pitchController.Control(pitchAngle);
+                } else {
+                    mousePitch = pitchController.Control(mousePitch);
+                }
+
+                if (mouseRoll != 0) {
+                    mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
+                }
+                if (mouseRoll == 0) {
+                    mouseRoll = rollController.Control(rollAngle);
+                } else {
+                    mouseRoll = rollController.Control(mouseRoll);
+                }
+
+                ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
+
+                lastForwardVector = controller.WorldMatrix.Forward;
+                lastUpVector = controller.WorldMatrix.Up;
+            }
+        }
+        
         void Land(double altitude, IMyShipController controller)
         {
             double planetAltitude;

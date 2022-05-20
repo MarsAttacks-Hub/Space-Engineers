@@ -41,7 +41,7 @@ namespace IngameScript {
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
         readonly string navigatorName = "[CRX] PB Navigator";
-        readonly string decoyName = "[CRX] PB Decoy";
+        readonly string decoyName = "[CRX] PB Shooter";
         readonly string managerName = "[CRX] PB Manager";
         readonly string cargoName = "[CRX] Cargo";
         readonly string debugPanelName = "[CRX] Debug";
@@ -62,7 +62,7 @@ namespace IngameScript {
         const string argMDGyroStabilizeOff = "StabilizeOff";
         const string argMDGyroStabilizeOn = "StabilizeOn";
         const string argSunchaseOff = "SunchaseOff";
-        const string argFireDecoy = "Launch";
+        const string argFireDecoy = "LaunchDecoy";
 
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
