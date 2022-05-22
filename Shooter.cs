@@ -20,7 +20,6 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO build decoy at the end of the procedure
         //check speed and roll be4 detaching the decoy
         //SHOOTER
 
@@ -50,7 +49,7 @@ namespace IngameScript {
 
         int launchDelay = 25;
         int selectedDrop = 0;//0 decoys - 1 bombs
-        bool toggleDecoy = false;
+        bool toggleDecoy = true;
         bool launchOnce = false;
         bool readyDecoy = false;
         int launchTick = 0;
@@ -214,7 +213,7 @@ namespace IngameScript {
             }
 
             if (!readyDecoy) {
-                readyDecoy = CheckProjectors(TEMPPROJECTORS, WELDERSDECOY);
+                readyDecoy = CheckBuildable(TEMPPROJECTORS, WELDERSDECOY);
             }
             if (readyDecoy) {
                 if (launchTick == 1) {
@@ -226,16 +225,29 @@ namespace IngameScript {
                         foreach (IMyWarhead war in warHeads) { war.IsArmed = true; }
                     }
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = false; }
-                } else if (launchTick >= launchDelay) {
+                } else if (launchTick == launchDelay) {
                     foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = false; }
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = true; }
-                    if (toggleDecoy) {
-                        launchOnce = false;
+                    if (selectedDrop == 1) {
+                        if (toggleDecoy) {
+                            launchOnce = false;
+                        }
+                        readyDecoy = false;
+                        launchTick = -1;
                     }
-                    readyDecoy = false;
-                    launchTick = -1;
+                } else if (launchTick > launchDelay) {
+                    foreach (IMyShipWelder block in WELDERSDECOY) { block.Enabled = true; }
+                    bool ready = CheckBuildable(TEMPPROJECTORS, WELDERSDECOY);
+                    if (ready) {
+                        foreach (IMyShipWelder block in WELDERSDECOY) { block.Enabled = false; }
+                        if (toggleDecoy) {
+                            launchOnce = false;
+                        }
+                        readyDecoy = false;
+                        launchTick = -1;
+                    }
                 }
-                if (launchTick <= launchDelay) {
+                if (launchTick <= launchDelay + 1) {
                     launchTick++;
                 }
             }
@@ -292,6 +304,19 @@ namespace IngameScript {
             int blocksCount = 0;
             foreach (IMyProjector block in projectors) {
                 blocksCount += block.RemainingBlocks;
+            }
+            if (blocksCount == 0) {
+                foreach (IMyShipWelder block in welders) { block.Enabled = false; }
+                completed = true;
+            }
+            return completed;
+        }
+
+        bool CheckBuildable(List<IMyProjector> projectors, List<IMyShipWelder> welders) {
+            bool completed = false;
+            int blocksCount = 0;
+            foreach (IMyProjector block in projectors) {
+                blocksCount += block.BuildableBlocksCount;
             }
             if (blocksCount == 0) {
                 foreach (IMyShipWelder block in welders) { block.Enabled = false; }

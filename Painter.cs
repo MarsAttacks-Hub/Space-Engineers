@@ -20,6 +20,8 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
+        //TODO add fudge at the first scan
+        //send run or write to custom data if target is aquired or not so the navigator can read it
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -272,7 +274,7 @@ namespace IngameScript {
                         return;
                     }
 
-                    ActivateOtherScriptsGyros();
+                    //ActivateOtherScriptsGyros();
 
                     TurretsDetection(false);
                 }
@@ -936,6 +938,8 @@ namespace IngameScript {
                     SendMissileUnicastMessage(commandLost, id.Key);
                 }
             }
+
+            ActivateOtherScriptsGyros();//TODO
         }
 
         void ActivateTargeter() {

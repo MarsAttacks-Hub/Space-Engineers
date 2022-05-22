@@ -23,6 +23,8 @@ namespace IngameScript {
         //TODO add generate orbital gps function
         //generate orbital gps above target 
         //land function
+        //read from Painter if target is aquired or not
+        //generate gps path to chase enemy and send command to shooter to fire jolt
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -61,10 +63,10 @@ namespace IngameScript {
 
         const string argRangeFinder = "RangeFinder";
         const string argAimTarget = "AimTarget";
-        const string argChangePlanet = "ChangePlanet";
         const string argDeadMan = "DeadMan";
         const string argMagneticDrive = "ToggleMagneticDrive";
         const string argIdleThrusters = "ToggleIdleThrusters";
+        const string argChangePlanet = "ChangePlanet";
         const string argSetPlanet = "SetPlanet";
 
         const string argSunchaseOff = "SunchaseOff";
@@ -95,11 +97,11 @@ namespace IngameScript {
         int impactDetectionDelay = 5;
 
         bool magneticDrive = true;
-        bool sunChaseOff = false;
         bool controlDampeners = true;
         bool idleThrusters = false;
         bool aimTarget = false;
         bool useGyrosToStabilize = true;
+        bool keepAltitude = true;
         string selectedPlanet = "";
         int impactDetectionCount = 5;
         int escapeCount = 10;
@@ -119,6 +121,7 @@ namespace IngameScript {
         bool lockTargetOnce = true;
         bool launchDecoyOnce = true;
         bool stabilizeOnce = true;
+        bool keepAltitudeOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -211,9 +214,9 @@ namespace IngameScript {
             InitPIDControllers();
 
             if (useGyrosToStabilize) {
-                Me.CustomData = "GyroStabilize=true";//TODO
+                Me.CustomData = "GyroStabilize=true";
             } else {
-                Me.CustomData = "GyroStabilize=false";//TODO
+                Me.CustomData = "GyroStabilize=false";
             }
         }
 
@@ -241,24 +244,70 @@ namespace IngameScript {
                     ProcessArgument(arg);
                 }
 
+                if (magneticDrive) {
+                    if (magneticDriveOnce) {
+                        InitMagneticDrive();
+                        magneticDriveOnce = false;
+                    }
+
+                    bool isControlled = GetController();
+
+                    if (!isControlled) {
+                        if (!setOnce) {
+                            IdleMagneticDrive();
+                            setOnce = true;
+                        }
+                    } else {
+                        if (setOnce) {
+                            InitMagneticDrive();
+                            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
+                                MANAGERPB.TryRun(argSunchaseOff);
+                            }
+                            setOnce = false;
+                        }
+
+                        SyncRotors();
+
+                        if (REMOTE.IsAutoPilotEnabled) {
+                            AutoMagneticDrive();
+                            GyroStabilize(REMOTE);
+                        } else {
+                            if (!initAutoThrustOnce) {
+                                foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+                                initAutoThrustOnce = true;
+                            }
+
+                            MagneticDrive();
+                            GyroStabilize(CONTROLLER);
+                        }
+                    }
+                } else {
+                    if (!magneticDriveOnce) {
+                        IdleMagneticDrive();
+                        magneticDriveOnce = true;
+                    }
+                    if (tickCount == tickDelay) {
+                        if (controlDampeners) {
+                            DeadMan();
+                            LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
+                        } else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
+                        if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); } else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
+
+                        tickCount = 0;
+                    }
+                    tickCount++;
+                }
+
                 if (aimTarget) {
                     if (!runOnce) {
-                        useGyrosToStabilize = false;
-                        Me.CustomData = "GyroStabilize=false";//TODO
-                        if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                        }
+                        StabilizeOff();
                         runOnce = true;
-                    }
-                    if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                        sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                     }
 
                     AimAtTarget(targetPosition);
                 } else {
                     if (runOnce) {
-                        useGyrosToStabilize = true;
-                        Me.CustomData = "GyroStabilize=true";//TODO
+                        StabilizeOn();
                         runOnce = false;
                     }
                 }
@@ -301,64 +350,6 @@ namespace IngameScript {
 
                 WriteInfo();
 
-                if (magneticDrive) {
-                    if (magneticDriveOnce) {
-                        InitMagneticDrive();
-                        magneticDriveOnce = false;
-                    }
-
-                    bool isControlled = GetController();
-
-                    if (!isControlled) {
-                        if (!setOnce) {
-                            IdleMagneticDrive();
-                            setOnce = true;
-                        }
-                    } else {
-                        if (setOnce) {
-                            InitMagneticDrive();
-                            if (MANAGERPB != null) {
-                                if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                                    sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                                }
-                            }
-                            setOnce = false;
-                        }
-                        if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                        }
-
-                        SyncRotors();
-
-                        if (REMOTE.IsAutoPilotEnabled) {
-                            AutoMagneticDrive();
-                            GyroStabilize(REMOTE);
-                        } else {
-                            if (!initAutoThrustOnce) {
-                                foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-                                initAutoThrustOnce = true;
-                            }
-
-                            MagneticDrive();
-                            GyroStabilize(CONTROLLER);
-                        }
-                    }
-                } else {
-                    if (!magneticDriveOnce) {
-                        IdleMagneticDrive();
-                        magneticDriveOnce = true;
-                    }
-                    if (tickCount == tickDelay) {
-                        if (controlDampeners) {
-                            DeadMan();
-                            LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
-                        } else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
-                        if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); } else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
-
-                        tickCount = 0;
-                    }
-                    tickCount++;
-                }
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
                 if (DEBUG != null) {
@@ -376,7 +367,7 @@ namespace IngameScript {
                 case argRangeFinder: RangeFinder(); break;
                 case argChangePlanet:
                     planetSelector++;
-                    if (planetSelector > planetsList.Count()) {
+                    if (planetSelector >= planetsList.Count()) {
                         planetSelector = 0;
                     }
                     selectedPlanet = planetsList.ElementAt(planetSelector).Key;
@@ -394,11 +385,11 @@ namespace IngameScript {
                     break;
                 case argGyroStabilizeOn:
                     useGyrosToStabilize = true;
-                    Me.CustomData = "GyroStabilize=true";//TODO
+                    Me.CustomData = "GyroStabilize=true";
                     break;
                 case argGyroStabilizeOff:
                     useGyrosToStabilize = false;
-                    Me.CustomData = "GyroStabilize=false";//TODO
+                    Me.CustomData = "GyroStabilize=false";
                     break;
                 case argDeadMan:
                     controlDampeners = !controlDampeners;
@@ -428,7 +419,7 @@ namespace IngameScript {
                         targetPosition = safeJumpPosition;
 
                         targetLog.Clear();
-                        targetLog.Append("Safe Dist. for: ").Append(selectedPlanet).Append("\n");
+                        //targetLog.Append("Safe Dist. for: ").Append(selectedPlanet).Append("\n");
 
                         string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
                         targetLog.Append(safeJumpGps).Append("\n");
@@ -500,7 +491,7 @@ namespace IngameScript {
 
                     targetPosition = safeJumpPosition;
 
-                    targetLog.Append("Safe Dist. for: ").Append(selectedPlanet).Append("\n");
+                    //targetLog.Append("Safe Dist. for: ").Append(selectedPlanet).Append("\n");
 
                     string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
                     targetLog.Append(safeJumpGps).Append("\n");
@@ -628,14 +619,14 @@ namespace IngameScript {
                 }
                 if (!targetFound) {
                     if (!lockTargetOnce) {
-                        useGyrosToStabilize = true;
-                        Me.CustomData = "GyroStabilize=true";//TODO
+                        StabilizeOn();
                         stabilizeOnce = true;
                         PAINTERPB.TryRun(argUnlockFromTarget);
                         lockTargetOnce = true;
                     }
                     if (!launchDecoyOnce) {
                         launchDecoyOnce = true;
+                        keepAltitude = true;
                     }
                     if (!Vector3D.IsZero(returnPosition)) {
                         escapePosition = Vector3D.Zero;
@@ -648,11 +639,7 @@ namespace IngameScript {
                     bool aligned = false;
                     if (lockTargetOnce) {
                         if (stabilizeOnce) {
-                            useGyrosToStabilize = false;
-                            Me.CustomData = "GyroStabilize=false";//TODO
-                            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                                sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                            }
+                            StabilizeOff();
                             stabilizeOnce = false;
                         }
                         aligned = AimAtTarget(targetInfo.Position);
@@ -664,8 +651,9 @@ namespace IngameScript {
                         impactDetectionDelay = 5;
                     }
                     if (launchDecoyOnce) {
-                        SHOOTERPB.TryRun(argLaunchDecoy);
+                        if (Vector3D.IsZero(REMOTE.GetNaturalGravity())) { SHOOTERPB.TryRun(argLaunchDecoy); }
                         launchDecoyOnce = false;
+                        keepAltitude = false;
                     }
                     CheckCollisions(targetInfo.Position, targetInfo.Velocity);
                 }
@@ -700,7 +688,7 @@ namespace IngameScript {
             }
         }
 
-        void AlignToGround(IMyShipController controller) {//TODO align upsideDown
+        void AlignToGround(IMyShipController controller) {
             Vector3D gravityVec = controller.GetNaturalGravity();
             if (!Vector3D.IsZero(gravityVec)) {
                 MatrixD matrix = controller.WorldMatrix;
@@ -709,7 +697,7 @@ namespace IngameScript {
                 double pitchAngle, rollAngle, yawAngle;
                 GetRotationAnglesSimultaneous(horizonVec, -gravityVec, matrix, out pitchAngle, out yawAngle, out rollAngle);
 
-                yawController.Reset();
+                //yawController.Reset();
                 double pitchSpeed = pitchController.Control(pitchAngle);
                 double rollSpeed = rollController.Control(rollAngle);
 
@@ -733,22 +721,18 @@ namespace IngameScript {
 
         Vector3 KeepAltitude(Vector3 dir, IMyShipController controller) {
             Vector3D gravity = controller.GetNaturalGravity();
-            if (!Vector3D.IsZero(gravity) && idleThrusters) {
-                if (!Vector3.IsZero(dir)) {
-                    double altitude;
-                    controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
-                    if (altitudeToKeep == 0d) {
-                        altitudeToKeep = altitude;
-                    }
-                    if (altitude < altitudeToKeep - 15d) {
-                        Vector3D gravTransformed = -Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
-                        dir += Vector3D.IsZeroVector(dir) * gravTransformed;
-                    } else if (altitude > altitudeToKeep + 15d) {
-                        Vector3D gravTransformed = Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
-                        dir += Vector3D.IsZeroVector(dir) * gravTransformed;
-                    }
-                } else {
-                    altitudeToKeep = 0d;
+            if (!Vector3D.IsZero(gravity) && idleThrusters && keepAltitude) {
+                double altitude;
+                controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
+                if (altitudeToKeep == 0d) {
+                    altitudeToKeep = altitude;
+                }
+                if (altitude < altitudeToKeep - 30d) {
+                    Vector3D gravTransformed = -Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
+                    dir += Vector3D.IsZeroVector(dir) * gravTransformed;
+                } else if (altitude > altitudeToKeep + 30d) {
+                    Vector3D gravTransformed = Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
+                    dir += Vector3D.IsZeroVector(dir) * gravTransformed;
                 }
             }
             return dir;
@@ -944,7 +928,19 @@ namespace IngameScript {
             if (Math.Abs(vel.Y) < minSpeed) { vel.Y = 0; }
             if (Math.Abs(vel.Z) < minSpeed) { vel.Z = 0; }
 
-            vel = KeepAltitude(vel, CONTROLLER);
+            if (!IsPiloted(false)) {
+                if (keepAltitudeOnce) {
+                    StabilizeOff();
+                    keepAltitudeOnce = false;
+                }
+                vel = KeepAltitude(vel, CONTROLLER);
+            } else {
+                if (!keepAltitudeOnce) {
+                    StabilizeOn();
+                    keepAltitudeOnce = true;
+                }
+                altitudeToKeep = 0d;
+            }
 
             SetPow(vel);
         }
@@ -1168,6 +1164,19 @@ namespace IngameScript {
 
         float Smallest(float rotorAngle, float b) {
             return Math.Abs(rotorAngle) > Math.Abs(b) ? b : rotorAngle;
+        }
+
+        void StabilizeOff() {
+            useGyrosToStabilize = false;
+            Me.CustomData = "GyroStabilize=false";
+            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
+                MANAGERPB.TryRun(argSunchaseOff);
+            }
+        }
+
+        void StabilizeOn() {
+            useGyrosToStabilize = true;
+            Me.CustomData = "GyroStabilize=true";
         }
 
         void ReadLidarInfos() {
