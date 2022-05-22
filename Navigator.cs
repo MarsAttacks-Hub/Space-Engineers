@@ -53,7 +53,7 @@ namespace IngameScript {
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
         readonly string debugPanelName = "[CRX] Debug";
         readonly string painterName = "[CRX] PB Painter";
-        readonly string decoyName = "[CRX] PB Shooter";
+        readonly string shooterName = "[CRX] PB Shooter";
         readonly string managerName = "[CRX] PB Manager";
 
         readonly string sectionTag = "RangeFinderSettings";
@@ -69,58 +69,62 @@ namespace IngameScript {
 
         const string argSunchaseOff = "SunchaseOff";
         const string argUnlockFromTarget = "Clear";
+        const string argLockTarget = "Lock";
         const string argLaunchDecoy = "LaunchDecoy";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
-        readonly double escapeDistance = 250d;
-        readonly double enemySafeDistance = 3000d;
-        readonly double friendlySafeDistance = 1000d;
         readonly double aimP = 1d;
         readonly double aimI = 0d;
         readonly double aimD = 1d;
         readonly double integralWindupLimit = 0d;
-        readonly int escapeDelay = 10;
-        readonly double targetStopDistance = 150d;
-        readonly double escapeStopDistance = 30d;
-        readonly double returnStopDistance = 50d;
-        readonly int impactDetectionDelay = 5;
         readonly bool useRoll = true;
+        readonly double escapeDistance = 250d;
+        readonly double enemySafeDistance = 3000d;
+        readonly double friendlySafeDistance = 1000d;
+        readonly double targetStopDistance = 50d;
+        readonly double escapeStopDistance = 50d;
+        readonly double returnStopDistance = 50d;
         readonly float maxSpeed = 105f;
-        readonly float minSpeed = 2f;//TODO
+        readonly float minSpeed = 2f;
         readonly float deadManMinSpeed = 0.1f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
         readonly int tickDelay = 50;
+        readonly int escapeDelay = 10;
+        int impactDetectionDelay = 5;
 
+        bool magneticDrive = true;
+        bool sunChaseOff = false;
+        bool controlDampeners = true;
+        bool idleThrusters = false;
+        bool aimTarget = false;
+        bool useGyrosToStabilize = true;
+        string selectedPlanet = "";
         int impactDetectionCount = 5;
         int escapeCount = 10;
         int cockpitRangeFinderSurface = 4;
-        bool aimTarget = false;
-        double maxScanRange = 0d;
         int planetSelector = 0;
-        string selectedPlanet = "";
         int tickCount = 0;
+        double maxScanRange = 0d;
+        double altitudeToKeep = 0d;
+        bool unlockOnce = true;
         bool magneticDriveOnce = true;
         bool deadManOnce = false;
         bool switchOnce = false;
         bool setOnce = false;
         bool initAutoThrustOnce = true;
-        bool runMDOnce = false;
-        bool sunChaseOff = false;
+        bool runOnce = false;
         bool returnOnce = true;
-        bool magneticDrive = true;
-        bool controlDampeners = true;
-        bool useGyrosToStabilize = true;//If the script will override gyros to try and combat torque
-        bool idleThrusters = false;
-        double altitudeToKeep = 0d;
-        bool unlockOnce = true;
+        bool lockTargetOnce = true;
+        bool launchDecoyOnce = true;
+        bool stabilizeOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
-        const double rad2deg = 180 / Math.PI;
-        const double angleTolerance = 0.1;//degrees
         const float rpsOverRpm = (float)(Math.PI / 30);
         const float circle = (float)(2 * Math.PI);
+        const double rad2deg = 180 / Math.PI;
+        const double angleTolerance = 0.1d;//degrees
 
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
         public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
@@ -157,7 +161,7 @@ namespace IngameScript {
         IMyThrust BACKWARDTHRUST;
         IMyProgrammableBlock MANAGERPB;
         IMyProgrammableBlock PAINTERPB;
-        IMyProgrammableBlock DECOYPB;
+        IMyProgrammableBlock SHOOTERPB;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
 
@@ -207,9 +211,9 @@ namespace IngameScript {
             InitPIDControllers();
 
             if (useGyrosToStabilize) {
-                Me.CustomData = "GyroStabilize=true";
+                Me.CustomData = "GyroStabilize=true";//TODO
             } else {
-                Me.CustomData = "GyroStabilize=false";
+                Me.CustomData = "GyroStabilize=false";//TODO
             }
         }
 
@@ -238,26 +242,24 @@ namespace IngameScript {
                 }
 
                 if (aimTarget) {
-                    if (!runMDOnce) {
+                    if (!runOnce) {
                         useGyrosToStabilize = false;
-                        Me.CustomData = "GyroStabilize=false";
-                        if (MANAGERPB != null) {
-                            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                                sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                            }
+                        Me.CustomData = "GyroStabilize=false";//TODO
+                        if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
+                            sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                         }
-                        runMDOnce = true;
+                        runOnce = true;
                     }
                     if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true")) {
                         sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
                     }
 
-                    AimAtTarget();
+                    AimAtTarget(targetPosition);
                 } else {
-                    if (runMDOnce) {
+                    if (runOnce) {
                         useGyrosToStabilize = true;
-                        Me.CustomData = "GyroStabilize=true";
-                        runMDOnce = false;
+                        Me.CustomData = "GyroStabilize=true";//TODO
+                        runOnce = false;
                     }
                 }
 
@@ -278,6 +280,7 @@ namespace IngameScript {
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
                     double dist = Vector3D.Distance(escapePosition, REMOTE.GetPosition());
                     if (dist < escapeStopDistance) {
+                        REMOTE.ClearWaypoints();
                         REMOTE.SetAutoPilotEnabled(false);
                         escapePosition = Vector3D.Zero;
                     }
@@ -286,6 +289,7 @@ namespace IngameScript {
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
                     double dist = Vector3D.Distance(returnPosition, REMOTE.GetPosition());
                     if (dist < returnStopDistance) {
+                        REMOTE.ClearWaypoints();
                         REMOTE.SetAutoPilotEnabled(false);
                         returnPosition = Vector3D.Zero;
                         returnOnce = true;
@@ -330,7 +334,7 @@ namespace IngameScript {
                             AutoMagneticDrive();
                             GyroStabilize(REMOTE);
                         } else {
-                            if (!initAutoThrustOnce) {//TODO
+                            if (!initAutoThrustOnce) {
                                 foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                                 initAutoThrustOnce = true;
                             }
@@ -390,11 +394,11 @@ namespace IngameScript {
                     break;
                 case argGyroStabilizeOn:
                     useGyrosToStabilize = true;
-                    Me.CustomData = "GyroStabilize=true";
+                    Me.CustomData = "GyroStabilize=true";//TODO
                     break;
                 case argGyroStabilizeOff:
                     useGyrosToStabilize = false;
-                    Me.CustomData = "GyroStabilize=false";
+                    Me.CustomData = "GyroStabilize=false";//TODO
                     break;
                 case argDeadMan:
                     controlDampeners = !controlDampeners;
@@ -585,8 +589,9 @@ namespace IngameScript {
             }
         }
 
-        void AimAtTarget() {
-            Vector3D aimDirection = targetPosition - REMOTE.GetPosition();
+        bool AimAtTarget(Vector3D targetPos) {
+            bool aligned = false;
+            Vector3D aimDirection = targetPos - REMOTE.GetPosition();
 
             double yawAngle;
             double pitchAngle;
@@ -602,8 +607,10 @@ namespace IngameScript {
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance) {
                 aimTarget = false;
+                aligned = true;
                 UnlockGyros();
             }
+            return aligned;
         }
 
         void TurretsImpactDetection() {
@@ -614,19 +621,53 @@ namespace IngameScript {
                     if (!targ.IsEmpty()) {
                         if (IsValidTarget(ref targ)) {
                             targetInfo = targ;
-                            CheckCollisions(targetInfo.Position, targetInfo.Velocity);
                             targetFound = true;
                             break;
                         }
                     }
                 }
                 if (!targetFound) {
+                    if (!lockTargetOnce) {
+                        useGyrosToStabilize = true;
+                        Me.CustomData = "GyroStabilize=true";//TODO
+                        stabilizeOnce = true;
+                        PAINTERPB.TryRun(argUnlockFromTarget);
+                        lockTargetOnce = true;
+                    }
+                    if (!launchDecoyOnce) {
+                        launchDecoyOnce = true;
+                    }
                     if (!Vector3D.IsZero(returnPosition)) {
+                        escapePosition = Vector3D.Zero;
                         REMOTE.ClearWaypoints();
                         REMOTE.AddWaypoint(returnPosition, "returnPosition");
                         REMOTE.SetAutoPilotEnabled(true);
                         returnOnce = true;
                     }
+                } else {
+                    bool aligned = false;
+                    if (lockTargetOnce) {
+                        if (stabilizeOnce) {
+                            useGyrosToStabilize = false;
+                            Me.CustomData = "GyroStabilize=false";//TODO
+                            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
+                                sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
+                            }
+                            stabilizeOnce = false;
+                        }
+                        aligned = AimAtTarget(targetInfo.Position);
+                        impactDetectionDelay = 1;
+                    }
+                    if (aligned) {
+                        PAINTERPB.TryRun(argLockTarget);
+                        lockTargetOnce = false;
+                        impactDetectionDelay = 5;
+                    }
+                    if (launchDecoyOnce) {
+                        SHOOTERPB.TryRun(argLaunchDecoy);
+                        launchDecoyOnce = false;
+                    }
+                    CheckCollisions(targetInfo.Position, targetInfo.Velocity);
                 }
                 impactDetectionCount = 0;
             }
@@ -634,23 +675,22 @@ namespace IngameScript {
         }
 
         void CheckCollisions(Vector3D targetPos, Vector3D targetVelocity) {
-            BoundingBoxD gridLocalBB = new BoundingBoxD(Me.CubeGrid.Min * Me.CubeGrid.GridSize, Me.CubeGrid.Max * Me.CubeGrid.GridSize);
-            MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, Me.CubeGrid.WorldMatrix);
-            //Vector3 halfExtents = (Vector3)(Me.CubeGrid.Max - Me.CubeGrid.Min) * Me.CubeGrid.GridSize;
-            //MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(Me.CubeGrid.WorldMatrix.Translation, halfExtents, Quaternion.CreateFromRotationMatrix(Me.CubeGrid.WorldMatrix));
-            double time = 8.0;
+            BoundingBoxD gridLocalBB = new BoundingBoxD(REMOTE.CubeGrid.Min * REMOTE.CubeGrid.GridSize, REMOTE.CubeGrid.Max * REMOTE.CubeGrid.GridSize);
+            MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, REMOTE.CubeGrid.WorldMatrix);
+            double time = 80.0d;
             Vector3D targetFuturePosition = targetPos + (targetVelocity * time);
             LineD line = new LineD(targetPos, targetFuturePosition);
             double? hitDist = obb.Intersects(ref line);
             if (hitDist.HasValue) {
                 if (returnOnce) {
-                    PAINTERPB.TryRun(argUnlockFromTarget);
-                    DECOYPB.TryRun(argLaunchDecoy);
-                    returnPosition = REMOTE.GetPosition();
+                    if (Vector3D.IsZero(returnPosition)) {
+                        returnPosition = REMOTE.GetPosition();
+                    }
                     returnOnce = false;
                 }
                 if (escapeCount == escapeDelay) {
-                    Vector3D escapePosition = targetPos - (Vector3D.Normalize(targetPos - REMOTE.GetPosition()) * escapeDistance);
+                    Vector3D escapePos = targetPos + (Vector3D.Normalize(targetPos - REMOTE.GetPosition()) * escapeDistance);
+                    escapePosition = Vector3D.Cross(escapePos, REMOTE.WorldMatrix.Down);
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(escapePosition, "escapePosition");
                     REMOTE.SetAutoPilotEnabled(true);
@@ -693,7 +733,7 @@ namespace IngameScript {
 
         Vector3 KeepAltitude(Vector3 dir, IMyShipController controller) {
             Vector3D gravity = controller.GetNaturalGravity();
-            if (!Vector3D.IsZero(gravity) && idleThrusters) {//TODO
+            if (!Vector3D.IsZero(gravity) && idleThrusters) {
                 if (!Vector3.IsZero(dir)) {
                     double altitude;
                     controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
@@ -731,7 +771,7 @@ namespace IngameScript {
                         cntrllr.DampenersOverride = true;
                     } else {
                         if (!deadManOnce) {
-                            if (idleThrusters) {//TODO
+                            if (idleThrusters) {
                                 foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; }
                             }
                             deadManOnce = true;
@@ -817,7 +857,7 @@ namespace IngameScript {
         void InitMagneticDrive() {
             foreach (IMyMotorStator block in ROTORS) { block.Enabled = true; }
             foreach (IMyMotorStator block in ROTORSINV) { block.Enabled = true; }
-            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }//TODO
+            foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
         }
 
         void IdleMagneticDrive() {
@@ -830,7 +870,7 @@ namespace IngameScript {
                 block.TargetVelocityRPM = 0;
                 block.Enabled = false;
             }
-            if (idleThrusters) {//TODO
+            if (idleThrusters) {
                 foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
             }
         }
@@ -882,12 +922,12 @@ namespace IngameScript {
                 //debugLog.Append("dir X: " + dir.X + "\ndir Y: " + dir.Y + "\ndir Z: " + dir.Z + "\n\n");
                 dir /= dir.Length();
                 if (!switchOnce) {
-                    foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }//TODO
+                    foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
                     switchOnce = true;
                 }
             } else {
                 if (switchOnce) {
-                    foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }//TODO
+                    foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                     switchOnce = false;
                 }
             }
@@ -1233,7 +1273,7 @@ namespace IngameScript {
             REMOTE = REMOTES[0];
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
             PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
-            DECOYPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
+            SHOOTERPB = GridTerminalSystem.GetBlockWithName(shooterName) as IMyProgrammableBlock;
         }
 
         void InitPIDControllers() {
@@ -1377,168 +1417,5 @@ namespace IngameScript {
             }
         }
 
-        /*
-        void GyroStabilize(IMyShipController controller) {
-            if (useGyrosToStabilize) {
-                if (!hasVector) {
-                    hasVector = true;
-                    lastForwardVector = controller.WorldMatrix.Forward;
-                    lastUpVector = controller.WorldMatrix.Up;
-                }
-
-                double mouseYaw = controller.RotationIndicator.Y;
-                double mousePitch = controller.RotationIndicator.X;
-                double mouseRoll = controller.RollIndicator;
-
-                double pitchAngle, yawAngle, rollAngle;
-                if (!useRoll) { lastUpVector = Vector3D.Zero; };
-                GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
-                if (mouseYaw != 0) {
-                    mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
-                }
-                if (mouseYaw == 0) {
-                    mouseYaw = yawController.Control(yawAngle);
-                } else {
-                    mouseYaw = yawController.Control(mouseYaw);
-                }
-
-                if (mousePitch != 0) {
-                    mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
-                }
-                if (mousePitch == 0) {
-                    mousePitch = pitchController.Control(pitchAngle);
-                } else {
-                    mousePitch = pitchController.Control(mousePitch);
-                }
-
-                if (mouseRoll != 0) {
-                    mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
-                }
-                if (mouseRoll == 0) {
-                    mouseRoll = rollController.Control(rollAngle);
-                } else {
-                    mouseRoll = rollController.Control(mouseRoll);
-                }
-
-                ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
-
-                lastForwardVector = controller.WorldMatrix.Forward;
-                lastUpVector = controller.WorldMatrix.Up;
-            }
-        }
-        
-        void Land(double altitude, IMyShipController controller)
-        {
-            double planetAltitude;
-            bool altitudeFound = controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out planetAltitude);
-            if (altitudeFound)
-            {
-                
-            }
-
-            var distanceToGround = GetAltitude(controller) - GetShipEdgeVector(controller, Base6Directions.Direction.Down).Length() - 10;// altitudeSafetyCushion;
-            var target = CalculateDistanceVector(controller, distanceToGround, Base6Directions.Direction.Down);
-
-        }
-
-        Vector3D GetShipEdgeVector(IMyTerminalBlock reference, Base6Directions.Direction directionFrom = Base6Directions.Direction.Forward)
-        {
-            var direction = DirConvert(reference, directionFrom);
-            var gridSize = reference.CubeGrid.GridSize;//get dimension of grid cubes 
-            var gridMatrix = reference.CubeGrid.WorldMatrix;//get worldmatrix for the grid 
-            var worldMinimum = Vector3D.Transform(reference.CubeGrid.Min * gridSize, gridMatrix);//convert grid coordinates to world coords 
-            var worldMaximum = Vector3D.Transform(reference.CubeGrid.Max * gridSize, gridMatrix);
-            var origin = reference.GetPosition();//get reference position 
-            var minRelative = worldMinimum - origin;//compute max and min relative vectors 
-            var maxRelative = worldMaximum - origin;
-            var minProjected = Vector3D.Dot(minRelative, direction) / direction.LengthSquared() * direction;//project relative vectors on desired direction 
-            var maxProjected = Vector3D.Dot(maxRelative, direction) / direction.LengthSquared() * direction;
-            if (Vector3D.Dot(minProjected, direction) > 0)//check direction of the projections to determine which is correct 
-                return minProjected;
-            else
-                return maxProjected;
-        }
-
-        Vector3D DirConvert(IMyTerminalBlock block, Base6Directions.Direction direction = Base6Directions.Direction.Forward)
-        {
-            MatrixD wM = block.WorldMatrix;
-            switch (direction)
-            {
-                case Base6Directions.Direction.Up:
-                    return wM.Up;
-                case Base6Directions.Direction.Down:
-                    return wM.Down;
-                case Base6Directions.Direction.Backward:
-                    return wM.Backward;
-                case Base6Directions.Direction.Left:
-                    return wM.Left;
-                case Base6Directions.Direction.Right:
-                    return wM.Right;
-                default:
-                    return wM.Forward;
-            }
-        }
-
-        Vector3D CalculateDistanceVector(IMyTerminalBlock reference, double depth, Base6Directions.Direction directionFrom = Base6Directions.Direction.Forward)
-        {
-            return reference.GetPosition() + depth * DirConvert(reference, directionFrom);
-        }
-
-        
-        void GyroStabilize(bool overrideOn, IMyShipController reference, Vector2 mouseInput, float rollInput)
-        {
-            if (useGyrosToStabilize)
-            {
-                if (!hasVector)
-                {
-                    hasVector = true;
-                    lastForwardVector = reference.WorldMatrix.Forward;
-                    lastUpVector = reference.WorldMatrix.Up;
-                }
-
-                double pitchAngle, yawAngle, rollAngle;
-                if (!useRoll) { lastUpVector = Vector3D.Zero; };
-                GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, reference.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
-
-                var updatesPerSecond = 6;//10;
-                var timeMaxCycle = 1 / updatesPerSecond;
-
-                var localAngularDeviation = new Vector3D(-pitchAngle, yawAngle, rollAngle);
-                var worldAngularDeviation = Vector3D.TransformNormal(localAngularDeviation, reference.WorldMatrix);
-                var worldAngularVelocity = worldAngularDeviation / timeMaxCycle;
-
-                var localMouseInput = new Vector3(mouseInput.X, mouseInput.Y, rollInput);
-
-                if (!Vector3D.IsZero(localMouseInput, 1E-3))
-                {
-                    overrideOn = false;
-                }
-
-                foreach (var block in GYROS)
-                {
-                    if (overrideOn)
-                    {
-                        var gyroAngularVelocity = Vector3D.TransformNormal(worldAngularVelocity, MatrixD.Transpose(block.WorldMatrix));
-                        gyroAngularVelocity *= updatesPerSecond / 60.0;
-
-                        block.Pitch = (float)Math.Round(gyroAngularVelocity.X, 2);
-                        block.Yaw = (float)Math.Round(gyroAngularVelocity.Y, 2);
-                        block.Roll = (float)Math.Round(gyroAngularVelocity.Z, 2);
-                        block.GyroOverride = true;
-                        //block.GyroPower = 1f;
-                    }
-                    else
-                    {
-                        block.GyroOverride = false;
-                    }
-                }
-
-                lastForwardVector = reference.WorldMatrix.Forward;
-                lastUpVector = reference.WorldMatrix.Up;
-            }
-        }
-        */
     }
 }
