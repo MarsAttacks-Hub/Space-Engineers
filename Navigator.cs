@@ -17,6 +17,7 @@ using VRage.Game;
 using VRage;
 using VRageMath;
 using SpaceEngineers.Game.Entities.Blocks;
+using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
@@ -25,6 +26,7 @@ namespace IngameScript {
         //land function
         //read from Painter if target is aquired or not
         //generate gps path to chase enemy and send command to shooter to fire jolt
+        //i don't have target Pos or targetVel if range > 800, must be passed from Painter
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -58,6 +60,7 @@ namespace IngameScript {
         readonly string shooterName = "[CRX] PB Shooter";
         readonly string managerName = "[CRX] PB Manager";
 
+        readonly string navigatorTag = "[NAVIGATOR]";
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
 
@@ -84,9 +87,7 @@ namespace IngameScript {
         readonly double escapeDistance = 250d;
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
-        readonly double targetStopDistance = 50d;
-        readonly double escapeStopDistance = 50d;
-        readonly double returnStopDistance = 50d;
+        readonly double stopDistance = 50d;
         readonly float maxSpeed = 105f;
         readonly float minSpeed = 2f;
         readonly float deadManMinSpeed = 0.1f;
@@ -122,6 +123,7 @@ namespace IngameScript {
         bool launchDecoyOnce = true;
         bool stabilizeOnce = true;
         bool keepAltitudeOnce = true;
+        bool targFound = false;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -168,12 +170,16 @@ namespace IngameScript {
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
 
+        IMyBroadcastListener BROADCASTLISTENER;
         MyDetectedEntityInfo targetInfo;
         Vector3D targetPosition = Vector3D.Zero;
         Vector3D returnPosition = Vector3D.Zero;
         Vector3D escapePosition = Vector3D.Zero;
+        Vector3D randomPosition = Vector3D.Zero;
         Vector3D lastForwardVector = Vector3D.Zero;
         Vector3D lastUpVector = Vector3D.Zero;
+        Vector3D targPos = Vector3D.Zero;
+        Vector3D targVelVec = Vector3D.Zero;
 
         public StringBuilder jumpersLog = new StringBuilder("");
         public StringBuilder lidarsLog = new StringBuilder("");
@@ -183,6 +189,7 @@ namespace IngameScript {
         PID pitchController;
         PID rollController;
 
+        readonly Random random = new Random();
         readonly MyIni myIni = new MyIni();
 
         readonly Dictionary<String, MyTuple<Vector3D, double, double>> planetsList = new Dictionary<String, MyTuple<Vector3D, double, double>>() {
@@ -204,6 +211,8 @@ namespace IngameScript {
 
         void Setup() {
             GetBlocks();
+
+            BROADCASTLISTENER = IGC.RegisterBroadcastListener(navigatorTag);
 
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
 
@@ -312,15 +321,25 @@ namespace IngameScript {
                     }
                 }
 
+                GetBroadcastMessages();//TODO
+
                 if (!IsPiloted(true)) {
+                    AlignToGround(REMOTE);
+                }
+                if (!IsPiloted(false)) {
                     TurretsImpactDetection();
 
-                    AlignToGround(REMOTE);
+                    if (targFound && Vector3D.IsZero(escapePosition)) {//TODO
+                        randomPosition = CalculateRandomVectorAroundTarget(targPos, targVelVec, LIDARS[0]);
+                        REMOTE.ClearWaypoints();
+                        REMOTE.AddWaypoint(randomPosition, "randomPosition");
+                        REMOTE.SetAutoPilotEnabled(true);
+                    }
                 }
 
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
                     double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
-                    if (dist < targetStopDistance) {
+                    if (dist < stopDistance) {
                         REMOTE.SetAutoPilotEnabled(false);
                         targetPosition = Vector3D.Zero;
                     }
@@ -328,7 +347,7 @@ namespace IngameScript {
 
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
                     double dist = Vector3D.Distance(escapePosition, REMOTE.GetPosition());
-                    if (dist < escapeStopDistance) {
+                    if (dist < stopDistance) {
                         REMOTE.ClearWaypoints();
                         REMOTE.SetAutoPilotEnabled(false);
                         escapePosition = Vector3D.Zero;
@@ -337,11 +356,20 @@ namespace IngameScript {
 
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
                     double dist = Vector3D.Distance(returnPosition, REMOTE.GetPosition());
-                    if (dist < returnStopDistance) {
+                    if (dist < stopDistance) {
                         REMOTE.ClearWaypoints();
                         REMOTE.SetAutoPilotEnabled(false);
                         returnPosition = Vector3D.Zero;
                         returnOnce = true;
+                    }
+                }
+
+                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(randomPosition)) {//TODO
+                    double dist = Vector3D.Distance(randomPosition, REMOTE.GetPosition());
+                    if (dist < stopDistance) {
+                        REMOTE.ClearWaypoints();
+                        REMOTE.SetAutoPilotEnabled(false);
+                        randomPosition = Vector3D.Zero;
                     }
                 }
 
@@ -490,8 +518,6 @@ namespace IngameScript {
                     JUMPERS[0].JumpDistanceMeters = (float)distance;
 
                     targetPosition = safeJumpPosition;
-
-                    //targetLog.Append("Safe Dist. for: ").Append(selectedPlanet).Append("\n");
 
                     string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
                     targetLog.Append(safeJumpGps).Append("\n");
@@ -642,11 +668,17 @@ namespace IngameScript {
                             StabilizeOff();
                             stabilizeOnce = false;
                         }
-                        aligned = AimAtTarget(targetInfo.Position);
+                        if (!targFound) {//TODO
+                            aligned = AimAtTarget(targetInfo.Position);
+                        } else {
+                            aligned = true;
+                        }
                         impactDetectionDelay = 1;
                     }
                     if (aligned) {
-                        PAINTERPB.TryRun(argLockTarget);
+                        if (!targFound) {//TODO
+                            PAINTERPB.TryRun(argLockTarget);
+                        }
                         lockTargetOnce = false;
                         impactDetectionDelay = 5;
                     }
@@ -660,6 +692,63 @@ namespace IngameScript {
                 impactDetectionCount = 0;
             }
             impactDetectionCount++;
+        }
+
+        bool GetBroadcastMessages() {
+            bool received = false;
+            if (BROADCASTLISTENER.HasPendingMessage) {
+                while (BROADCASTLISTENER.HasPendingMessage) {
+                    var igcMessage = BROADCASTLISTENER.AcceptMessage();
+                    long missileId = igcMessage.Source;
+                    if (igcMessage.Data is ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>) {
+                        var data = (ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>)igcMessage.Data;
+                        targFound = data[0].Item1;
+                        targPos = data[0].Item2;
+                        targVelVec = data[0].Item3;
+                        received = true;
+                    }
+                }
+            }
+            return received;
+        }
+
+        Vector3D CalculateRandomVectorAroundTarget(Vector3D targetPosition, Vector3D targetDirection, IMyTerminalBlock tBlock) {//TODO
+            double dist = Vector3D.Distance(targetPosition, tBlock.GetPosition());
+            int minValue;
+            int maxValue;
+            if (dist < 800) {
+                minValue = -500;
+                maxValue = -750;
+            } else if (dist > 1500) {
+                minValue = 500;
+                maxValue = 750;
+            } else {
+                minValue = 250;
+                maxValue = 500;
+            }
+            double fudgeFactor = (double)random.Next(minValue, maxValue);
+
+            Vector3D perpVector1 = Vector3D.CalculatePerpendicularVector(targetDirection);
+            Vector3D perpVector2 = Vector3D.Cross(perpVector1, targetDirection);
+            if (!Vector3D.IsUnit(ref perpVector2)) {
+                perpVector2.Normalize();
+            }
+
+            Vector3D randomVector = (2.0 * random.NextDouble() - 1.0) * perpVector1 + (2.0 * random.NextDouble() - 1.0) * perpVector2;
+
+            randomVector *= fudgeFactor;
+
+            double overshootDistance = (double)random.Next(100, 500);
+            randomVector += Vector3D.Normalize(randomVector - tBlock.GetPosition()) * overshootDistance;
+
+            dist = Vector3D.Distance(targetPosition, randomVector);
+            if (dist < 800d) {//recursive call :(
+                CalculateRandomVectorAroundTarget(targetPosition, targetDirection, tBlock);
+            } else if (dist > 1500d) {
+                CalculateRandomVectorAroundTarget(targetPosition, targetDirection, tBlock);
+            }
+
+            return randomVector;
         }
 
         void CheckCollisions(Vector3D targetPos, Vector3D targetVelocity) {

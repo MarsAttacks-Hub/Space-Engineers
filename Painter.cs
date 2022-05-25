@@ -20,8 +20,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO add fudge at the first scan
-        //send run or write to custom data if target is aquired or not so the navigator can read it
+        //TODO add timer for lockOnTarget then unlock
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -42,6 +41,7 @@ namespace IngameScript {
         readonly string missilePrefix = "[M]";
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
+        readonly string navigatorTag = "[NAVIGATOR]";
         readonly string navigatorName = "[CRX] PB Navigator";
         readonly string decoyName = "[CRX] PB Shooter";
         readonly string managerName = "[CRX] PB Manager";
@@ -225,8 +225,7 @@ namespace IngameScript {
                 ReadMessages();
 
                 if (targetName != null) {
-                    if (lostTicks > ticksScanDelay)//if lidars or turrets doesn't detect a enemy for some time reset the script
-                    {
+                    if (lostTicks > ticksScanDelay) {//if lidars or turrets doesn't detect a enemy for some time reset the script
                         ResetTargeter();
                         return;
                     }
@@ -241,8 +240,9 @@ namespace IngameScript {
                         targetFound = AcquireTarget();
                     }
 
-                    if (targetFound && currentTick == ticksScanDelay)//send message to missiles every some ticks
-                    {
+                    if (targetFound && currentTick == ticksScanDelay) {//send message to missiles every some ticks
+                        SendBroadcastTargetMessage(true, targetPosition, targetInfo.Velocity);//TODO
+
                         foreach (var id in MissileIDs) {
                             SendMissileUnicastMessage(commandUpdate, id.Key);
                         }
@@ -268,13 +268,10 @@ namespace IngameScript {
 
                     ReadTargetInfo();
                 } else {
-                    if (doOnce)//things to run once when a enemy is lost
-                    {
+                    if (doOnce) {//things to run once when a enemy is lost
                         ResetTargeter();
                         return;
                     }
-
-                    //ActivateOtherScriptsGyros();
 
                     TurretsDetection(false);
                 }
@@ -424,6 +421,15 @@ namespace IngameScript {
             if (targetName == null)//case argLock
             {
                 targetFound = ScanTarget(false);
+                if (!targetFound) {
+                    fudgeFactor = 5;
+                    for (int i = 0; i < fudgeAttempts; i++) {
+                        targetFound = ScanFudgeEmptyTarget();//TODO
+                        if (targetFound) {
+                            break;
+                        }
+                    }
+                }
                 if (targetFound) {
                     targetFound = ScanTargetCenter(true);
 
@@ -438,6 +444,7 @@ namespace IngameScript {
                 {
                     targetFound = ScanDelayedTarget();
                     if (!targetFound) {
+                        fudgeFactor = 5;
                         for (int i = 0; i < fudgeAttempts; i++) {
                             targetFound = ScanFudgeTarget();
                             if (targetFound) {
@@ -561,6 +568,33 @@ namespace IngameScript {
             return targetFound;
         }
 
+        bool ScanFudgeEmptyTarget() {//TODO to test
+            bool targetFound = false;
+            IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
+            Vector3D scanPosition = Vector3D.Normalize(lidar.WorldMatrix.Forward) * 5000d;
+            scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition());
+            double dist = Vector3D.Distance(scanPosition, lidar.GetPosition());
+            if (lidar.CanScan(dist)) {
+                MyDetectedEntityInfo entityInfo = lidar.Raycast(scanPosition);
+                if (!entityInfo.IsEmpty()) {
+                    if (entityInfo.EntityId == targetInfo.EntityId) {
+                        targetName = entityInfo.Name;
+                        targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
+                        targetInfo = entityInfo;
+                        DetermineTargetPostion();
+                        targetFound = true;
+                    }
+                }
+            }
+
+            if (!targetFound) {
+                fudgeFactor++;
+            } else {
+                fudgeFactor = 5;
+            }
+            return targetFound;
+        }
+
         Vector3D CalculateFudgeVector(Vector3D targetDirection) {
             fudgeVectorSwitch = !fudgeVectorSwitch;
 
@@ -654,12 +688,11 @@ namespace IngameScript {
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, CONTROLLER.WorldMatrix.Up, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
 
-
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
             //double rollSpeed = rollController.Control(rollAngle);
 
-            double mouseRoll = CONTROLLER.RollIndicator;
+            double mouseRoll = CONTROLLER.RollIndicator;//TODO doesn't work
             if (mouseRoll != 0) {
                 mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
             }
@@ -863,13 +896,11 @@ namespace IngameScript {
         }
 
         bool SendMissileUnicastMessage(string cmd, long id) {
-            Vector3D targetPos = targetPosition;
-
             var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
                 MyTuple<Vector3, Vector3D>>>();
 
             var tuple = MyTuple.Create(MyTuple.Create(id, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix, creative),
-                MyTuple.Create(targetInfo.Velocity, targetPos));
+                MyTuple.Create(targetInfo.Velocity, targetPosition));
 
             immArray.Add(tuple);
 
@@ -879,6 +910,13 @@ namespace IngameScript {
                 LostMissileIDs.Add(id);
             }
             return uniMessageSent;
+        }
+
+        void SendBroadcastTargetMessage(bool targFound, Vector3D targPos, Vector3D targVel) {
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<bool, Vector3D, Vector3D>>();
+            var tuple = MyTuple.Create(targFound, targPos, targVel);
+            immArray.Add(tuple);
+            IGC.SendBroadcastMessage(navigatorTag, immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
         }
 
         void RemoveLostMissiles() {
@@ -911,8 +949,6 @@ namespace IngameScript {
         }
 
         void ResetTargeter() {
-            //Runtime.UpdateFrequency = UpdateFrequency.Update10;
-
             UnlockShip();
             TurnAlarmOff();
             TurnGunsOff();
@@ -939,14 +975,14 @@ namespace IngameScript {
                 }
             }
 
-            ActivateOtherScriptsGyros();//TODO
+            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero);//TODO
+
+            ActivateOtherScriptsGyros();
         }
 
         void ActivateTargeter() {
             if (!doOnce)//things to run once when a enemy is detected
             {
-                //Runtime.UpdateFrequency = UpdateFrequency.Update1;
-
                 TurnAlarmOn();
 
                 doOnce = true;
@@ -1293,14 +1329,13 @@ namespace IngameScript {
         void ReadTargetInfo() {
             if (currentTick == ticksScanDelay) {
                 targetLog.Clear();
-                targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString());//.Append("\n");
+                targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString());
                 if (!missilesLoaded) {
                     targetLog.Append(" Not Loaded\n");
                 } else {
                     targetLog.Append(" Loaded\n");
                 }
 
-                //targetLog.Append("ID: ").Append(targetInfo.EntityId.ToString()).Append("\n");
                 targetLog.Append("Target Name: ").Append(targetInfo.Name).Append(", ");
 
                 string targX = targetInfo.Position.X.ToString("0.00");
@@ -1308,16 +1343,10 @@ namespace IngameScript {
                 string targZ = targetInfo.Position.Z.ToString("0.00");
                 targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
 
-                //long targetLastDetected = targetInfo.TimeStamp / 1000;
-                //targetLog.Append("Detected Since: ").Append(targetLastDetected).Append(" s\n");
-
                 targetLog.Append("Target Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append(", ");
 
                 double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
                 targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
-
-                //double targetRadius = Vector3D.Distance(targetInfo.BoundingBox.Min, targetInfo.BoundingBox.Max);
-                //targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append("\n");
             }
         }
 
