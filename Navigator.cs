@@ -24,9 +24,10 @@ namespace IngameScript {
         //TODO add generate orbital gps function
         //generate orbital gps above target 
         //land function
-        //read from Painter if target is aquired or not
-        //generate gps path to chase enemy and send command to shooter to fire jolt
-        //i don't have target Pos or targetVel if range > 800, must be passed from Painter
+        //when autopiloting set stabilizeGyro false
+        //after some time randomMagneticDrive get stuck
+        //sometime when randomMagneticDriving and colliding to the enemy, autopilot get enabled and
+        //when reaching the return gps, gyros remain overridden
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -46,12 +47,13 @@ namespace IngameScript {
         readonly string minusYname = "Merge_MD-Z";
         readonly string minusZname = "Merge_MD-Y";
         readonly string thrustersName = "[CRX] HThruster";
-        readonly string upThrustersName = "UP";
-        readonly string downThrustersName = "DOWN";
-        readonly string leftThrustersName = "LEFT";
-        readonly string rightThrustersName = "RIGHT";
-        readonly string forwardThrustersName = "FORWARD";
-        readonly string backwardThrustersName = "BACKWARD";
+        readonly string sensorsName = "[CRX] Sensor";
+        readonly string upName = "UP";
+        readonly string downName = "DOWN";
+        readonly string leftName = "LEFT";
+        readonly string rightName = "RIGHT";
+        readonly string forwardName = "FORWARD";
+        readonly string backwardName = "BACKWARD";
         readonly string deadManPanelName = "[CRX] LCD DeadMan Toggle";
         readonly string idleThrusterPanelName = "[CRX] LCD IdleThrusters Toggle";
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
@@ -76,6 +78,7 @@ namespace IngameScript {
         const string argUnlockFromTarget = "Clear";
         const string argLockTarget = "Lock";
         const string argLaunchDecoy = "LaunchDecoy";
+        const string argFireJolt = "FireJolt";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
@@ -95,7 +98,10 @@ namespace IngameScript {
         readonly float syncSpeed = 1 * rpsOverRpm;
         readonly int tickDelay = 50;
         readonly int escapeDelay = 10;
+        readonly int randomDelay = 10;
+        readonly int sensorsDelay = 5;
         int impactDetectionDelay = 5;
+        int randomFireDelay = 10;
 
         bool magneticDrive = true;
         bool controlDampeners = true;
@@ -103,14 +109,20 @@ namespace IngameScript {
         bool aimTarget = false;
         bool useGyrosToStabilize = true;
         bool keepAltitude = true;
+        bool targFound = false;
+        bool readyToFire = true;
         string selectedPlanet = "";
-        int impactDetectionCount = 5;
-        int escapeCount = 10;
-        int cockpitRangeFinderSurface = 4;
-        int planetSelector = 0;
-        int tickCount = 0;
         double maxScanRange = 0d;
         double altitudeToKeep = 0d;
+        int cockpitRangeFinderSurface = 4;
+        int planetSelector = 0;
+        int impactDetectionCount = 5;
+        int escapeCount = 10;
+        int tickCount = 0;
+        int randomCount = 50;
+        int sensorsCount = 10;
+        int changedDirCount = 0;
+
         bool unlockOnce = true;
         bool magneticDriveOnce = true;
         bool deadManOnce = false;
@@ -123,7 +135,8 @@ namespace IngameScript {
         bool launchDecoyOnce = true;
         bool stabilizeOnce = true;
         bool keepAltitudeOnce = true;
-        bool targFound = false;
+        bool isPilotedOnce = true;
+        bool sensorsOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -155,6 +168,7 @@ namespace IngameScript {
         public List<IMyThrust> RIGHTTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> FORWARDTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> BACKWARDTHRUSTERS = new List<IMyThrust>();
+        public List<IMySensorBlock> SENSORS = new List<IMySensorBlock>();
 
         IMyShipController CONTROLLER = null;
         IMyRemoteControl REMOTE;
@@ -169,17 +183,23 @@ namespace IngameScript {
         IMyProgrammableBlock SHOOTERPB;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
+        IMySensorBlock UPSENSOR;
+        IMySensorBlock DOWNSENSOR;
+        IMySensorBlock LEFTSENSOR;
+        IMySensorBlock RIGHTSENSOR;
+        IMySensorBlock FORWARDSENSOR;
+        IMySensorBlock BACKWARDSENSOR;
 
         IMyBroadcastListener BROADCASTLISTENER;
         MyDetectedEntityInfo targetInfo;
         Vector3D targetPosition = Vector3D.Zero;
         Vector3D returnPosition = Vector3D.Zero;
         Vector3D escapePosition = Vector3D.Zero;
-        Vector3D randomPosition = Vector3D.Zero;
         Vector3D lastForwardVector = Vector3D.Zero;
         Vector3D lastUpVector = Vector3D.Zero;
         Vector3D targPos = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
+        Vector3 RandomDir = new Vector3();
 
         public StringBuilder jumpersLog = new StringBuilder("");
         public StringBuilder lidarsLog = new StringBuilder("");
@@ -321,57 +341,49 @@ namespace IngameScript {
                     }
                 }
 
-                GetBroadcastMessages();//TODO
+                GetBroadcastMessages();
+
+                if (!IsPiloted(false)) {
+                    TurretsDetection();
+                    Vector3D trgP, trgV;
+                    ManageTarget(out trgP, out trgV);
+                    CheckTarget(trgP, trgV);
+
+                    isPilotedOnce = true;
+                } else {
+                    if (isPilotedOnce) {
+                        REMOTE.ClearWaypoints();
+                        returnPosition = Vector3D.Zero;
+                        escapePosition = Vector3D.Zero;
+                        isPilotedOnce = false;
+                    }
+                }
 
                 if (!IsPiloted(true)) {
-                    AlignToGround(REMOTE);
-                }
-                if (!IsPiloted(false)) {
-                    TurretsImpactDetection();
+                    if (targFound) {
+                        if (sensorsOnce) {
+                            foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = true; }
+                            sensorsOnce = false;
+                        }
 
-                    if (targFound && Vector3D.IsZero(escapePosition)) {//TODO
-                        randomPosition = CalculateRandomVectorAroundTarget(targPos, targVelVec, LIDARS[0]);
-                        REMOTE.ClearWaypoints();
-                        REMOTE.AddWaypoint(randomPosition, "randomPosition");
-                        REMOTE.SetAutoPilotEnabled(true);
+                        RandomMagneticDrive(targPos, LIDARS[0]);//TODO
+                    } else {
+                        if (!sensorsOnce) {
+                            RandomDir = Vector3.Zero;
+                            foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = false; }
+                            sensorsOnce = true;
+                        }
+
+                        AlignToGround(REMOTE);//TODO use it when piloting too (roll)
+                    }
+                } else {
+                    if (!sensorsOnce) {
+                        foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = false; }
+                        sensorsOnce = true;
                     }
                 }
 
-                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
-                    double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
-                    if (dist < stopDistance) {
-                        REMOTE.SetAutoPilotEnabled(false);
-                        targetPosition = Vector3D.Zero;
-                    }
-                }
-
-                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
-                    double dist = Vector3D.Distance(escapePosition, REMOTE.GetPosition());
-                    if (dist < stopDistance) {
-                        REMOTE.ClearWaypoints();
-                        REMOTE.SetAutoPilotEnabled(false);
-                        escapePosition = Vector3D.Zero;
-                    }
-                }
-
-                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
-                    double dist = Vector3D.Distance(returnPosition, REMOTE.GetPosition());
-                    if (dist < stopDistance) {
-                        REMOTE.ClearWaypoints();
-                        REMOTE.SetAutoPilotEnabled(false);
-                        returnPosition = Vector3D.Zero;
-                        returnOnce = true;
-                    }
-                }
-
-                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(randomPosition)) {//TODO
-                    double dist = Vector3D.Distance(randomPosition, REMOTE.GetPosition());
-                    if (dist < stopDistance) {
-                        REMOTE.ClearWaypoints();
-                        REMOTE.SetAutoPilotEnabled(false);
-                        randomPosition = Vector3D.Zero;
-                    }
-                }
+                ManageWaypoints();
 
                 ReadLidarInfos();
                 ReadJumpersInfos();
@@ -630,12 +642,12 @@ namespace IngameScript {
             return aligned;
         }
 
-        void TurretsImpactDetection() {
+        bool TurretsDetection() {
+            bool targetFound = false;
             if (impactDetectionCount == impactDetectionDelay) {
-                bool targetFound = false;
                 foreach (IMyLargeTurretBase turret in TURRETS) {
                     MyDetectedEntityInfo targ = turret.GetTargetedEntity();
-                    if (!targ.IsEmpty()) {
+                    if (!targ.IsEmpty()) {//TODO sameID
                         if (IsValidTarget(ref targ)) {
                             targetInfo = targ;
                             targetFound = true;
@@ -644,111 +656,95 @@ namespace IngameScript {
                     }
                 }
                 if (!targetFound) {
-                    if (!lockTargetOnce) {
-                        StabilizeOn();
-                        stabilizeOnce = true;
-                        PAINTERPB.TryRun(argUnlockFromTarget);
-                        lockTargetOnce = true;
+                    targetInfo = default(MyDetectedEntityInfo);
+                }
+                impactDetectionCount = 0;
+            }
+            impactDetectionCount++;
+
+            return targetFound;
+        }
+
+        void ManageTarget(out Vector3D trgP, out Vector3D trgV) {
+            trgP = Vector3D.Zero;
+            trgV = Vector3D.Zero;
+            if (targFound) {
+                trgP = targPos;
+                trgV = targVelVec;
+            } else if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+                trgP = targetInfo.HitPosition.Value;
+                trgV = targetInfo.Velocity;
+            }
+        }
+
+        void CheckTarget(Vector3D trgP, Vector3D trgV) {
+            if (!Vector3D.IsZero(trgP)) {// && !Vector3D.IsZero(trgV)) {
+                if (lockTargetOnce) {
+
+                    IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                    StringBuilder debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("if lockTargetOnce: " + lockTargetOnce + "\n");
+                    DEBUG.WriteText(debugLog);
+
+                    if (stabilizeOnce) {
+                        StabilizeOff();
+                        stabilizeOnce = false;
                     }
-                    if (!launchDecoyOnce) {
-                        launchDecoyOnce = true;
-                        keepAltitude = true;
+                    bool aligned;
+                    if (!targFound) {
+                        aligned = AimAtTarget(trgP);//TODO targetInfo.Position
+                    } else {
+                        aligned = true;
                     }
-                    if (!Vector3D.IsZero(returnPosition)) {
-                        escapePosition = Vector3D.Zero;
-                        REMOTE.ClearWaypoints();
-                        REMOTE.AddWaypoint(returnPosition, "returnPosition");
-                        REMOTE.SetAutoPilotEnabled(true);
-                        returnOnce = true;
-                    }
-                } else {
-                    bool aligned = false;
-                    if (lockTargetOnce) {
-                        if (stabilizeOnce) {
-                            StabilizeOff();
-                            stabilizeOnce = false;
-                        }
-                        if (!targFound) {//TODO
-                            aligned = AimAtTarget(targetInfo.Position);
-                        } else {
-                            aligned = true;
-                        }
-                        impactDetectionDelay = 1;
-                    }
+                    impactDetectionDelay = 1;
                     if (aligned) {
-                        if (!targFound) {//TODO
+                        if (!targFound) {
                             PAINTERPB.TryRun(argLockTarget);
                         }
                         lockTargetOnce = false;
                         impactDetectionDelay = 5;
                     }
-                    if (launchDecoyOnce) {
-                        if (Vector3D.IsZero(REMOTE.GetNaturalGravity())) { SHOOTERPB.TryRun(argLaunchDecoy); }
-                        launchDecoyOnce = false;
-                        keepAltitude = false;
-                    }
-                    CheckCollisions(targetInfo.Position, targetInfo.Velocity);
                 }
-                impactDetectionCount = 0;
-            }
-            impactDetectionCount++;
-        }
 
-        bool GetBroadcastMessages() {
-            bool received = false;
-            if (BROADCASTLISTENER.HasPendingMessage) {
-                while (BROADCASTLISTENER.HasPendingMessage) {
-                    var igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    long missileId = igcMessage.Source;
-                    if (igcMessage.Data is ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>) {
-                        var data = (ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>)igcMessage.Data;
-                        targFound = data[0].Item1;
-                        targPos = data[0].Item2;
-                        targVelVec = data[0].Item3;
-                        received = true;
+                if (launchDecoyOnce) {
+                    double dist = Vector3D.Distance(trgP, LIDARS[0].GetPosition());
+                    if (Vector3D.IsZero(REMOTE.GetNaturalGravity()) && dist < 800d) {
+                        SHOOTERPB.TryRun(argLaunchDecoy);
                     }
+                    launchDecoyOnce = false;
+                    keepAltitude = false;
                 }
-            }
-            return received;
-        }
 
-        Vector3D CalculateRandomVectorAroundTarget(Vector3D targetPosition, Vector3D targetDirection, IMyTerminalBlock tBlock) {//TODO
-            double dist = Vector3D.Distance(targetPosition, tBlock.GetPosition());
-            int minValue;
-            int maxValue;
-            if (dist < 800) {
-                minValue = -500;
-                maxValue = -750;
-            } else if (dist > 1500) {
-                minValue = 500;
-                maxValue = 750;
+                CheckCollisions(trgP, trgV);
+
             } else {
-                minValue = 250;
-                maxValue = 500;
+                if (!lockTargetOnce) {
+
+                    IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                    StringBuilder debugLog = new StringBuilder("");
+                    DEBUG.ReadText(debugLog, true);
+                    debugLog.Append("else lockTargetOnce: " + lockTargetOnce + "\n");
+                    DEBUG.WriteText(debugLog);
+
+                    UnlockGyros();//TODO
+                    StabilizeOn();
+                    stabilizeOnce = true;
+                    PAINTERPB.TryRun(argUnlockFromTarget);
+                    lockTargetOnce = true;
+                }
+                if (!launchDecoyOnce) {
+                    launchDecoyOnce = true;
+                    keepAltitude = true;
+                }
+                if (!Vector3D.IsZero(returnPosition)) {
+                    escapePosition = Vector3D.Zero;
+                    REMOTE.ClearWaypoints();
+                    REMOTE.AddWaypoint(returnPosition, "returnPosition");
+                    REMOTE.SetAutoPilotEnabled(true);
+                    returnOnce = true;
+                }
             }
-            double fudgeFactor = (double)random.Next(minValue, maxValue);
-
-            Vector3D perpVector1 = Vector3D.CalculatePerpendicularVector(targetDirection);
-            Vector3D perpVector2 = Vector3D.Cross(perpVector1, targetDirection);
-            if (!Vector3D.IsUnit(ref perpVector2)) {
-                perpVector2.Normalize();
-            }
-
-            Vector3D randomVector = (2.0 * random.NextDouble() - 1.0) * perpVector1 + (2.0 * random.NextDouble() - 1.0) * perpVector2;
-
-            randomVector *= fudgeFactor;
-
-            double overshootDistance = (double)random.Next(100, 500);
-            randomVector += Vector3D.Normalize(randomVector - tBlock.GetPosition()) * overshootDistance;
-
-            dist = Vector3D.Distance(targetPosition, randomVector);
-            if (dist < 800d) {//recursive call :(
-                CalculateRandomVectorAroundTarget(targetPosition, targetDirection, tBlock);
-            } else if (dist > 1500d) {
-                CalculateRandomVectorAroundTarget(targetPosition, targetDirection, tBlock);
-            }
-
-            return randomVector;
         }
 
         void CheckCollisions(Vector3D targetPos, Vector3D targetVelocity) {
@@ -775,6 +771,57 @@ namespace IngameScript {
                 }
                 escapeCount++;
             }
+        }
+
+        void ManageWaypoints() {//TODO
+            if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
+                double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
+                if (dist < stopDistance) {
+                    REMOTE.SetAutoPilotEnabled(false);
+                    targetPosition = Vector3D.Zero;
+                }
+            }
+
+            if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
+                double dist = Vector3D.Distance(escapePosition, REMOTE.GetPosition());
+                if (dist < stopDistance) {
+                    REMOTE.ClearWaypoints();
+                    REMOTE.SetAutoPilotEnabled(false);
+                    escapePosition = Vector3D.Zero;
+                }
+            }
+
+            if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
+                double dist = Vector3D.Distance(returnPosition, REMOTE.GetPosition());
+                if (dist < stopDistance) {
+                    REMOTE.ClearWaypoints();
+                    REMOTE.SetAutoPilotEnabled(false);
+                    returnPosition = Vector3D.Zero;
+                    returnOnce = true;
+                }
+            }
+        }
+
+        bool GetBroadcastMessages() {
+            bool received = false;
+            if (BROADCASTLISTENER.HasPendingMessage) {
+                while (BROADCASTLISTENER.HasPendingMessage) {
+                    var igcMessage = BROADCASTLISTENER.AcceptMessage();
+                    if (igcMessage.Data is ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>) {
+                        var data = (ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>)igcMessage.Data;
+                        targFound = data[0].Item1;
+                        targPos = data[0].Item2;
+                        targVelVec = data[0].Item3;
+                        received = true;
+                    }
+                    if (igcMessage.Data is ImmutableArray<MyTuple<bool>>) {
+                        var data = (ImmutableArray<MyTuple<bool>>)igcMessage.Data;
+                        readyToFire = data[0].Item1;
+                        received = true;
+                    }
+                }
+            }
+            return received;
         }
 
         void AlignToGround(IMyShipController controller) {
@@ -894,6 +941,10 @@ namespace IngameScript {
                         CONTROLLER = controller;
                         controlled = true;
                     }
+                    if (targFound) {//TODO
+                        CONTROLLER = controller;
+                        controlled = true;
+                    }
                 }
             } else {
                 controlled = true;
@@ -961,6 +1012,120 @@ namespace IngameScript {
                 i++;
             }
             return thruster;
+        }
+
+        void RandomMagneticDrive(Vector3D targPos, IMyTerminalBlock tBlock) {
+            bool detectedOwner = false;
+            if (sensorsCount >= sensorsDelay) {
+                List<MyDetectedEntityInfo> entities = new List<MyDetectedEntityInfo>();
+                foreach (IMySensorBlock sensor in SENSORS) {
+                    entities.Clear();
+                    sensor.DetectedEntities(entities);
+                    if (entities.Count > 0) {
+                        foreach (var entity in entities) {
+                            if (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner) {
+                                detectedOwner = true;
+                                break;
+                            }
+                        }
+                        randomCount = randomDelay;
+                        break;
+                    }
+                }
+                sensorsCount = 0;
+            }
+            sensorsCount++;
+
+            double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
+            if (distance > 1000d && changedDirCount >= randomFireDelay) {
+                SHOOTERPB.TryRun(argFireJolt);
+                randomFireDelay = random.Next(10, 20);
+            }
+
+            if (!detectedOwner && readyToFire) {//SHOOTERPB.CustomData.Contains("ReadyToFire")) {//TODO
+                if (randomCount >= randomDelay) {
+                    RandomDir = new Vector3();
+                    int randomInt;
+
+                    List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
+                    List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
+                    LEFTSENSOR.DetectedEntities(entitiesA);
+                    RIGHTSENSOR.DetectedEntities(entitiesB);
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        RandomDir.X = 0;
+                    } else if (entitiesA.Count > 0) {
+                        RandomDir.X = 1;
+                    } else if (entitiesB.Count > 0) {
+                        RandomDir.X = -1;
+                    } else {
+                        randomInt = random.Next(-1, 1);
+                        RandomDir.X = randomInt;
+                    }
+
+                    entitiesA.Clear();
+                    entitiesB.Clear();
+                    UPSENSOR.DetectedEntities(entitiesA);
+                    DOWNSENSOR.DetectedEntities(entitiesB);
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        RandomDir.Y = 0;
+                    } else if (entitiesA.Count > 0) {
+                        RandomDir.Y = -1;
+                    } else if (entitiesB.Count > 0) {
+                        RandomDir.Y = 1;
+                    } else {
+                        randomInt = random.Next(-1, 1);
+                        RandomDir.Y = randomInt;
+                    }
+
+                    entitiesA.Clear();
+                    entitiesB.Clear();
+                    UPSENSOR.DetectedEntities(entitiesA);
+                    DOWNSENSOR.DetectedEntities(entitiesB);
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        RandomDir.Y = 0;
+                    } else if (entitiesA.Count > 0) {
+                        RandomDir.Y = -1;
+                    } else if (entitiesB.Count > 0) {
+                        RandomDir.Y = 1;
+                    } else {
+                        randomInt = random.Next(-1, 1);
+                        RandomDir.Y = randomInt;
+                    }
+
+                    entitiesA.Clear();
+                    entitiesB.Clear();
+                    FORWARDSENSOR.DetectedEntities(entitiesA);
+                    BACKWARDSENSOR.DetectedEntities(entitiesB);
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        RandomDir.Z = 0;
+                    } else if (entitiesA.Count > 0) {
+                        RandomDir.Z = 1;
+                    } else if (entitiesB.Count > 0) {
+                        RandomDir.Z = -1;
+                    } else {
+                        if (distance <= 800d) {
+                            RandomDir.Z = 1;
+                        } else if (distance >= 1500d) {
+                            RandomDir.Z = -1;
+                        } else {
+                            randomInt = random.Next(-1, 1);
+                            RandomDir.Z = randomInt;
+                        }
+                    }
+                    randomCount = 0;
+                    changedDirCount++;
+                }
+                randomCount++;
+
+                SetPow(RandomDir);
+            } else {
+                randomCount = 0;
+                RandomDir = Vector3.Zero;//TODO
+                //RandomDir.X = 0;
+                //RandomDir.Y = 0;
+                //RandomDir.Z = 0;
+                SetPow(RandomDir);
+            }
         }
 
         void AutoMagneticDrive() {
@@ -1332,12 +1497,12 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyGyro>(GYROS, block => block.CustomName.Contains(gyrosName));
             THRUSTERS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyThrust>(THRUSTERS, block => block.CustomName.Contains(thrustersName));
-            UPTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(upThrustersName)));
-            DOWNTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(downThrustersName)));
-            LEFTTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(leftThrustersName)));
-            RIGHTTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(rightThrustersName)));
-            FORWARDTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(forwardThrustersName)));
-            BACKWARDTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(backwardThrustersName)));
+            UPTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(upName)));
+            DOWNTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(downName)));
+            LEFTTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(leftName)));
+            RIGHTTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(rightName)));
+            FORWARDTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(forwardName)));
+            BACKWARDTHRUSTERS.AddRange(THRUSTERS.Where(block => block.CustomName.Contains(backwardName)));
             LIDARS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyCameraBlock>(LIDARS, block => block.CustomName.Contains(lidarsName));
             JUMPERS.Clear();
@@ -1372,6 +1537,23 @@ namespace IngameScript {
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
             PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
             SHOOTERPB = GridTerminalSystem.GetBlockWithName(shooterName) as IMyProgrammableBlock;
+            SENSORS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(SENSORS, block => block.CustomName.Contains(sensorsName));
+            foreach (IMySensorBlock sensor in SENSORS) {
+                if (sensor.CustomName.Contains(upName)) {
+                    UPSENSOR = sensor;
+                } else if (sensor.CustomName.Contains(downName)) {
+                    DOWNSENSOR = sensor;
+                } else if (sensor.CustomName.Contains(leftName)) {
+                    LEFTSENSOR = sensor;
+                } else if (sensor.CustomName.Contains(rightName)) {
+                    RIGHTSENSOR = sensor;
+                } else if (sensor.CustomName.Contains(forwardName)) {
+                    FORWARDSENSOR = sensor;
+                } else if (sensor.CustomName.Contains(backwardName)) {
+                    BACKWARDSENSOR = sensor;
+                }
+            }
         }
 
         void InitPIDControllers() {
@@ -1515,5 +1697,20 @@ namespace IngameScript {
             }
         }
 
+        /*
+        trgP: X:-638.525981959625 Y:1913.99944182133 Z:-306.536745534455, trgV:X:-0.0099786352366209 Y:0.0741840302944183 Z:-0.018282463774085
+targFound: True
+readyToFire: True
+
+Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+mscorlib
+Void ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)
+   at System.ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument argument, ExceptionResource resource)
+   at Program.SequenceWeapons(List`1 weapons)
+   at Program.ManageGuns()
+   at Program.Main(String arg)
+
+        */
     }
 }

@@ -20,7 +20,6 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO add timer for lockOnTarget then unlock
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -28,7 +27,7 @@ namespace IngameScript {
         readonly string lightsName = "[CRX] Rotating Light";
         readonly string turretsName = "[CRX] Turret";
         readonly string lcdsTargetName = "[CRX] LCD Target";
-        readonly string controllersName = "Reference";
+        readonly string controllersName = "[CRX] Controller";//"Reference";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
         readonly string gyrosName = "[CRX] Gyro";
         readonly string alarmsName = "[CRX] Alarm Lidar";
@@ -692,17 +691,23 @@ namespace IngameScript {
             double pitchSpeed = pitchController.Control(pitchAngle);
             //double rollSpeed = rollController.Control(rollAngle);
 
-            double mouseRoll = CONTROLLER.RollIndicator;//TODO doesn't work
-            if (mouseRoll != 0) {
-                mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
+            double userRoll = 0d;
+            foreach (IMyShipController cntrllr in CONTROLLERS) {
+                if (cntrllr.IsUnderControl) {
+                    userRoll = (double)cntrllr.RollIndicator;
+                    break;
+                }
             }
-            if (mouseRoll == 0) {
-                mouseRoll = rollController.Control(rollAngle);
+            if (userRoll != 0d) {
+                userRoll = userRoll < 0d ? MathHelper.Clamp(userRoll, -10d, -2d) : MathHelper.Clamp(userRoll, 2d, 10d);
+            }
+            if (userRoll == 0d) {
+                userRoll = rollController.Control(rollAngle);
             } else {
-                mouseRoll = rollController.Control(mouseRoll);
+                userRoll = rollController.Control(userRoll);
             }
 
-            ApplyGyroOverride(pitchSpeed, yawSpeed, mouseRoll, GYROS, CONTROLLER.WorldMatrix);
+            ApplyGyroOverride(pitchSpeed, yawSpeed, userRoll, GYROS, CONTROLLER.WorldMatrix);
 
             Vector3D forwardVec = CONTROLLER.WorldMatrix.Forward;
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
@@ -1105,7 +1110,7 @@ namespace IngameScript {
                     double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                     if (distanceFromTarget < gunsMaxRange) {
                         if (!decoyRan) {
-                            decoyRan = DECOYPB.TryRun(argFireDecoy);
+                            //decoyRan = DECOYPB.TryRun(argFireDecoy);//TODO conflict with Navigator
                         }
                         if (useAllGuns) {
                             if (distanceFromTarget < rocketProjectileMaxRange && missileAmmoFound) {
@@ -1186,7 +1191,7 @@ namespace IngameScript {
                 fireCount = 0;
             }
             weaponIndex++;
-            if (weaponIndex > weapons.Count) { weaponIndex = 0; }
+            if (weaponIndex >= weapons.Count) { weaponIndex = 0; }
             fireCount++;
         }
 
