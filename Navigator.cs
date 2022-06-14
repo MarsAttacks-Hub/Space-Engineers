@@ -24,10 +24,6 @@ namespace IngameScript {
         //TODO add generate orbital gps function
         //generate orbital gps above target 
         //land function
-        //when autopiloting set stabilizeGyro false
-        //after some time randomMagneticDrive get stuck
-        //sometime when randomMagneticDriving and colliding to the enemy, autopilot get enabled and
-        //when reaching the return gps, gyros remain overridden
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -82,11 +78,11 @@ namespace IngameScript {
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
+        readonly bool useRoll = false;
         readonly double aimP = 1d;
         readonly double aimI = 0d;
         readonly double aimD = 1d;
         readonly double integralWindupLimit = 0d;
-        readonly bool useRoll = true;
         readonly double escapeDistance = 250d;
         readonly double enemySafeDistance = 3000d;
         readonly double friendlySafeDistance = 1000d;
@@ -123,20 +119,16 @@ namespace IngameScript {
         int sensorsCount = 10;
         int changedDirCount = 0;
 
-        bool unlockOnce = true;
-        bool magneticDriveOnce = true;
+        bool unlockGyrosOnce = true;
         bool deadManOnce = false;
-        bool switchOnce = false;
-        bool setOnce = false;
-        bool initAutoThrustOnce = true;
-        bool runOnce = false;
+        bool toggleThrustersOnce = false;
         bool returnOnce = true;
         bool lockTargetOnce = true;
         bool launchDecoyOnce = true;
-        bool stabilizeOnce = true;
-        bool keepAltitudeOnce = true;
         bool isPilotedOnce = true;
-        bool sensorsOnce = true;
+        bool initMagneticDriveOnce = true;
+        bool initAutoMagneticDriveOnce = true;
+        bool initRandomMagneticDriveOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -199,7 +191,7 @@ namespace IngameScript {
         Vector3D lastUpVector = Vector3D.Zero;
         Vector3D targPos = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
-        Vector3 RandomDir = new Vector3();
+        Vector3 randomDir = new Vector3();
 
         public StringBuilder jumpersLog = new StringBuilder("");
         public StringBuilder lidarsLog = new StringBuilder("");
@@ -241,12 +233,6 @@ namespace IngameScript {
             selectedPlanet = planetsList.ElementAt(0).Key;
 
             InitPIDControllers();
-
-            if (useGyrosToStabilize) {
-                Me.CustomData = "GyroStabilize=true";
-            } else {
-                Me.CustomData = "GyroStabilize=false";
-            }
         }
 
         public void Main(string arg) {
@@ -273,117 +259,29 @@ namespace IngameScript {
                     ProcessArgument(arg);
                 }
 
-                if (magneticDrive) {
-                    if (magneticDriveOnce) {
-                        InitMagneticDrive();
-                        magneticDriveOnce = false;
-                    }
-
-                    bool isControlled = GetController();
-
-                    if (!isControlled) {
-                        if (!setOnce) {
-                            IdleMagneticDrive();
-                            setOnce = true;
-                        }
-                    } else {
-                        if (setOnce) {
-                            InitMagneticDrive();
-                            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                                MANAGERPB.TryRun(argSunchaseOff);
-                            }
-                            setOnce = false;
-                        }
-
-                        SyncRotors();
-
-                        if (REMOTE.IsAutoPilotEnabled) {
-                            AutoMagneticDrive();
-                            GyroStabilize(REMOTE);
-                        } else {
-                            if (!initAutoThrustOnce) {
-                                foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-                                initAutoThrustOnce = true;
-                            }
-
-                            MagneticDrive();
-                            GyroStabilize(CONTROLLER);
-                        }
-                    }
-                } else {
-                    if (!magneticDriveOnce) {
-                        IdleMagneticDrive();
-                        magneticDriveOnce = true;
-                    }
-                    if (tickCount == tickDelay) {
-                        if (controlDampeners) {
-                            DeadMan();
-                            LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
-                        } else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
-                        if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); } else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
-
-                        tickCount = 0;
-                    }
-                    tickCount++;
-                }
-
-                if (aimTarget) {
-                    if (!runOnce) {
-                        StabilizeOff();
-                        runOnce = true;
-                    }
-
-                    AimAtTarget(targetPosition);
-                } else {
-                    if (runOnce) {
-                        StabilizeOn();
-                        runOnce = false;
-                    }
-                }
-
                 GetBroadcastMessages();
 
-                if (!IsPiloted(false)) {
+                bool isControlled = GetController();
+                bool isAutoPiloted = IsAutoPiloted();
+                bool isUnderControl = IsPiloted(false);
+                Vector3D gravity = CONTROLLER.GetNaturalGravity();
+
+                if (!isUnderControl) {
                     TurretsDetection();
                     Vector3D trgP, trgV;
                     ManageTarget(out trgP, out trgV);
-                    CheckTarget(trgP, trgV);
-
-                    isPilotedOnce = true;
-                } else {
-                    if (isPilotedOnce) {
-                        REMOTE.ClearWaypoints();
-                        returnPosition = Vector3D.Zero;
-                        escapePosition = Vector3D.Zero;
-                        isPilotedOnce = false;
-                    }
+                    CheckTarget(REMOTE, REMOTE, trgP, trgV, gravity);
                 }
 
-                if (!IsPiloted(true)) {
-                    if (targFound) {
-                        if (sensorsOnce) {
-                            foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = true; }
-                            sensorsOnce = false;
-                        }
+                GyroStabilize(CONTROLLER, targFound, aimTarget, isAutoPiloted, useRoll, gravity);
 
-                        RandomMagneticDrive(targPos, LIDARS[0]);//TODO
-                    } else {
-                        if (!sensorsOnce) {
-                            RandomDir = Vector3.Zero;
-                            foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = false; }
-                            sensorsOnce = true;
-                        }
+                ManageMagneticDrive(CONTROLLER, isControlled, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity);
 
-                        AlignToGround(REMOTE);//TODO use it when piloting too (roll)
-                    }
-                } else {
-                    if (!sensorsOnce) {
-                        foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = false; }
-                        sensorsOnce = true;
-                    }
+                if (aimTarget) {
+                    AimAtTarget(REMOTE, targetPosition);
                 }
 
-                ManageWaypoints();
+                ManageWaypoints(REMOTE, isUnderControl);
 
                 ReadLidarInfos();
                 ReadJumpersInfos();
@@ -404,7 +302,7 @@ namespace IngameScript {
 
         void ProcessArgument(string argument) {
             switch (argument) {
-                case argRangeFinder: RangeFinder(); break;
+                case argRangeFinder: RangeFinder(REMOTE); break;
                 case argChangePlanet:
                     planetSelector++;
                     if (planetSelector >= planetsList.Count()) {
@@ -425,11 +323,9 @@ namespace IngameScript {
                     break;
                 case argGyroStabilizeOn:
                     useGyrosToStabilize = true;
-                    Me.CustomData = "GyroStabilize=true";
                     break;
                 case argGyroStabilizeOff:
                     useGyrosToStabilize = false;
-                    Me.CustomData = "GyroStabilize=false";
                     break;
                 case argDeadMan:
                     controlDampeners = !controlDampeners;
@@ -475,333 +371,6 @@ namespace IngameScript {
             }
         }
 
-        void ParseCockpitConfigData(IMyCockpit cockpit) {
-            if (!cockpit.CustomData.Contains(sectionTag)) {
-                cockpit.CustomData += $"[{sectionTag}]\n{cockpitRangeFinderKey}={cockpitRangeFinderSurface}\n";
-            }
-            MyIniParseResult result;
-            myIni.TryParse(cockpit.CustomData, sectionTag, out result);
-
-            if (!string.IsNullOrEmpty(myIni.Get(sectionTag, cockpitRangeFinderKey).ToString())) {
-                cockpitRangeFinderSurface = myIni.Get(sectionTag, cockpitRangeFinderKey).ToInt32();
-
-                SURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));
-            }
-        }
-
-        void RangeFinder() {
-            targetLog.Clear();
-
-            IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-
-            MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);
-
-            if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
-                foreach (var block in ALARMS) {
-                    block.Play();
-                }
-                if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    Vector3D planetCenter = TARGET.Position;
-                    Vector3D hitPosition = TARGET.HitPosition.Value;
-                    double planetRadius = Vector3D.Distance(planetCenter, hitPosition);
-                    string planetName = "Earth";
-                    MyTuple<Vector3D, double, double> planet;
-                    planetsList.TryGetValue(planetName, out planet);
-                    double aRadius = Math.Abs(planet.Item2 - planetRadius);
-                    foreach (var planetElement in planetsList) {
-                        double dictPlanetRadius = planetElement.Value.Item2;
-                        double bRadius = Math.Abs(dictPlanetRadius - planetRadius);
-                        if (bRadius < aRadius) {
-                            planetName = planetElement.Key;
-                            aRadius = bRadius;
-                        }
-                    }
-                    selectedPlanet = planetName;
-                    planetsList.TryGetValue(planetName, out planet);
-                    double atmosphereRange = planet.Item3 + 1000d;
-
-                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * atmosphereRange);
-
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
-
-                    double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-
-                    JUMPERS[0].JumpDistanceMeters = (float)distance;
-
-                    targetPosition = safeJumpPosition;
-
-                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
-                    targetLog.Append(safeJumpGps).Append("\n");
-
-                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
-
-                    double targetRadius = Vector3D.Distance(TARGET.Position, hitPosition);
-                    targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append(", ");
-                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
-                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
-
-                    double targetGroundDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
-                    targetLog.Append("Ground Dist.: ").Append(targetGroundDistance.ToString("0.0")).Append("\n");
-
-                    double targetAtmoHeight = Vector3D.Distance(hitPosition, safeJumpPosition);
-                    targetLog.Append("Atmo. Height: ").Append(targetAtmoHeight.ToString("0.0")).Append("\n");
-                } else if (TARGET.Type == MyDetectedEntityType.Asteroid) {
-                    Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * friendlySafeDistance);
-
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(safeJumpPosition, "Asteroid");
-
-                    double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-
-                    JUMPERS[0].JumpDistanceMeters = (float)distance;
-
-                    targetPosition = safeJumpPosition;
-
-                    string safeJumpGps = $"GPS:Asteroid:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
-                    targetLog.Append(safeJumpGps).Append("\n");
-
-                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
-
-                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
-                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
-                } else if (IsNotFriendly(TARGET.Relationship)) {
-                    Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * enemySafeDistance);
-
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
-
-                    double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-
-                    JUMPERS[0].JumpDistanceMeters = (float)distance;
-
-                    targetPosition = safeJumpPosition;
-
-                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
-                    targetLog.Append(safeJumpGps).Append("\n");
-
-                    targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
-
-                    double targetDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
-                    targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
-
-                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
-                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
-                } else {
-                    Vector3D hitPosition = TARGET.HitPosition.Value;
-                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * friendlySafeDistance);
-
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
-
-                    double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-
-                    JUMPERS[0].JumpDistanceMeters = (float)distance;
-
-                    targetPosition = safeJumpPosition;
-
-                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
-                    targetLog.Append(safeJumpGps).Append("\n");
-
-                    targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
-
-                    double targetDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, hitPosition);
-                    targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
-
-                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
-                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
-                }
-            } else {
-                targetLog.Append("Nothing Detected!\n");
-            }
-        }
-
-        bool AimAtTarget(Vector3D targetPos) {
-            bool aligned = false;
-            Vector3D aimDirection = targetPos - REMOTE.GetPosition();
-
-            double yawAngle;
-            double pitchAngle;
-            double rollAngle;
-            GetRotationAnglesSimultaneous(aimDirection, REMOTE.WorldMatrix.Up, REMOTE.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
-            double yawSpeed = yawController.Control(yawAngle);
-            double pitchSpeed = pitchController.Control(pitchAngle);
-            double rollSpeed = rollController.Control(rollAngle);
-            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, REMOTE.WorldMatrix);
-
-            Vector3D forwardVec = REMOTE.WorldMatrix.Forward;
-            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
-            if (angle * rad2deg <= angleTolerance) {
-                aimTarget = false;
-                aligned = true;
-                UnlockGyros();
-            }
-            return aligned;
-        }
-
-        bool TurretsDetection() {
-            bool targetFound = false;
-            if (impactDetectionCount == impactDetectionDelay) {
-                foreach (IMyLargeTurretBase turret in TURRETS) {
-                    MyDetectedEntityInfo targ = turret.GetTargetedEntity();
-                    if (!targ.IsEmpty()) {//TODO sameID
-                        if (IsValidTarget(ref targ)) {
-                            targetInfo = targ;
-                            targetFound = true;
-                            break;
-                        }
-                    }
-                }
-                if (!targetFound) {
-                    targetInfo = default(MyDetectedEntityInfo);
-                }
-                impactDetectionCount = 0;
-            }
-            impactDetectionCount++;
-
-            return targetFound;
-        }
-
-        void ManageTarget(out Vector3D trgP, out Vector3D trgV) {
-            trgP = Vector3D.Zero;
-            trgV = Vector3D.Zero;
-            if (targFound) {
-                trgP = targPos;
-                trgV = targVelVec;
-            } else if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
-                trgP = targetInfo.HitPosition.Value;
-                trgV = targetInfo.Velocity;
-            }
-        }
-
-        void CheckTarget(Vector3D trgP, Vector3D trgV) {
-            if (!Vector3D.IsZero(trgP)) {// && !Vector3D.IsZero(trgV)) {
-                if (lockTargetOnce) {
-
-                    IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
-                    StringBuilder debugLog = new StringBuilder("");
-                    DEBUG.ReadText(debugLog, true);
-                    debugLog.Append("if lockTargetOnce: " + lockTargetOnce + "\n");
-                    DEBUG.WriteText(debugLog);
-
-                    if (stabilizeOnce) {
-                        StabilizeOff();
-                        stabilizeOnce = false;
-                    }
-                    bool aligned;
-                    if (!targFound) {
-                        aligned = AimAtTarget(trgP);//TODO targetInfo.Position
-                    } else {
-                        aligned = true;
-                    }
-                    impactDetectionDelay = 1;
-                    if (aligned) {
-                        if (!targFound) {
-                            PAINTERPB.TryRun(argLockTarget);
-                        }
-                        lockTargetOnce = false;
-                        impactDetectionDelay = 5;
-                    }
-                }
-
-                if (launchDecoyOnce) {
-                    double dist = Vector3D.Distance(trgP, LIDARS[0].GetPosition());
-                    if (Vector3D.IsZero(REMOTE.GetNaturalGravity()) && dist < 800d) {
-                        SHOOTERPB.TryRun(argLaunchDecoy);
-                    }
-                    launchDecoyOnce = false;
-                    keepAltitude = false;
-                }
-
-                CheckCollisions(trgP, trgV);
-
-            } else {
-                if (!lockTargetOnce) {
-
-                    IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
-                    StringBuilder debugLog = new StringBuilder("");
-                    DEBUG.ReadText(debugLog, true);
-                    debugLog.Append("else lockTargetOnce: " + lockTargetOnce + "\n");
-                    DEBUG.WriteText(debugLog);
-
-                    UnlockGyros();//TODO
-                    StabilizeOn();
-                    stabilizeOnce = true;
-                    PAINTERPB.TryRun(argUnlockFromTarget);
-                    lockTargetOnce = true;
-                }
-                if (!launchDecoyOnce) {
-                    launchDecoyOnce = true;
-                    keepAltitude = true;
-                }
-                if (!Vector3D.IsZero(returnPosition)) {
-                    escapePosition = Vector3D.Zero;
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(returnPosition, "returnPosition");
-                    REMOTE.SetAutoPilotEnabled(true);
-                    returnOnce = true;
-                }
-            }
-        }
-
-        void CheckCollisions(Vector3D targetPos, Vector3D targetVelocity) {
-            BoundingBoxD gridLocalBB = new BoundingBoxD(REMOTE.CubeGrid.Min * REMOTE.CubeGrid.GridSize, REMOTE.CubeGrid.Max * REMOTE.CubeGrid.GridSize);
-            MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, REMOTE.CubeGrid.WorldMatrix);
-            double time = 80.0d;
-            Vector3D targetFuturePosition = targetPos + (targetVelocity * time);
-            LineD line = new LineD(targetPos, targetFuturePosition);
-            double? hitDist = obb.Intersects(ref line);
-            if (hitDist.HasValue) {
-                if (returnOnce) {
-                    if (Vector3D.IsZero(returnPosition)) {
-                        returnPosition = REMOTE.GetPosition();
-                    }
-                    returnOnce = false;
-                }
-                if (escapeCount == escapeDelay) {
-                    Vector3D escapePos = targetPos + (Vector3D.Normalize(targetPos - REMOTE.GetPosition()) * escapeDistance);
-                    escapePosition = Vector3D.Cross(escapePos, REMOTE.WorldMatrix.Down);
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(escapePosition, "escapePosition");
-                    REMOTE.SetAutoPilotEnabled(true);
-                    escapeCount = 0;
-                }
-                escapeCount++;
-            }
-        }
-
-        void ManageWaypoints() {//TODO
-            if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
-                double dist = Vector3D.Distance(targetPosition, REMOTE.GetPosition());
-                if (dist < stopDistance) {
-                    REMOTE.SetAutoPilotEnabled(false);
-                    targetPosition = Vector3D.Zero;
-                }
-            }
-
-            if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
-                double dist = Vector3D.Distance(escapePosition, REMOTE.GetPosition());
-                if (dist < stopDistance) {
-                    REMOTE.ClearWaypoints();
-                    REMOTE.SetAutoPilotEnabled(false);
-                    escapePosition = Vector3D.Zero;
-                }
-            }
-
-            if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
-                double dist = Vector3D.Distance(returnPosition, REMOTE.GetPosition());
-                if (dist < stopDistance) {
-                    REMOTE.ClearWaypoints();
-                    REMOTE.SetAutoPilotEnabled(false);
-                    returnPosition = Vector3D.Zero;
-                    returnOnce = true;
-                }
-            }
-        }
-
         bool GetBroadcastMessages() {
             bool received = false;
             if (BROADCASTLISTENER.HasPendingMessage) {
@@ -824,88 +393,6 @@ namespace IngameScript {
             return received;
         }
 
-        void AlignToGround(IMyShipController controller) {
-            Vector3D gravityVec = controller.GetNaturalGravity();
-            if (!Vector3D.IsZero(gravityVec)) {
-                MatrixD matrix = controller.WorldMatrix;
-                Vector3D leftVec = Vector3D.Cross(matrix.Forward, gravityVec);
-                Vector3D horizonVec = Vector3D.Cross(gravityVec, leftVec);
-                double pitchAngle, rollAngle, yawAngle;
-                GetRotationAnglesSimultaneous(horizonVec, -gravityVec, matrix, out pitchAngle, out yawAngle, out rollAngle);
-
-                //yawController.Reset();
-                double pitchSpeed = pitchController.Control(pitchAngle);
-                double rollSpeed = rollController.Control(rollAngle);
-
-                ApplyGyroOverride(pitchSpeed, 0, rollSpeed, GYROS, matrix);
-
-                bool forwardAligned = false;
-                bool upAligned = false;
-                double angle = VectorMath.AngleBetween(matrix.Forward, horizonVec);
-                if (angle * rad2deg <= 1d) {//angleTolerance
-                    forwardAligned = true;
-                }
-                angle = VectorMath.AngleBetween(matrix.Up, -gravityVec);
-                if (angle * rad2deg <= 1d) {//angleTolerance
-                    upAligned = true;
-                }
-                if (forwardAligned && upAligned) {
-                    UnlockGyros();
-                }
-            }
-        }
-
-        Vector3 KeepAltitude(Vector3 dir, IMyShipController controller) {
-            Vector3D gravity = controller.GetNaturalGravity();
-            if (!Vector3D.IsZero(gravity) && idleThrusters && keepAltitude) {
-                double altitude;
-                controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
-                if (altitudeToKeep == 0d) {
-                    altitudeToKeep = altitude;
-                }
-                if (altitude < altitudeToKeep - 30d) {
-                    Vector3D gravTransformed = -Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
-                    dir += Vector3D.IsZeroVector(dir) * gravTransformed;
-                } else if (altitude > altitudeToKeep + 30d) {
-                    Vector3D gravTransformed = Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
-                    dir += Vector3D.IsZeroVector(dir) * gravTransformed;
-                }
-            }
-            return dir;
-        }
-
-        void DeadMan() {
-            bool undercontrol = IsPiloted(true);
-            if (!undercontrol) {
-                IMyShipController cntrllr = null;
-                foreach (IMyShipController block in CONTROLLERS) {
-                    if (block.CanControlShip) {
-                        cntrllr = block;
-                        break;
-                    }
-                }
-                if (cntrllr != null) {
-                    double speed = cntrllr.GetShipSpeed();
-                    if (speed > deadManMinSpeed) {
-                        foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
-                        cntrllr.DampenersOverride = true;
-                    } else {
-                        if (!deadManOnce) {
-                            if (idleThrusters) {
-                                foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; }
-                            }
-                            deadManOnce = true;
-                        }
-                    }
-                }
-            } else {
-                if (deadManOnce) {
-                    foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
-                    deadManOnce = false;
-                }
-            }
-        }
-
         bool GetController() {
             if (CONTROLLER != null && (!CONTROLLER.IsUnderControl || !CONTROLLER.CanControlShip || !CONTROLLER.ControlThrusters)) {
                 CONTROLLER = null;
@@ -914,6 +401,7 @@ namespace IngameScript {
                 foreach (IMyShipController block in CONTROLLERS) {
                     if (block.IsUnderControl && block.IsFunctional && block.CanControlShip && block.ControlThrusters && !(block is IMyRemoteControl)) {
                         CONTROLLER = block;
+                        break;
                     }
                 }
             }
@@ -928,6 +416,7 @@ namespace IngameScript {
                     foreach (IMyShipController contr in CONTROLLERS) {
                         if (contr.IsFunctional && contr.CanControlShip && contr.ControlThrusters && !(contr is IMyRemoteControl)) {
                             controller = contr;
+                            break;
                         }
                     }
                     if (CONTROLLER == null) { controller = REMOTE; }
@@ -941,7 +430,7 @@ namespace IngameScript {
                         CONTROLLER = controller;
                         controlled = true;
                     }
-                    if (targFound) {//TODO
+                    if (targFound) {
                         CONTROLLER = controller;
                         controlled = true;
                     }
@@ -952,29 +441,169 @@ namespace IngameScript {
             return controlled;
         }
 
-        void SyncRotors() {
-            float angle = 0;
-            foreach (IMyMotorStator rotor in ROTORS) { angle += rotor.Angle; }
-            foreach (IMyMotorStator rotor in ROTORSINV) { angle += circle - rotor.Angle; }
-            angle /= ROTORS.Count() + ROTORSINV.Count();
-            float angleInv = circle - angle;
-            foreach (IMyMotorStator rotor in ROTORS) {
-                float rotorAngle = rotor.Angle;
-                float asyncAngle = Smallest(rotorAngle - angle, Smallest(rotorAngle - angle + circle, rotorAngle - angle - circle));
-                if (asyncAngle > 0) {
-                    rotor.TargetVelocityRad = (targetVel - syncSpeed);
+        void GyroStabilize(IMyShipController controller, bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity) {
+            if (useGyrosToStabilize && !targetFound && !aimingTarget && !isAutoPiloted) {
+                if (!Vector3D.IsZero(gravity)) {
+                    MatrixD matrix = controller.WorldMatrix;
+                    Vector3D leftVec = Vector3D.Cross(matrix.Forward, gravity);
+                    Vector3D horizonVec = Vector3D.Cross(gravity, leftVec);
+                    double pitchAngle, rollAngle, yawAngle;
+                    GetRotationAnglesSimultaneous(horizonVec, -gravity, matrix, out pitchAngle, out yawAngle, out rollAngle);
+
+                    double mouseYaw = controller.RotationIndicator.Y;
+                    double mousePitch = controller.RotationIndicator.X;
+                    double mouseRoll = controller.RollIndicator;
+
+                    if (mouseYaw != 0d) {
+                        mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
+                    }
+                    if (mouseYaw == 0d) {
+                        mouseYaw = yawController.Control(yawAngle);
+                    } else {
+                        mouseYaw = yawController.Control(mouseYaw);
+                    }
+
+                    if (mousePitch != 0d) {
+                        mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
+                    }
+                    if (mousePitch == 0d) {
+                        mousePitch = pitchController.Control(pitchAngle);
+                    } else {
+                        mousePitch = pitchController.Control(mousePitch);
+                    }
+
+                    if (mouseRoll != 0d) {
+                        mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
+                    }
+                    if (mouseRoll == 0d) {
+                        mouseRoll = rollController.Control(rollAngle);
+                    } else {
+                        mouseRoll = rollController.Control(mouseRoll);
+                    }
+
+                    ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, matrix);
+
                 } else {
-                    rotor.TargetVelocityRad = (targetVel + syncSpeed);
+                    double speed = controller.GetShipSpeed();
+                    if (speed > minSpeed) {
+                        double pitchAngle, yawAngle, rollAngle;
+                        if (Vector3D.IsZero(lastForwardVector)) {
+                            lastForwardVector = controller.WorldMatrix.Forward;
+                            lastUpVector = controller.WorldMatrix.Up;
+                        }
+                        if (!useRoll) { lastUpVector = Vector3D.Zero; };
+                        GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+
+                        double mouseYaw = controller.RotationIndicator.Y;
+                        double mousePitch = controller.RotationIndicator.X;
+                        double mouseRoll = controller.RollIndicator;
+
+                        if (mouseYaw != 0d) {
+                            mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
+                        }
+                        if (mouseYaw == 0d) {
+                            mouseYaw = yawController.Control(yawAngle);
+                        } else {
+                            mouseYaw = yawController.Control(mouseYaw);
+                        }
+
+                        if (mousePitch != 0d) {
+                            mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
+                        }
+                        if (mousePitch == 0d) {
+                            mousePitch = pitchController.Control(pitchAngle);
+                        } else {
+                            mousePitch = pitchController.Control(mousePitch);
+                        }
+
+                        if (mouseRoll != 0d) {
+                            mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
+                        }
+                        if (mouseRoll == 0d) {
+                            mouseRoll = rollController.Control(rollAngle);
+                        } else {
+                            mouseRoll = rollController.Control(mouseRoll);
+                        }
+
+                        ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
+
+                        lastForwardVector = controller.WorldMatrix.Forward;
+                        lastUpVector = controller.WorldMatrix.Up;
+                    }
+                }
+
+                unlockGyrosOnce = true;
+            } else {
+                if (unlockGyrosOnce) {
+                    UnlockGyros();
+                    lastForwardVector = Vector3D.Zero;
+                    lastUpVector = Vector3D.Zero;
+                    unlockGyrosOnce = false;
                 }
             }
-            foreach (IMyMotorStator rotor in ROTORSINV) {
-                float rotorAngle = rotor.Angle;
-                float asyncAngle = Smallest(rotorAngle - angleInv, Smallest(rotorAngle - angleInv + circle, rotorAngle - angleInv - circle));
-                if (asyncAngle > 0) {
-                    rotor.TargetVelocityRad = (-targetVel - syncSpeed);
-                } else {
-                    rotor.TargetVelocityRad = (-targetVel + syncSpeed);
+        }
+
+        void ManageMagneticDrive(IMyShipController controller, bool isControlled, bool isUnderControl, bool isAutoPiloted, bool targetFound, bool idleThrusters, bool keepAltitude, Vector3D gravity) {
+            if (magneticDrive && isControlled) {
+                if (initMagneticDriveOnce) {
+                    InitMagneticDrive();
+                    if (MANAGERPB.CustomData.Contains("SunChaser=true")) { MANAGERPB.TryRun(argSunchaseOff); }
+                    initMagneticDriveOnce = false;
                 }
+
+                SyncRotors();
+
+                if (isAutoPiloted) {
+                    Vector3 dir = AutoMagneticDrive();
+                    SetPower(dir);
+                } else {
+                    if (!initAutoMagneticDriveOnce) {
+                        foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
+                        initAutoMagneticDriveOnce = true;
+                    }
+
+                    if (!isUnderControl && targetFound) {
+                        if (initRandomMagneticDriveOnce) {
+                            foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = true; }
+                            controller.DampenersOverride = false;
+                            initRandomMagneticDriveOnce = false;
+                        }
+
+                        Vector3 dir = RandomMagneticDrive(targPos, LIDARS[0]);
+                        SetPower(dir);
+                    } else {
+                        if (!initRandomMagneticDriveOnce) {
+                            randomDir = Vector3.Zero;
+                            foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = false; }
+                            controller.DampenersOverride = true;
+                            initRandomMagneticDriveOnce = true;
+                        }
+
+                        Vector3 dir = MagneticDrive(controller, gravity);
+                        if (!isUnderControl) {
+                            dir = KeepAltitude(dir, controller, idleThrusters, keepAltitude, gravity);
+                        } else {
+                            altitudeToKeep = 0d;
+                        }
+                        SetPower(dir);
+                    }
+                }
+            } else {
+                if (!initMagneticDriveOnce) {
+                    IdleMagneticDrive(idleThrusters);
+                    initMagneticDriveOnce = true;
+                }
+
+                if (tickCount == tickDelay) {
+                    if (controlDampeners) {
+                        DeadMan(IsPiloted(true));
+                        LCDDEADMAN.BackgroundColor = new Color(0, 255, 255);
+                    } else { LCDDEADMAN.BackgroundColor = new Color(0, 0, 0); }
+                    if (idleThrusters) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); } else { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
+
+                    tickCount = 0;
+                }
+                tickCount++;
             }
         }
 
@@ -984,8 +613,8 @@ namespace IngameScript {
             foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
         }
 
-        void IdleMagneticDrive() {
-            SetPow(Vector3D.Zero);
+        void IdleMagneticDrive(bool idleThrusters) {
+            SetPower(Vector3D.Zero);
             foreach (IMyMotorStator block in ROTORS) {
                 block.TargetVelocityRPM = 0;
                 block.Enabled = false;
@@ -999,7 +628,7 @@ namespace IngameScript {
             }
         }
 
-        IMyThrust AutopilotThrustInitializer(List<IMyThrust> thrusters) {
+        IMyThrust InitAutopilotMagneticDrive(List<IMyThrust> thrusters) {
             IMyThrust thruster = null;
             int i = 0;
             foreach (IMyThrust thrust in thrusters) {
@@ -1014,7 +643,29 @@ namespace IngameScript {
             return thruster;
         }
 
-        void RandomMagneticDrive(Vector3D targPos, IMyTerminalBlock tBlock) {
+        Vector3 AutoMagneticDrive() {
+            if (initAutoMagneticDriveOnce) {
+                UPTHRUST = InitAutopilotMagneticDrive(UPTHRUSTERS);
+                DOWNTHRUST = InitAutopilotMagneticDrive(DOWNTHRUSTERS);
+                LEFTTHRUST = InitAutopilotMagneticDrive(LEFTTHRUSTERS);
+                RIGHTTHRUST = InitAutopilotMagneticDrive(RIGHTTHRUSTERS);
+                FORWARDTHRUST = InitAutopilotMagneticDrive(FORWARDTHRUSTERS);
+                BACKWARDTHRUST = InitAutopilotMagneticDrive(BACKWARDTHRUSTERS);
+
+                initAutoMagneticDriveOnce = false;
+            }
+
+            Vector3 dir = new Vector3();
+            if (FORWARDTHRUST.CurrentThrust > 0) { dir.Z = -1; } else if (BACKWARDTHRUST.CurrentThrust > 0) { dir.Z = 1; }
+
+            if (UPTHRUST.CurrentThrust > 0) { dir.Y = 1; } else if (DOWNTHRUST.CurrentThrust > 0) { dir.Y = -1; }
+
+            if (LEFTTHRUST.CurrentThrust > 0) { dir.X = -1; } else if (RIGHTTHRUST.CurrentThrust > 0) { dir.X = 1; }
+
+            return dir;
+        }
+
+        Vector3 RandomMagneticDrive(Vector3D targPos, IMyTerminalBlock tBlock) {
             bool detectedOwner = false;
             if (sensorsCount >= sensorsDelay) {
                 List<MyDetectedEntityInfo> entities = new List<MyDetectedEntityInfo>();
@@ -1042,9 +693,9 @@ namespace IngameScript {
                 randomFireDelay = random.Next(10, 20);
             }
 
-            if (!detectedOwner && readyToFire) {//SHOOTERPB.CustomData.Contains("ReadyToFire")) {//TODO
+            if (!detectedOwner && readyToFire) {
                 if (randomCount >= randomDelay) {
-                    RandomDir = new Vector3();
+                    randomDir = new Vector3();
                     int randomInt;
 
                     List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
@@ -1052,14 +703,14 @@ namespace IngameScript {
                     LEFTSENSOR.DetectedEntities(entitiesA);
                     RIGHTSENSOR.DetectedEntities(entitiesB);
                     if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                        RandomDir.X = 0;
+                        randomDir.X = 0;
                     } else if (entitiesA.Count > 0) {
-                        RandomDir.X = 1;
+                        randomDir.X = 1;
                     } else if (entitiesB.Count > 0) {
-                        RandomDir.X = -1;
+                        randomDir.X = -1;
                     } else {
                         randomInt = random.Next(-1, 1);
-                        RandomDir.X = randomInt;
+                        randomDir.X = randomInt;
                     }
 
                     entitiesA.Clear();
@@ -1067,14 +718,14 @@ namespace IngameScript {
                     UPSENSOR.DetectedEntities(entitiesA);
                     DOWNSENSOR.DetectedEntities(entitiesB);
                     if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                        RandomDir.Y = 0;
+                        randomDir.Y = 0;
                     } else if (entitiesA.Count > 0) {
-                        RandomDir.Y = -1;
+                        randomDir.Y = -1;
                     } else if (entitiesB.Count > 0) {
-                        RandomDir.Y = 1;
+                        randomDir.Y = 1;
                     } else {
                         randomInt = random.Next(-1, 1);
-                        RandomDir.Y = randomInt;
+                        randomDir.Y = randomInt;
                     }
 
                     entitiesA.Clear();
@@ -1082,14 +733,14 @@ namespace IngameScript {
                     UPSENSOR.DetectedEntities(entitiesA);
                     DOWNSENSOR.DetectedEntities(entitiesB);
                     if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                        RandomDir.Y = 0;
+                        randomDir.Y = 0;
                     } else if (entitiesA.Count > 0) {
-                        RandomDir.Y = -1;
+                        randomDir.Y = -1;
                     } else if (entitiesB.Count > 0) {
-                        RandomDir.Y = 1;
+                        randomDir.Y = 1;
                     } else {
                         randomInt = random.Next(-1, 1);
-                        RandomDir.Y = randomInt;
+                        randomDir.Y = randomInt;
                     }
 
                     entitiesA.Clear();
@@ -1097,19 +748,19 @@ namespace IngameScript {
                     FORWARDSENSOR.DetectedEntities(entitiesA);
                     BACKWARDSENSOR.DetectedEntities(entitiesB);
                     if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                        RandomDir.Z = 0;
+                        randomDir.Z = 0;
                     } else if (entitiesA.Count > 0) {
-                        RandomDir.Z = 1;
+                        randomDir.Z = 1;
                     } else if (entitiesB.Count > 0) {
-                        RandomDir.Z = -1;
+                        randomDir.Z = -1;
                     } else {
                         if (distance <= 800d) {
-                            RandomDir.Z = 1;
+                            randomDir.Z = 1;
                         } else if (distance >= 1500d) {
-                            RandomDir.Z = -1;
+                            randomDir.Z = -1;
                         } else {
                             randomInt = random.Next(-1, 1);
-                            RandomDir.Z = randomInt;
+                            randomDir.Z = randomInt;
                         }
                     }
                     randomCount = 0;
@@ -1117,89 +768,49 @@ namespace IngameScript {
                 }
                 randomCount++;
 
-                SetPow(RandomDir);
+                return randomDir;
             } else {
                 randomCount = 0;
-                RandomDir = Vector3.Zero;//TODO
-                //RandomDir.X = 0;
-                //RandomDir.Y = 0;
-                //RandomDir.Z = 0;
-                SetPow(RandomDir);
+                randomDir = Vector3.Zero;
+                return randomDir;
             }
         }
 
-        void AutoMagneticDrive() {
-            if (initAutoThrustOnce) {
-                UPTHRUST = AutopilotThrustInitializer(UPTHRUSTERS);
-                DOWNTHRUST = AutopilotThrustInitializer(DOWNTHRUSTERS);
-                LEFTTHRUST = AutopilotThrustInitializer(LEFTTHRUSTERS);
-                RIGHTTHRUST = AutopilotThrustInitializer(RIGHTTHRUSTERS);
-                FORWARDTHRUST = AutopilotThrustInitializer(FORWARDTHRUSTERS);
-                BACKWARDTHRUST = AutopilotThrustInitializer(BACKWARDTHRUSTERS);
-
-                initAutoThrustOnce = false;
-            }
-
-            Vector3 dir = new Vector3();
-            if (FORWARDTHRUST.CurrentThrust > 0) { dir.Z = -1; } else if (BACKWARDTHRUST.CurrentThrust > 0) { dir.Z = 1; }
-
-            if (UPTHRUST.CurrentThrust > 0) { dir.Y = 1; } else if (DOWNTHRUST.CurrentThrust > 0) { dir.Y = -1; }
-
-            if (LEFTTHRUST.CurrentThrust > 0) { dir.X = -1; } else if (RIGHTTHRUST.CurrentThrust > 0) { dir.X = 1; }
-
-            SetPow(dir);
-        }
-
-        void MagneticDrive() {
+        Vector3 MagneticDrive(IMyShipController controller, Vector3D gravity) {
             Matrix mtrx;
             Vector3 dir;
-            dir = CONTROLLER.MoveIndicator;
-            CONTROLLER.Orientation.GetMatrix(out mtrx);
+            dir = controller.MoveIndicator;
+            controller.Orientation.GetMatrix(out mtrx);
             dir = Vector3.Transform(dir, mtrx);
             if (!Vector3.IsZero(dir)) {
                 //debugLog.Append("dir X: " + dir.X + "\ndir Y: " + dir.Y + "\ndir Z: " + dir.Z + "\n\n");
                 dir /= dir.Length();
-                if (!switchOnce) {
+                if (!toggleThrustersOnce) {
                     foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = false; }
-                    switchOnce = true;
+                    toggleThrustersOnce = true;
                 }
             } else {
-                if (switchOnce) {
+                if (toggleThrustersOnce) {
                     foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-                    switchOnce = false;
+                    toggleThrustersOnce = false;
                 }
             }
-            if (Vector3D.IsZero(CONTROLLER.GetNaturalGravity()) && !CONTROLLER.DampenersOverride && dir.LengthSquared() == 0) {
-                SetPow(Vector3.Zero);
-                return;
+            if (Vector3D.IsZero(gravity) && !controller.DampenersOverride && dir.LengthSquared() == 0) {
+                return Vector3.Zero;
             }
 
-            CONTROLLER.Orientation.GetMatrix(out mtrx);
-            Vector3 vel = CONTROLLER.GetShipVelocities().LinearVelocity;
-            vel = Vector3.Transform(vel, MatrixD.Transpose(CONTROLLER.WorldMatrix.GetOrientation()));
+            controller.Orientation.GetMatrix(out mtrx);
+            Vector3 vel = controller.GetShipVelocities().LinearVelocity;
+            vel = Vector3.Transform(vel, MatrixD.Transpose(controller.WorldMatrix.GetOrientation()));
             vel = dir * maxSpeed - Vector3.Transform(vel, mtrx);
             if (Math.Abs(vel.X) < minSpeed) { vel.X = 0; }
             if (Math.Abs(vel.Y) < minSpeed) { vel.Y = 0; }
             if (Math.Abs(vel.Z) < minSpeed) { vel.Z = 0; }
 
-            if (!IsPiloted(false)) {
-                if (keepAltitudeOnce) {
-                    StabilizeOff();
-                    keepAltitudeOnce = false;
-                }
-                vel = KeepAltitude(vel, CONTROLLER);
-            } else {
-                if (!keepAltitudeOnce) {
-                    StabilizeOn();
-                    keepAltitudeOnce = true;
-                }
-                altitudeToKeep = 0d;
-            }
-
-            SetPow(vel);
+            return vel;
         }
 
-        void SetPow(Vector3 pow) {
+        void SetPower(Vector3 pow) {
             if (pow.X != 0) {
                 if (pow.X > 0) {
                     foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = true; }
@@ -1238,63 +849,382 @@ namespace IngameScript {
             }
         }
 
-        void GyroStabilize(IMyShipController controller) {
-            double speed = controller.GetShipSpeed();
-            if (useGyrosToStabilize && speed > minSpeed) {
-                if (Vector3D.IsZero(lastForwardVector) || Vector3D.IsZero(lastUpVector)) {
-                    lastForwardVector = controller.WorldMatrix.Forward;
-                    lastUpVector = controller.WorldMatrix.Up;
+        void SyncRotors() {
+            float angle = 0;
+            foreach (IMyMotorStator rotor in ROTORS) { angle += rotor.Angle; }
+            foreach (IMyMotorStator rotor in ROTORSINV) { angle += circle - rotor.Angle; }
+            angle /= ROTORS.Count() + ROTORSINV.Count();
+            float angleInv = circle - angle;
+            foreach (IMyMotorStator rotor in ROTORS) {
+                float rotorAngle = rotor.Angle;
+                float asyncAngle = Smallest(rotorAngle - angle, Smallest(rotorAngle - angle + circle, rotorAngle - angle - circle));
+                if (asyncAngle > 0) {
+                    rotor.TargetVelocityRad = (targetVel - syncSpeed);
                 } else {
-                    double pitchAngle, yawAngle, rollAngle;
-                    if (!useRoll) { lastUpVector = Vector3D.Zero; };
-                    GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
-                    double mouseYaw = controller.RotationIndicator.Y;
-                    double mousePitch = controller.RotationIndicator.X;
-                    double mouseRoll = controller.RollIndicator;
-
-                    if (mouseYaw != 0) {
-                        mouseYaw = mouseYaw < 0 ? MathHelper.Clamp(mouseYaw, -10, -2) : MathHelper.Clamp(mouseYaw, 2, 10);
-                    }
-                    if (mouseYaw == 0) {
-                        mouseYaw = yawController.Control(yawAngle);
-                    } else {
-                        mouseYaw = yawController.Control(mouseYaw);
-                    }
-
-                    if (mousePitch != 0) {
-                        mousePitch = mousePitch < 0 ? MathHelper.Clamp(mousePitch, -10, -2) : MathHelper.Clamp(mousePitch, 2, 10);
-                    }
-                    if (mousePitch == 0) {
-                        mousePitch = pitchController.Control(pitchAngle);
-                    } else {
-                        mousePitch = pitchController.Control(mousePitch);
-                    }
-
-                    if (mouseRoll != 0) {
-                        mouseRoll = mouseRoll < 0 ? MathHelper.Clamp(mouseRoll, -10, -2) : MathHelper.Clamp(mouseRoll, 2, 10);
-                    }
-                    if (mouseRoll == 0) {
-                        mouseRoll = rollController.Control(rollAngle);
-                    } else {
-                        mouseRoll = rollController.Control(mouseRoll);
-                    }
-
-                    ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
-
-                    lastForwardVector = controller.WorldMatrix.Forward;
-                    lastUpVector = controller.WorldMatrix.Up;
-
-                    unlockOnce = true;
-                }
-            } else {
-                if (unlockOnce) {
-                    UnlockGyros();
-                    lastForwardVector = Vector3D.Zero;
-                    lastUpVector = Vector3D.Zero;
-                    unlockOnce = false;
+                    rotor.TargetVelocityRad = (targetVel + syncSpeed);
                 }
             }
+            foreach (IMyMotorStator rotor in ROTORSINV) {
+                float rotorAngle = rotor.Angle;
+                float asyncAngle = Smallest(rotorAngle - angleInv, Smallest(rotorAngle - angleInv + circle, rotorAngle - angleInv - circle));
+                if (asyncAngle > 0) {
+                    rotor.TargetVelocityRad = (-targetVel - syncSpeed);
+                } else {
+                    rotor.TargetVelocityRad = (-targetVel + syncSpeed);
+                }
+            }
+        }
+
+        Vector3 KeepAltitude(Vector3 dir, IMyShipController controller, bool idleThrusters, bool keepAltitude, Vector3D gravity) {
+            if (!Vector3D.IsZero(gravity) && idleThrusters && keepAltitude) {
+                double altitude;
+                controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
+                if (altitudeToKeep == 0d) {
+                    altitudeToKeep = altitude;
+                }
+                if (altitude < altitudeToKeep - 30d) {
+                    Vector3D gravTransformed = -Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
+                    dir += Vector3D.IsZeroVector(dir) * gravTransformed;
+                } else if (altitude > altitudeToKeep + 30d) {
+                    Vector3D gravTransformed = Vector3D.Sign(Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix)));
+                    dir += Vector3D.IsZeroVector(dir) * gravTransformed;
+                }
+            }
+            return dir;
+        }
+
+        void DeadMan(bool isUnderControl) {
+            if (!isUnderControl) {
+                IMyShipController cntrllr = null;
+                foreach (IMyShipController block in CONTROLLERS) {
+                    if (block.CanControlShip) {
+                        cntrllr = block;
+                        break;
+                    }
+                }
+                if (cntrllr != null) {
+                    double speed = cntrllr.GetShipSpeed();
+                    if (speed > deadManMinSpeed) {
+                        foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
+                        cntrllr.DampenersOverride = true;
+                    } else {
+                        if (!deadManOnce) {
+                            if (idleThrusters) {
+                                foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = false; }
+                            }
+                            deadManOnce = true;
+                        }
+                    }
+                }
+            } else {
+                if (deadManOnce) {
+                    foreach (IMyThrust thrst in THRUSTERS) { thrst.Enabled = true; }
+                    deadManOnce = false;
+                }
+            }
+        }
+
+        bool TurretsDetection() {
+            bool targetFound = false;
+            if (impactDetectionCount == impactDetectionDelay) {
+                foreach (IMyLargeTurretBase turret in TURRETS) {
+                    MyDetectedEntityInfo targ = turret.GetTargetedEntity();
+                    if (!targ.IsEmpty()) {
+                        if (IsValidTarget(ref targ)) {
+                            targetInfo = targ;
+                            targetFound = true;
+                            break;
+                        }
+                    }
+                }
+                if (!targetFound) {
+                    targetInfo = default(MyDetectedEntityInfo);
+                }
+                impactDetectionCount = 0;
+            }
+            impactDetectionCount++;
+
+            return targetFound;
+        }
+
+        void ManageTarget(out Vector3D trgP, out Vector3D trgV) {
+            trgP = Vector3D.Zero;
+            trgV = Vector3D.Zero;
+            if (targFound) {
+                trgP = targPos;
+                trgV = targVelVec;
+            } else if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+                trgP = targetInfo.HitPosition.Value;
+                trgV = targetInfo.Velocity;
+            }
+        }
+
+        void CheckTarget(IMyShipController controller, IMyRemoteControl remote, Vector3D trgP, Vector3D trgV, Vector3D gravity) {
+            if (!Vector3D.IsZero(trgP)) {
+                if (lockTargetOnce) {
+                    bool aligned;
+                    if (!targFound) {
+                        aligned = AimAtTarget(controller, trgP);
+                    } else {
+                        aligned = true;
+                    }
+                    impactDetectionDelay = 1;
+                    if (aligned) {
+                        if (!targFound) {
+                            PAINTERPB.TryRun(argLockTarget);
+                        }
+                        lockTargetOnce = false;
+                        impactDetectionDelay = 5;
+                    }
+                }
+
+                if (launchDecoyOnce) {
+                    double dist = Vector3D.Distance(trgP, LIDARS[0].GetPosition());
+                    if (Vector3D.IsZero(gravity) && dist < 800d) {
+                        SHOOTERPB.TryRun(argLaunchDecoy);
+                    }
+                    launchDecoyOnce = false;
+                    keepAltitude = false;//TODO
+                }
+
+                CheckCollisions(remote, trgP, trgV);
+
+            } else {
+                if (!lockTargetOnce) {
+                    PAINTERPB.TryRun(argUnlockFromTarget);
+                    lockTargetOnce = true;
+                }
+                if (!launchDecoyOnce) {
+                    launchDecoyOnce = true;
+                    keepAltitude = true;//TODO
+                }
+                if (!Vector3D.IsZero(returnPosition)) {
+                    escapePosition = Vector3D.Zero;
+                    remote.ClearWaypoints();
+                    remote.AddWaypoint(returnPosition, "returnPosition");
+                    remote.SetAutoPilotEnabled(true);
+                    returnOnce = true;
+                }
+            }
+        }
+
+        void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {
+            BoundingBoxD gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
+            MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
+            double time = 80.0d;
+            Vector3D targetFuturePosition = targetPos + (targetVelocity * time);
+            LineD line = new LineD(targetPos, targetFuturePosition);
+            double? hitDist = obb.Intersects(ref line);
+            if (hitDist.HasValue) {
+                if (returnOnce) {
+                    if (Vector3D.IsZero(returnPosition)) {
+                        returnPosition = remote.GetPosition();
+                    }
+                    returnOnce = false;
+                }
+                if (escapeCount == escapeDelay) {
+                    Vector3D escapePos = targetPos + (Vector3D.Normalize(targetPos - remote.GetPosition()) * escapeDistance);
+                    escapePosition = Vector3D.Cross(escapePos, remote.WorldMatrix.Down);
+                    remote.ClearWaypoints();
+                    remote.AddWaypoint(escapePosition, "escapePosition");
+                    remote.SetAutoPilotEnabled(true);
+                    escapeCount = 0;
+                }
+                escapeCount++;
+            }
+        }
+
+        void ManageWaypoints(IMyRemoteControl remote, bool isUnderControl) {
+            if (!isUnderControl) {
+                isPilotedOnce = true;
+            } else {
+                if (isPilotedOnce) {
+                    remote.ClearWaypoints();
+                    returnPosition = Vector3D.Zero;
+                    escapePosition = Vector3D.Zero;
+                    isPilotedOnce = false;
+                }
+            }
+
+            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
+                double dist = Vector3D.Distance(targetPosition, remote.GetPosition());
+                if (dist < stopDistance) {
+                    remote.SetAutoPilotEnabled(false);
+                    targetPosition = Vector3D.Zero;
+                }
+            }
+
+            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
+                double dist = Vector3D.Distance(escapePosition, remote.GetPosition());
+                if (dist < stopDistance) {
+                    remote.ClearWaypoints();
+                    remote.SetAutoPilotEnabled(false);
+                    escapePosition = Vector3D.Zero;
+                }
+            }
+
+            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
+                double dist = Vector3D.Distance(returnPosition, remote.GetPosition());
+                if (dist < stopDistance) {
+                    remote.ClearWaypoints();
+                    remote.SetAutoPilotEnabled(false);
+                    returnPosition = Vector3D.Zero;
+                    returnOnce = true;
+                }
+            }
+        }
+
+        void RangeFinder(IMyRemoteControl remote) {
+            targetLog.Clear();
+
+            IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
+
+            MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);
+
+            if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
+                foreach (var block in ALARMS) {
+                    block.Play();
+                }
+                if (TARGET.Type == MyDetectedEntityType.Planet) {
+                    Vector3D planetCenter = TARGET.Position;
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
+                    double planetRadius = Vector3D.Distance(planetCenter, hitPosition);
+                    string planetName = "Earth";
+                    MyTuple<Vector3D, double, double> planet;
+                    planetsList.TryGetValue(planetName, out planet);
+                    double aRadius = Math.Abs(planet.Item2 - planetRadius);
+                    foreach (var planetElement in planetsList) {
+                        double dictPlanetRadius = planetElement.Value.Item2;
+                        double bRadius = Math.Abs(dictPlanetRadius - planetRadius);
+                        if (bRadius < aRadius) {
+                            planetName = planetElement.Key;
+                            aRadius = bRadius;
+                        }
+                    }
+                    selectedPlanet = planetName;
+                    planetsList.TryGetValue(planetName, out planet);
+                    double atmosphereRange = planet.Item3 + 1000d;
+
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * atmosphereRange);
+
+                    remote.ClearWaypoints();
+                    remote.AddWaypoint(safeJumpPosition, selectedPlanet);
+
+                    double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition);
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
+
+                    targetPosition = safeJumpPosition;
+
+                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
+                    targetLog.Append(safeJumpGps).Append("\n");
+
+                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
+
+                    double targetRadius = Vector3D.Distance(TARGET.Position, hitPosition);
+                    targetLog.Append("Radius: ").Append(targetRadius.ToString("0.0")).Append(", ");
+                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
+                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
+
+                    double targetGroundDistance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, hitPosition);
+                    targetLog.Append("Ground Dist.: ").Append(targetGroundDistance.ToString("0.0")).Append("\n");
+
+                    double targetAtmoHeight = Vector3D.Distance(hitPosition, safeJumpPosition);
+                    targetLog.Append("Atmo. Height: ").Append(targetAtmoHeight.ToString("0.0")).Append("\n");
+                } else if (TARGET.Type == MyDetectedEntityType.Asteroid) {
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * friendlySafeDistance);
+
+                    remote.ClearWaypoints();
+                    remote.AddWaypoint(safeJumpPosition, "Asteroid");
+
+                    double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition);
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
+
+                    targetPosition = safeJumpPosition;
+
+                    string safeJumpGps = $"GPS:Asteroid:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
+                    targetLog.Append(safeJumpGps).Append("\n");
+
+                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
+
+                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
+                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
+                } else if (IsNotFriendly(TARGET.Relationship)) {
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * enemySafeDistance);
+
+                    remote.ClearWaypoints();
+                    remote.AddWaypoint(safeJumpPosition, TARGET.Name);
+
+                    double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition);
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
+
+                    targetPosition = safeJumpPosition;
+
+                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
+                    targetLog.Append(safeJumpGps).Append("\n");
+
+                    targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
+
+                    double targetDistance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, hitPosition);
+                    targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
+
+                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
+                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
+                } else {
+                    Vector3D hitPosition = TARGET.HitPosition.Value;
+                    Vector3D safeJumpPosition = hitPosition - (Vector3D.Normalize(hitPosition - lidar.GetPosition()) * friendlySafeDistance);
+
+                    remote.ClearWaypoints();
+                    remote.AddWaypoint(safeJumpPosition, TARGET.Name);
+
+                    double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition);
+
+                    JUMPERS[0].JumpDistanceMeters = (float)distance;
+
+                    targetPosition = safeJumpPosition;
+
+                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
+                    targetLog.Append(safeJumpGps).Append("\n");
+
+                    targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
+
+                    double targetDistance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, hitPosition);
+                    targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
+
+                    double targetDiameter = Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max);
+                    targetLog.Append("Diameter: ").Append(targetDiameter.ToString("0.0")).Append("\n");
+                }
+            } else {
+                targetLog.Append("Nothing Detected!\n");
+            }
+        }
+
+        bool AimAtTarget(IMyShipController controller, Vector3D targetPos) {
+            bool aligned = false;
+            Vector3D aimDirection = targetPos - controller.GetPosition();
+
+            double yawAngle;
+            double pitchAngle;
+            double rollAngle;
+            GetRotationAnglesSimultaneous(aimDirection, controller.WorldMatrix.Up, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+
+            double yawSpeed = yawController.Control(yawAngle);
+            double pitchSpeed = pitchController.Control(pitchAngle);
+            double rollSpeed = rollController.Control(rollAngle);
+            ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, controller.WorldMatrix);
+
+            Vector3D forwardVec = controller.WorldMatrix.Forward;
+            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
+            if (angle * rad2deg <= angleTolerance) {
+                aimTarget = false;
+                aligned = true;
+                UnlockGyros();
+            }
+            return aligned;
         }
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
@@ -1385,6 +1315,17 @@ namespace IngameScript {
             return isPiloted;
         }
 
+        bool IsAutoPiloted() {
+            bool isAutoPiloted = false;
+            foreach (IMyRemoteControl block in REMOTES) {
+                if (block.IsAutoPilotEnabled) {
+                    isAutoPiloted = true;
+                    break;
+                }
+            }
+            return isAutoPiloted;
+        }
+
         public double GetMaxJumpDistance(IMyJumpDrive jumpDrive) {
             double maxDistance = (double)jumpDrive.MaxJumpDistanceMeters;
             return maxDistance;
@@ -1418,19 +1359,6 @@ namespace IngameScript {
 
         float Smallest(float rotorAngle, float b) {
             return Math.Abs(rotorAngle) > Math.Abs(b) ? b : rotorAngle;
-        }
-
-        void StabilizeOff() {
-            useGyrosToStabilize = false;
-            Me.CustomData = "GyroStabilize=false";
-            if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                MANAGERPB.TryRun(argSunchaseOff);
-            }
-        }
-
-        void StabilizeOn() {
-            useGyrosToStabilize = true;
-            Me.CustomData = "GyroStabilize=true";
         }
 
         void ReadLidarInfos() {
@@ -1486,11 +1414,34 @@ namespace IngameScript {
             }
         }
 
+        void ParseCockpitConfigData(IMyCockpit cockpit) {
+            if (!cockpit.CustomData.Contains(sectionTag)) {
+                cockpit.CustomData += $"[{sectionTag}]\n{cockpitRangeFinderKey}={cockpitRangeFinderSurface}\n";
+            }
+            MyIniParseResult result;
+            myIni.TryParse(cockpit.CustomData, sectionTag, out result);
+
+            if (!string.IsNullOrEmpty(myIni.Get(sectionTag, cockpitRangeFinderKey).ToString())) {
+                cockpitRangeFinderSurface = myIni.Get(sectionTag, cockpitRangeFinderKey).ToInt32();
+
+                SURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));
+            }
+        }
+
         void GetBlocks() {
             CONTROLLERS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipController>(CONTROLLERS, block => block.CustomName.Contains(controllersName));
             REMOTES.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyRemoteControl>(REMOTES, block => block.CustomName.Contains(remotesName));
+            int count = 0;
+            foreach (IMyRemoteControl remote in REMOTES) {
+                if (count == 0) {
+                    REMOTE = remote;
+                } else if (remote.IsMainCockpit) {
+                    REMOTE = remote;
+                }
+                count++;
+            }
             COCKPITS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, block => block.CustomName.Contains(cockpitsName));
             GYROS.Clear();
@@ -1533,7 +1484,6 @@ namespace IngameScript {
             foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             LCDDEADMAN = GridTerminalSystem.GetBlockWithName(deadManPanelName) as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
-            REMOTE = REMOTES[0];
             MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
             PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
             SHOOTERPB = GridTerminalSystem.GetBlockWithName(shooterName) as IMyProgrammableBlock;
@@ -1697,20 +1647,6 @@ namespace IngameScript {
             }
         }
 
-        /*
-        trgP: X:-638.525981959625 Y:1913.99944182133 Z:-306.536745534455, trgV:X:-0.0099786352366209 Y:0.0741840302944183 Z:-0.018282463774085
-targFound: True
-readyToFire: True
 
-Index was out of range. Must be non-negative and less than the size of the collection.
-Parameter name: index
-mscorlib
-Void ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)
-   at System.ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument argument, ExceptionResource resource)
-   at Program.SequenceWeapons(List`1 weapons)
-   at Program.ManageGuns()
-   at Program.Main(String arg)
-
-        */
     }
 }
