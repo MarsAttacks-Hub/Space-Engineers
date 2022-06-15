@@ -21,6 +21,7 @@ using SpaceEngineers.Game.Entities.Blocks;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO check damaged/destroyed blocks
+        //when sunchasing send message to navigator to stop gyroStabilize
         //MANAGER
 
         readonly string solarsName = "[CRX] Solar";

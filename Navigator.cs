@@ -24,6 +24,8 @@ namespace IngameScript {
         //TODO add generate orbital gps function
         //generate orbital gps above target 
         //land function
+        //when gyroStabilizing send message to manager to stop sunchasing
+        //when randomDriving if left and right sensors are detecting stuff then go up (if it's detecting decoys), so the painter can print decoy
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -273,6 +275,8 @@ namespace IngameScript {
                     CheckTarget(REMOTE, REMOTE, trgP, trgV, gravity);
                 }
 
+                ManageWaypoints(REMOTE, isUnderControl);
+
                 GyroStabilize(CONTROLLER, targFound, aimTarget, isAutoPiloted, useRoll, gravity);
 
                 ManageMagneticDrive(CONTROLLER, isControlled, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity);
@@ -280,8 +284,6 @@ namespace IngameScript {
                 if (aimTarget) {
                     AimAtTarget(REMOTE, targetPosition);
                 }
-
-                ManageWaypoints(REMOTE, isUnderControl);
 
                 ReadLidarInfos();
                 ReadJumpersInfos();
@@ -371,21 +373,24 @@ namespace IngameScript {
             }
         }
 
-        bool GetBroadcastMessages() {
+        bool GetBroadcastMessages() {//TODO
             bool received = false;
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     var igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    if (igcMessage.Data is ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>) {
-                        var data = (ImmutableArray<MyTuple<bool, Vector3D, Vector3D>>)igcMessage.Data;
-                        targFound = data[0].Item1;
-                        targPos = data[0].Item2;
-                        targVelVec = data[0].Item3;
+                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D>) {
+                        var data = (MyTuple<bool, Vector3D, Vector3D>)igcMessage.Data;
+                        targFound = data.Item1;
+                        targPos = data.Item2;
+                        targVelVec = data.Item3;
                         received = true;
                     }
-                    if (igcMessage.Data is ImmutableArray<MyTuple<bool>>) {
-                        var data = (ImmutableArray<MyTuple<bool>>)igcMessage.Data;
-                        readyToFire = data[0].Item1;
+                    if (igcMessage.Data is MyTuple<string, bool>) {
+                        var data = (MyTuple<string, bool>)igcMessage.Data;
+                        string variable = data.Item1;
+                        if (variable == "readyToFire") {
+                            readyToFire = data.Item2;
+                        }
                         received = true;
                     }
                 }
@@ -547,7 +552,7 @@ namespace IngameScript {
             if (magneticDrive && isControlled) {
                 if (initMagneticDriveOnce) {
                     InitMagneticDrive();
-                    if (MANAGERPB.CustomData.Contains("SunChaser=true")) { MANAGERPB.TryRun(argSunchaseOff); }
+                    if (MANAGERPB.CustomData.Contains("SunChaser=true")) { MANAGERPB.TryRun(argSunchaseOff); }//TODO
                     initMagneticDriveOnce = false;
                 }
 
@@ -702,6 +707,21 @@ namespace IngameScript {
                     List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
                     LEFTSENSOR.DetectedEntities(entitiesA);
                     RIGHTSENSOR.DetectedEntities(entitiesB);
+
+                    bool goUp = false;
+                    foreach (var entity in entitiesA) {
+                        if (entity.Type == MyDetectedEntityType.SmallGrid && (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Friends || entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner)) {
+                            goUp = true;
+                            break;
+                        }
+                    }
+                    foreach (var entity in entitiesB) {
+                        if (entity.Type == MyDetectedEntityType.SmallGrid && (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Friends || entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner)) {
+                            goUp = true;
+                            break;
+                        }
+                    }
+
                     if (entitiesA.Count > 0 && entitiesB.Count > 0) {
                         randomDir.X = 0;
                     } else if (entitiesA.Count > 0) {
@@ -717,21 +737,7 @@ namespace IngameScript {
                     entitiesB.Clear();
                     UPSENSOR.DetectedEntities(entitiesA);
                     DOWNSENSOR.DetectedEntities(entitiesB);
-                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                        randomDir.Y = 0;
-                    } else if (entitiesA.Count > 0) {
-                        randomDir.Y = -1;
-                    } else if (entitiesB.Count > 0) {
-                        randomDir.Y = 1;
-                    } else {
-                        randomInt = random.Next(-1, 1);
-                        randomDir.Y = randomInt;
-                    }
 
-                    entitiesA.Clear();
-                    entitiesB.Clear();
-                    UPSENSOR.DetectedEntities(entitiesA);
-                    DOWNSENSOR.DetectedEntities(entitiesB);
                     if (entitiesA.Count > 0 && entitiesB.Count > 0) {
                         randomDir.Y = 0;
                     } else if (entitiesA.Count > 0) {
@@ -739,8 +745,12 @@ namespace IngameScript {
                     } else if (entitiesB.Count > 0) {
                         randomDir.Y = 1;
                     } else {
-                        randomInt = random.Next(-1, 1);
-                        randomDir.Y = randomInt;
+                        if (goUp) {
+                            randomDir.Y = 1;
+                        } else {
+                            randomInt = random.Next(-1, 1);
+                            randomDir.Y = randomInt;
+                        }
                     }
 
                     entitiesA.Clear();

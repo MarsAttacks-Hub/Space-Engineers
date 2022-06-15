@@ -87,7 +87,6 @@ namespace IngameScript {
         public List<IMyShipMergeBlock> MERGES3 = new List<IMyShipMergeBlock>();
 
         Program() {
-            //Me.CustomData = "ReadyToFire";
             GetBlocks();
             if (selectedDrop == 0) {
                 TEMPPROJECTORS = PROJECTORSDECOY;
@@ -211,7 +210,6 @@ namespace IngameScript {
 
         void LaunchDecoy() {
             if (launchTick == 0) {
-                //Me.CustomData = "FiringDecoy";
                 SendBroadcastMessage(false);
                 foreach (IMyShipWelder block in WELDERSDECOY) { block.Enabled = true; }
                 launchTick++;
@@ -235,7 +233,6 @@ namespace IngameScript {
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = true; }
                     if (selectedDrop == 1) {
                         if (toggleDecoy) {
-                            //Me.CustomData = "ReadyToFire";
                             SendBroadcastMessage(true);
                             launchOnce = false;
                         }
@@ -248,7 +245,6 @@ namespace IngameScript {
                     if (ready) {
                         foreach (IMyShipWelder block in WELDERSDECOY) { block.Enabled = false; }
                         if (toggleDecoy) {
-                            //Me.CustomData = "ReadyToFire";
                             SendBroadcastMessage(true);
                             launchOnce = false;
                         }
@@ -264,7 +260,6 @@ namespace IngameScript {
 
         void FireJolt() {
             if (fireTick == 0) {
-                //Me.CustomData = "FiringJolt";
                 SendBroadcastMessage(false);
                 Runtime.UpdateFrequency = UpdateFrequency.Update10;
                 foreach (IMyShipWelder block in WELDERSJOLT) { block.Enabled = true; }
@@ -300,7 +295,6 @@ namespace IngameScript {
                 } else if (fireTick >= 260) {
                     if (toggleJolt) {
                         firing = false;
-                        //Me.CustomData = "ReadyToFire";
                         SendBroadcastMessage(true);
                     }
                     readyJolt = false;
@@ -312,11 +306,10 @@ namespace IngameScript {
             }
         }
 
-        void SendBroadcastMessage(bool readyToFire) {
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<bool>>();
-            var tuple = MyTuple.Create(readyToFire);
-            immArray.Add(tuple);
-            IGC.SendBroadcastMessage(navigatorTag, immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+        void SendBroadcastMessage(bool readyToFire) {//TODO
+            string variable = "readyToFire";
+            var tuple = MyTuple.Create(variable, readyToFire);
+            IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         bool CheckProjectors(List<IMyProjector> projectors, List<IMyShipWelder> welders) {
