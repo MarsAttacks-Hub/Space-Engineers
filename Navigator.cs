@@ -459,15 +459,6 @@ namespace IngameScript {
                     double mousePitch = controller.RotationIndicator.X;
                     double mouseRoll = controller.RollIndicator;
 
-                    if (mouseYaw != 0d) {
-                        mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
-                    }
-                    if (mouseYaw == 0d) {
-                        mouseYaw = yawController.Control(yawAngle);
-                    } else {
-                        mouseYaw = yawController.Control(mouseYaw);
-                    }
-
                     if (mousePitch != 0d) {
                         mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
                     }
@@ -484,6 +475,29 @@ namespace IngameScript {
                         mouseRoll = rollController.Control(rollAngle);
                     } else {
                         mouseRoll = rollController.Control(mouseRoll);
+                    }
+
+                    double speed = controller.GetShipSpeed();
+                    yawAngle = 0;
+                    if (speed > minSpeed) {
+                        if (Vector3D.IsZero(lastForwardVector)) {
+                            lastForwardVector = controller.WorldMatrix.Forward;
+                            lastUpVector = controller.WorldMatrix.Up;
+                        }
+                        if (!useRoll) { lastUpVector = Vector3D.Zero; };
+                        GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+
+                        lastForwardVector = controller.WorldMatrix.Forward;
+                        lastUpVector = controller.WorldMatrix.Up;
+                    }
+
+                    if (mouseYaw != 0d) {
+                        mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
+                    }
+                    if (mouseYaw == 0d) {
+                        mouseYaw = yawController.Control(yawAngle);
+                    } else {
+                        mouseYaw = yawController.Control(mouseYaw);
                     }
 
                     ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, matrix);
