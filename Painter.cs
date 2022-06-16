@@ -41,8 +41,7 @@ namespace IngameScript {
         readonly string antennaTag = "[RELAY]";
         readonly string missileAntennaTag = "[MISSILE]";
         readonly string navigatorTag = "[NAVIGATOR]";
-        //readonly string decoyName = "[CRX] PB Shooter";
-        readonly string managerName = "[CRX] PB Manager";
+        readonly string decoyName = "[CRX] PB Shooter";
         readonly string cargoName = "[CRX] Cargo";
         readonly string debugPanelName = "[CRX] Debug";
 
@@ -59,8 +58,7 @@ namespace IngameScript {
         const string argSwitchPayLoad = "SwitchPayLoad";
         const string argToggleAllGuns = "ToggleAllGuns";
 
-        const string argSunchaseOff = "SunchaseOff";
-        //const string argFireDecoy = "LaunchDecoy";
+        const string argFireDecoy = "LaunchDecoy";
 
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
@@ -99,7 +97,6 @@ namespace IngameScript {
         bool farShootOnce = false;
         bool shootOnce = false;
         bool missilesLoaded = false;
-        bool sunChaseOff = false;
         int writeCount = 0;
         bool fudgeVectorSwitch = false;
         double fudgeFactor = 5;
@@ -140,8 +137,7 @@ namespace IngameScript {
 
         IMyShipController CONTROLLER;
         IMyRadioAntenna ANTENNA;
-        IMyProgrammableBlock MANAGERPB;
-        //IMyProgrammableBlock DECOYPB;
+        IMyProgrammableBlock SHOOTERPB;
         IMyTextPanel DEBUG;
 
         IMyUnicastListener UNILISTENER;
@@ -226,8 +222,6 @@ namespace IngameScript {
 
                     ActivateTargeter();//things to run once when a enemy is detected
 
-                    DeactivateOtherScriptsGyros();
-
                     bool targetFound = TurretsDetection(true);
 
                     if (!targetFound) {
@@ -235,7 +229,7 @@ namespace IngameScript {
                     }
 
                     if (targetFound && currentTick == ticksScanDelay) {//send message to missiles every some ticks
-                        SendBroadcastTargetMessage(true, targetPosition, targetInfo.Velocity);//TODO
+                        SendBroadcastTargetMessage(true, targetPosition, targetInfo.Velocity);
 
                         foreach (var id in MissileIDs) {
                             SendMissileUnicastMessage(commandUpdate, id.Key);
@@ -418,7 +412,7 @@ namespace IngameScript {
                 if (!targetFound) {
                     fudgeFactor = 5;
                     for (int i = 0; i < fudgeAttempts; i++) {
-                        targetFound = ScanFudgeEmptyTarget();//TODO
+                        targetFound = ScanFudgeEmptyTarget();
                         if (targetFound) {
                             break;
                         }
@@ -562,7 +556,7 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool ScanFudgeEmptyTarget() {//TODO to test
+        bool ScanFudgeEmptyTarget() {
             bool targetFound = false;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             Vector3D scanPosition = Vector3D.Normalize(lidar.WorldMatrix.Forward) * 5000d;
@@ -912,7 +906,7 @@ namespace IngameScript {
             return uniMessageSent;
         }
 
-        void SendBroadcastTargetMessage(bool targFound, Vector3D targPos, Vector3D targVel) {//TODO
+        void SendBroadcastTargetMessage(bool targFound, Vector3D targPos, Vector3D targVel) {
             var tuple = MyTuple.Create(targFound, targPos, targVel);
             IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
@@ -973,28 +967,14 @@ namespace IngameScript {
                 }
             }
 
-            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero);//TODO
+            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
         }
 
         void ActivateTargeter() {
             if (!doOnce)//things to run once when a enemy is detected
             {
                 TurnAlarmOn();
-
                 doOnce = true;
-
-                if (MANAGERPB != null) {
-                    if (MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                        sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
-                    }
-                }
-            }
-        }
-
-
-        void DeactivateOtherScriptsGyros() {
-            if (!sunChaseOff && MANAGERPB.CustomData.Contains("SunChaser=true")) {
-                sunChaseOff = MANAGERPB.TryRun(argSunchaseOff);
             }
         }
 
@@ -1087,7 +1067,7 @@ namespace IngameScript {
                     double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                     if (distanceFromTarget < gunsMaxRange) {
                         if (!decoyRan) {
-                            //decoyRan = DECOYPB.TryRun(argFireDecoy);//TODO
+                            decoyRan = SHOOTERPB.TryRun(argFireDecoy);
                         }
                         if (useAllGuns) {
                             if (distanceFromTarget < rocketProjectileMaxRange && missileAmmoFound) {
@@ -1373,8 +1353,7 @@ namespace IngameScript {
             foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             ANTENNA = GridTerminalSystem.GetBlockWithName(antennasName) as IMyRadioAntenna;
             CONTROLLER = CONTROLLERS[0];
-            MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
-            //DECOYPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
+            SHOOTERPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
             DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
         }
 

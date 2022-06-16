@@ -24,8 +24,6 @@ namespace IngameScript {
         //TODO add generate orbital gps function
         //generate orbital gps above target 
         //land function
-        //when gyroStabilizing send message to manager to stop sunchasing
-        //when randomDriving if left and right sensors are detecting stuff then go up (if it's detecting decoys), so the painter can print decoy
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -46,6 +44,7 @@ namespace IngameScript {
         readonly string minusZname = "Merge_MD-Y";
         readonly string thrustersName = "[CRX] HThruster";
         readonly string sensorsName = "[CRX] Sensor";
+        readonly string solarsName = "[CRX] Solar";
         readonly string upName = "UP";
         readonly string downName = "DOWN";
         readonly string leftName = "LEFT";
@@ -55,10 +54,10 @@ namespace IngameScript {
         readonly string deadManPanelName = "[CRX] LCD DeadMan Toggle";
         readonly string idleThrusterPanelName = "[CRX] LCD IdleThrusters Toggle";
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
+        readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
         readonly string debugPanelName = "[CRX] Debug";
         readonly string painterName = "[CRX] PB Painter";
         readonly string shooterName = "[CRX] PB Shooter";
-        readonly string managerName = "[CRX] PB Manager";
 
         readonly string navigatorTag = "[NAVIGATOR]";
         readonly string sectionTag = "RangeFinderSettings";
@@ -72,11 +71,14 @@ namespace IngameScript {
         const string argChangePlanet = "ChangePlanet";
         const string argSetPlanet = "SetPlanet";
 
+        const string argSunChaserToggle = "SunChaserToggle";
+        const string argSunchaseOn = "SunchaseOn";
         const string argSunchaseOff = "SunchaseOff";
         const string argUnlockFromTarget = "Clear";
         const string argLockTarget = "Lock";
         const string argLaunchDecoy = "LaunchDecoy";
         const string argFireJolt = "FireJolt";
+        const string commandLaunch = "Launch";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
@@ -109,9 +111,13 @@ namespace IngameScript {
         bool keepAltitude = true;
         bool targFound = false;
         bool readyToFire = true;
+        bool sunChasing = false;
         string selectedPlanet = "";
         double maxScanRange = 0d;
         double altitudeToKeep = 0d;
+        double movePitch = .01;
+        double moveYaw = .01;
+        float prevSunPower = 0f;
         int cockpitRangeFinderSurface = 4;
         int planetSelector = 0;
         int impactDetectionCount = 5;
@@ -119,8 +125,9 @@ namespace IngameScript {
         int tickCount = 0;
         int randomCount = 50;
         int sensorsCount = 10;
-        int changedDirCount = 0;
-
+        int changedDirCount = 10;
+        int sunAlignmentStep = 0;
+        int selectedSunAlignmentStep;
         bool unlockGyrosOnce = true;
         bool deadManOnce = false;
         bool toggleThrustersOnce = false;
@@ -131,6 +138,7 @@ namespace IngameScript {
         bool initMagneticDriveOnce = true;
         bool initAutoMagneticDriveOnce = true;
         bool initRandomMagneticDriveOnce = true;
+        bool sunChaseOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -163,6 +171,7 @@ namespace IngameScript {
         public List<IMyThrust> FORWARDTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> BACKWARDTHRUSTERS = new List<IMyThrust>();
         public List<IMySensorBlock> SENSORS = new List<IMySensorBlock>();
+        public List<IMySolarPanel> SOLARS = new List<IMySolarPanel>();
 
         IMyShipController CONTROLLER = null;
         IMyRemoteControl REMOTE;
@@ -172,17 +181,18 @@ namespace IngameScript {
         IMyThrust RIGHTTHRUST;
         IMyThrust FORWARDTHRUST;
         IMyThrust BACKWARDTHRUST;
-        IMyProgrammableBlock MANAGERPB;
         IMyProgrammableBlock PAINTERPB;
         IMyProgrammableBlock SHOOTERPB;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
+        IMyTextPanel LCDSUNCHASER;
         IMySensorBlock UPSENSOR;
         IMySensorBlock DOWNSENSOR;
         IMySensorBlock LEFTSENSOR;
         IMySensorBlock RIGHTSENSOR;
         IMySensorBlock FORWARDSENSOR;
         IMySensorBlock BACKWARDSENSOR;
+        IMySolarPanel SOLAR;
 
         IMyBroadcastListener BROADCASTLISTENER;
         MyDetectedEntityInfo targetInfo;
@@ -235,6 +245,9 @@ namespace IngameScript {
             selectedPlanet = planetsList.ElementAt(0).Key;
 
             InitPIDControllers();
+
+            prevSunPower = SOLAR.MaxOutput;
+            LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
         }
 
         public void Main(string arg) {
@@ -284,6 +297,8 @@ namespace IngameScript {
                 if (aimTarget) {
                     AimAtTarget(REMOTE, targetPosition);
                 }
+
+                SunChase(isControlled, gravity, targFound);
 
                 ReadLidarInfos();
                 ReadJumpersInfos();
@@ -370,10 +385,19 @@ namespace IngameScript {
                         targetLog.Append("Atmo. Height: ").Append(planet.Item3.ToString("0.0")).Append("\n");
                     }
                     break;
+                case argSunChaserToggle:
+                    sunChasing = !sunChasing;
+                    break;
+                case argSunchaseOff:
+                    sunChasing = false;
+                    break;
+                case argSunchaseOn:
+                    sunChasing = true;
+                    break;
             }
         }
 
-        bool GetBroadcastMessages() {//TODO
+        bool GetBroadcastMessages() {
             bool received = false;
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
@@ -390,8 +414,8 @@ namespace IngameScript {
                         string variable = data.Item1;
                         if (variable == "readyToFire") {
                             readyToFire = data.Item2;
+                            received = true;
                         }
-                        received = true;
                     }
                 }
             }
@@ -566,7 +590,7 @@ namespace IngameScript {
             if (magneticDrive && isControlled) {
                 if (initMagneticDriveOnce) {
                     InitMagneticDrive();
-                    if (MANAGERPB.CustomData.Contains("SunChaser=true")) { MANAGERPB.TryRun(argSunchaseOff); }//TODO
+                    sunChasing = false;
                     initMagneticDriveOnce = false;
                 }
 
@@ -709,7 +733,9 @@ namespace IngameScript {
             double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
             if (distance > 1000d && changedDirCount >= randomFireDelay) {
                 SHOOTERPB.TryRun(argFireJolt);
+                PAINTERPB.TryRun(commandLaunch);
                 randomFireDelay = random.Next(10, 20);
+                changedDirCount = 0;
             }
 
             if (!detectedOwner && readyToFire) {
@@ -1251,6 +1277,82 @@ namespace IngameScript {
             return aligned;
         }
 
+        void SunChase(bool isControlled, Vector3D gravity, bool targFound) {
+            if (!isControlled && sunChasing && Vector3D.IsZero(gravity) && !targFound) {
+                if (SOLAR.IsFunctional && SOLAR.Enabled && SOLAR.IsWorking) {
+                    if (sunChaseOnce) {
+                        LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
+                        sunChaseOnce = false;
+                    }
+
+                    double pitch = 0;
+                    double yaw = 0;
+                    float power = SOLAR.MaxOutput;
+                    int powerDifference = Math.Sign(power - prevSunPower);
+
+                    if (power < .02) {//TODO
+                        UnlockGyros();
+                        return;
+                    }
+                    if (power > .98) {
+                        if (sunAlignmentStep > 0) {
+                            sunAlignmentStep = 0;
+                            UnlockGyros();
+                        }
+                        return;
+                    }
+
+                    switch (sunAlignmentStep) {
+                        case 0:
+                            selectedSunAlignmentStep = 0;
+                            sunAlignmentStep++;
+                            break;
+                        case 1:
+                            if (powerDifference < 0) {
+                                movePitch = -movePitch;
+                                selectedSunAlignmentStep++;
+                                if (selectedSunAlignmentStep > 2) {
+                                    sunAlignmentStep++;
+                                    selectedSunAlignmentStep = 0;
+                                }
+                            }
+                            pitch = movePitch;
+                            break;
+                        case 2:
+                            if (powerDifference < 0) {
+                                moveYaw = -moveYaw;
+                                selectedSunAlignmentStep++;
+                                if (selectedSunAlignmentStep > 2) {
+                                    UnlockGyros();
+                                    sunAlignmentStep = 0;
+                                    selectedSunAlignmentStep = 0;
+                                }
+                            }
+                            yaw = moveYaw;
+                            break;
+                    }
+
+                    double yawSpeed = yawController.Control(yaw);
+                    double pitchSpeed = pitchController.Control(pitch);
+                    ApplyGyroOverride(pitchSpeed, yawSpeed, 0d, GYROS, SOLAR.WorldMatrix);
+
+                    prevSunPower = power;
+                } else {
+                    foreach (IMySolarPanel solar in SOLARS) {
+                        if (solar.IsFunctional && solar.Enabled && solar.IsWorking) {
+                            SOLAR = solar;
+                        }
+                    }
+                }
+            } else {
+                if (!sunChaseOnce) {
+                    UnlockGyros();
+                    LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
+                    sunChaseOnce = true;
+                }
+            }
+        }
+
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
             desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
 
@@ -1508,7 +1610,7 @@ namespace IngameScript {
             foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             LCDDEADMAN = GridTerminalSystem.GetBlockWithName(deadManPanelName) as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
-            MANAGERPB = GridTerminalSystem.GetBlockWithName(managerName) as IMyProgrammableBlock;
+            LCDSUNCHASER = GridTerminalSystem.GetBlockWithName(sunChaserPanelName) as IMyTextPanel;
             PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
             SHOOTERPB = GridTerminalSystem.GetBlockWithName(shooterName) as IMyProgrammableBlock;
             SENSORS.Clear();
@@ -1526,6 +1628,13 @@ namespace IngameScript {
                     FORWARDSENSOR = sensor;
                 } else if (sensor.CustomName.Contains(backwardName)) {
                     BACKWARDSENSOR = sensor;
+                }
+            }
+            SOLARS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMySolarPanel>(SOLARS, block => block.CustomName.Contains(solarsName));
+            foreach (IMySolarPanel solar in SOLARS) {
+                if (solar.IsFunctional && solar.Enabled && solar.IsWorking) {
+                    SOLAR = solar;
                 }
             }
         }

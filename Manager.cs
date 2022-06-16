@@ -21,7 +21,6 @@ using SpaceEngineers.Game.Entities.Blocks;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO check damaged/destroyed blocks
-        //when sunchasing send message to navigator to stop gyroStabilize
         //MANAGER
 
         readonly string solarsName = "[CRX] Solar";
@@ -51,40 +50,24 @@ namespace IngameScript {
         readonly string shipPrefix = "[CRX] ";
         readonly string launchersName = "[CRX] Rocket";
         readonly string gatlingsName = "[CRX] Gatling";
-        readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
         readonly string debugPanelName = "[CRX] Debug";
-
-        const string argTogglePB = "TogglePB";
-        const string argSunChaserToggle = "SunChaserToggle";
-        const string argSunchaseOn = "SunchaseOn";
-        const string argSunchaseOff = "SunchaseOff";
-
         readonly string sectionTag = "ManagerSettings";
         readonly string cockpitPowerSurfaceKey = "cockpitPowerSurface";
+        readonly double tankThresold = 20;
+
+        const string argTogglePB = "TogglePB";
 
         int cockpitPowerSurface = 2;
-        readonly bool findTheLight = false;//Search for the Sun in the shadows
-        readonly double tankThresold = 20;
-        readonly float solarPanelMaxRatio = 1;//multiplier for modded panels
-
-        bool sunChaserPaused = true;
-        float shipSize = .16f;//.04f small blocks
-        float maxPwr;
-        double moveP = .01;
-        double moveY = .01;
-        float lastPwr;
-        int step = 0;
-        int next;
-        string powerStatus;
         int firstRun = 1;
-        bool togglePB = false;
         int ticks = 0;
+        bool togglePB = false;
+        string powerStatus;
 
+        double tankCapacityPercent;
         float terminalCurrentInput;
         float terminalMaxRequiredInput;
         float battsCurrentInput;
         float battsCurrentOutput;
-        double tankCapacityPercent;
         float hEngMaxOutput;
         float solarMaxOutput;
         float turbineMaxOutput;
@@ -126,7 +109,6 @@ namespace IngameScript {
         public List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
-        IMyTextPanel LCDSUNCHASER;
 
         readonly MyIni myIni = new MyIni();
 
@@ -338,22 +320,7 @@ namespace IngameScript {
         void Setup() {
             GetBlocks();
 
-            maxPwr = shipSize * solarPanelMaxRatio;
-            if (SOLARS.Count > 0) {
-                if (SOLARS[0] != null) { lastPwr = SOLARS[0].MaxOutput; }
-            }
-
-            if (CONTROLLERS[0].CubeGrid.GridSizeEnum == MyCubeSize.Large) { shipSize = .16f; } else { shipSize = .04f; }
-
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
-
-            if (!sunChaserPaused) {
-                LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
-                Me.CustomData = "GyroStabilize=true";
-            } else {
-                LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
-                Me.CustomData = "GyroStabilize=false";
-            }
         }
 
         public void Main(string argument) {
@@ -386,8 +353,6 @@ namespace IngameScript {
                 Echo($"COMPONENTSURFACES:{COMPONENTSURFACES.Count}");
 
                 if (!string.IsNullOrEmpty(argument)) { ProcessArgument(argument); }
-
-                if (!IsInGravity() && !sunChaserPaused) { SunChase(); }
 
                 CalcPower();
                 PowerManager();
@@ -444,28 +409,6 @@ namespace IngameScript {
 
         void ProcessArgument(string argument) {
             switch (argument) {
-                case argSunChaserToggle:
-                    sunChaserPaused = !sunChaserPaused;
-                    if (!sunChaserPaused) {
-                        LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
-                        Me.CustomData = "GyroStabilize=true";
-                    } else {
-                        LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
-                        foreach (IMyGyro block in GYROS) { block.GyroOverride = false; };
-                        Me.CustomData = "GyroStabilize=false";
-                    }
-                    break;
-                case argSunchaseOff:
-                    sunChaserPaused = true;
-                    LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
-                    foreach (IMyGyro block in GYROS) { block.GyroOverride = false; };
-                    Me.CustomData = "GyroStabilize=false";
-                    break;
-                case argSunchaseOn:
-                    sunChaserPaused = false;
-                    LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
-                    Me.CustomData = "GyroStabilize=true";
-                    break;
                 case argTogglePB:
                     togglePB = !togglePB;
                     if (togglePB) {
@@ -527,80 +470,6 @@ namespace IngameScript {
             }
         }
 
-        void SunChase() {
-            if (!SOLARS[0].IsFunctional || !SOLARS[0].Enabled || !SOLARS[0].IsWorking) {
-                SetGyroRotation(SOLARS[0], GYROS, 0, 0, 0);
-                return;
-            }
-            if (GetSkipTrigger()) {
-                SetGyroRotation(SOLARS[0], GYROS, 0, 0, 0);
-                return;
-            }
-            double P = 0; double Y = 0;
-            float Pwr = SOLARS[0].MaxOutput;
-            if (Pwr < maxPwr * .02) {
-                if (findTheLight) { SetGyroRotation(SOLARS[0], GYROS, .1, .4); } else { SetGyroRotation(SOLARS[0], GYROS, 0, 0, 0); }
-                return;
-            }
-            int D = Math.Sign(Pwr - lastPwr);
-            double V = 2 * maxPwr / Pwr;
-            if (Pwr > maxPwr * .98) {
-                if (step > 0) {
-                    step = 0;
-                    SetGyroRotation(SOLARS[0], GYROS, 0, 0, 0);
-                }
-                return;
-            }
-            switch (step) {
-                case 0:
-                    next = 0;
-                    step++;
-                    break;
-                case 1:
-                    if (D < 0) {
-                        moveP = -moveP;
-                        next++;
-                        if (next > 2) { step++; next = 0; }
-                    }
-                    P = moveP;
-                    break;
-                case 2:
-                    if (D < 0) {
-                        moveY = -moveY;
-                        next++;
-                        if (next > 2) { SetGyroRotation(SOLARS[0], GYROS, 0, 0, 0); step = 0; next = 0; }
-                    }
-                    Y = moveY;
-                    break;
-            }
-            SetGyroRotation(SOLARS[0], GYROS, P * V, Y * V, 0);
-            lastPwr = Pwr;
-        }
-
-        void SetGyroRotation(IMyTerminalBlock Master, List<IMyGyro> GYROS, double Pitch = 0, double Yaw = 0, double Roll = 0) {
-            Vector3D R = Vector3D.TransformNormal(new Vector3D(Pitch, Yaw, Roll), Master.WorldMatrix);
-            Vector3D T;
-            bool A = !(Pitch == 0 && Yaw == 0 && Roll == 0);
-            foreach (IMyGyro G in GYROS) {
-                T = Vector3D.TransformNormal(R, Matrix.Transpose(G.WorldMatrix));
-                G.Pitch = (float)T.X;
-                G.Yaw = (float)T.Y;
-                G.Roll = (float)T.Z;
-                G.GyroOverride = A;
-            }
-        }
-
-        bool GetSkipTrigger() {
-            bool piloted = false;
-            foreach (IMyShipController block in CONTROLLERS) {
-                if (block.CanControlShip) {
-                    piloted = piloted || block.IsUnderControl;
-                    if (block is IMyRemoteControl) { piloted = piloted || (block as IMyRemoteControl).IsAutoPilotEnabled; }
-                }
-            }
-            return piloted || sunChaserPaused;
-        }
-
         bool IsPiloted() {
             bool isPiloted = false;
             foreach (IMyShipController block in CONTROLLERS) {
@@ -616,12 +485,6 @@ namespace IngameScript {
                 }
             }
             return isPiloted;
-        }
-
-        bool IsInGravity() {
-            IMyShipController cntrllr = CONTROLLERS[0];
-            Vector3D grav = cntrllr.GetNaturalGravity();
-            if (Vector3D.IsZero(grav)) { return false; } else { return true; }
         }
 
         void CalcPower() {
@@ -711,13 +574,6 @@ namespace IngameScript {
         void ReadPowerInfos() {
             powerLog.Clear();
             powerLog.Append("Status: ").Append(powerStatus).Append(", ");
-            if (sunChaserPaused) {
-                LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
-                powerLog.Append("SunChase: OFF");
-            } else {
-                LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
-                powerLog.Append("SunChase: ON");
-            }
             powerLog.Append("\n");
             powerLog.Append("Current Input: ").Append(terminalCurrentInput.ToString("0.00")).Append(", ");
             powerLog.Append("Max Req. Input: ").Append(terminalMaxRequiredInput.ToString("0.00")).Append("\n");
@@ -1552,7 +1408,6 @@ namespace IngameScript {
             panels.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdComponentsName));
             foreach (IMyTextPanel panel in panels) { COMPONENTSURFACES.Add(panel as IMyTextSurface); }
-            LCDSUNCHASER = GridTerminalSystem.GetBlockWithName(sunChaserPanelName) as IMyTextPanel;
         }
 
         void ResetOreDict() {
