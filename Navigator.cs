@@ -112,6 +112,17 @@ namespace IngameScript {
         bool targFound = false;
         bool readyToFire = true;
         bool sunChasing = false;
+        bool unlockGyrosOnce = true;
+        bool deadManOnce = false;
+        bool toggleThrustersOnce = false;
+        bool returnOnce = true;
+        bool lockTargetOnce = true;
+        bool launchDecoyOnce = true;
+        bool isPilotedOnce = true;
+        bool initMagneticDriveOnce = true;
+        bool initAutoMagneticDriveOnce = true;
+        bool initRandomMagneticDriveOnce = true;
+        bool sunChaseOnce = true;
         string selectedPlanet = "";
         double maxScanRange = 0d;
         double altitudeToKeep = 0d;
@@ -128,17 +139,6 @@ namespace IngameScript {
         int changedDirCount = 10;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
-        bool unlockGyrosOnce = true;
-        bool deadManOnce = false;
-        bool toggleThrustersOnce = false;
-        bool returnOnce = true;
-        bool lockTargetOnce = true;
-        bool launchDecoyOnce = true;
-        bool isPilotedOnce = true;
-        bool initMagneticDriveOnce = true;
-        bool initAutoMagneticDriveOnce = true;
-        bool initRandomMagneticDriveOnce = true;
-        bool sunChaseOnce = true;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -246,7 +246,6 @@ namespace IngameScript {
 
             InitPIDControllers();
 
-            prevSunPower = SOLAR.MaxOutput;
             LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
         }
 
@@ -1282,6 +1281,7 @@ namespace IngameScript {
                 if (SOLAR.IsFunctional && SOLAR.Enabled && SOLAR.IsWorking) {
                     if (sunChaseOnce) {
                         LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
+                        prevSunPower = SOLAR.MaxOutput;
                         sunChaseOnce = false;
                     }
 
@@ -1348,6 +1348,7 @@ namespace IngameScript {
                 if (!sunChaseOnce) {
                     UnlockGyros();
                     LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0);
+                    prevSunPower = 0f;
                     sunChaseOnce = true;
                 }
             }
