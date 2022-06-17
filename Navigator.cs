@@ -123,6 +123,7 @@ namespace IngameScript {
         bool initAutoMagneticDriveOnce = true;
         bool initRandomMagneticDriveOnce = true;
         bool sunChaseOnce = true;
+        bool unlockSunChaseOnce = true;
         string selectedPlanet = "";
         double maxScanRange = 0d;
         double altitudeToKeep = 0d;
@@ -1282,6 +1283,7 @@ namespace IngameScript {
                     if (sunChaseOnce) {
                         LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255);
                         prevSunPower = SOLAR.MaxOutput;
+                        unlockSunChaseOnce = true;
                         sunChaseOnce = false;
                     }
 
@@ -1290,17 +1292,24 @@ namespace IngameScript {
                     float power = SOLAR.MaxOutput;
                     int powerDifference = Math.Sign(power - prevSunPower);
 
-                    if (power < .02) {//TODO
-                        UnlockGyros();
+                    if (power < .02) {
+                        if (unlockSunChaseOnce) {
+                            UnlockGyros();
+                            unlockSunChaseOnce = false;
+                        }
                         return;
                     }
                     if (power > .98) {
                         if (sunAlignmentStep > 0) {
                             sunAlignmentStep = 0;
-                            UnlockGyros();
+                            if (unlockSunChaseOnce) {
+                                UnlockGyros();
+                                unlockSunChaseOnce = false;
+                            }
                         }
                         return;
                     }
+                    unlockSunChaseOnce = true;
 
                     switch (sunAlignmentStep) {
                         case 0:
