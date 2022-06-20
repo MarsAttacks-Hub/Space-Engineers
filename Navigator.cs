@@ -60,6 +60,7 @@ namespace IngameScript {
         readonly string shooterName = "[CRX] PB Shooter";
 
         readonly string navigatorTag = "[NAVIGATOR]";
+        readonly string managerTag = "[MANAGER]";
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
 
@@ -251,6 +252,8 @@ namespace IngameScript {
         }
 
         public void Main(string arg) {
+            StringBuilder logger = new StringBuilder("");
+
             try {
                 Echo($"CONTROLLERS:{CONTROLLERS.Count}");
                 Echo($"REMOTES:{REMOTES.Count}");
@@ -277,25 +280,28 @@ namespace IngameScript {
                 GetBroadcastMessages();
 
                 bool isControlled = GetController();
+                SendBroadcastControllerMessage(isControlled);
                 bool isAutoPiloted = IsAutoPiloted();
                 bool isUnderControl = IsPiloted(false);
-                Vector3D gravity = CONTROLLER.GetNaturalGravity();
+
+                IMyShipController controller = CONTROLLER ?? REMOTE;
+                Vector3D gravity = controller.GetNaturalGravity();
 
                 if (!isUnderControl) {
                     TurretsDetection();
                     Vector3D trgP, trgV;
                     ManageTarget(out trgP, out trgV);
-                    CheckTarget(REMOTE, REMOTE, trgP, trgV, gravity);
+                    CheckTarget(controller, REMOTE, trgP, trgV, gravity);
                 }
 
                 ManageWaypoints(REMOTE, isUnderControl);
 
-                GyroStabilize(CONTROLLER, targFound, aimTarget, isAutoPiloted, useRoll, gravity);
+                GyroStabilize(controller, targFound, aimTarget, isAutoPiloted, useRoll, gravity);
 
-                ManageMagneticDrive(CONTROLLER, isControlled, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity);
+                ManageMagneticDrive(controller, isControlled, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity);
 
                 if (aimTarget) {
-                    AimAtTarget(REMOTE, targetPosition);
+                    AimAtTarget(controller, targetPosition);
                 }
 
                 SunChase(isControlled, gravity, targFound);
@@ -311,6 +317,9 @@ namespace IngameScript {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
                     DEBUG.ReadText(debugLog, true);
+
+                    debugLog.Append(logger.ToString());
+
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
@@ -420,6 +429,11 @@ namespace IngameScript {
                 }
             }
             return received;
+        }
+
+        void SendBroadcastControllerMessage(bool isControlled) {
+            var tuple = MyTuple.Create("isControlled", isControlled);
+            IGC.SendBroadcastMessage(managerTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         bool GetController() {
@@ -908,20 +922,12 @@ namespace IngameScript {
             foreach (IMyMotorStator rotor in ROTORS) {
                 float rotorAngle = rotor.Angle;
                 float asyncAngle = Smallest(rotorAngle - angle, Smallest(rotorAngle - angle + circle, rotorAngle - angle - circle));
-                if (asyncAngle > 0) {
-                    rotor.TargetVelocityRad = (targetVel - syncSpeed);
-                } else {
-                    rotor.TargetVelocityRad = (targetVel + syncSpeed);
-                }
+                rotor.TargetVelocityRad = asyncAngle > 0 ? targetVel - syncSpeed : targetVel + syncSpeed;
             }
             foreach (IMyMotorStator rotor in ROTORSINV) {
                 float rotorAngle = rotor.Angle;
                 float asyncAngle = Smallest(rotorAngle - angleInv, Smallest(rotorAngle - angleInv + circle, rotorAngle - angleInv - circle));
-                if (asyncAngle > 0) {
-                    rotor.TargetVelocityRad = (-targetVel - syncSpeed);
-                } else {
-                    rotor.TargetVelocityRad = (-targetVel + syncSpeed);
-                }
+                rotor.TargetVelocityRad = asyncAngle > 0 ? -targetVel - syncSpeed : -targetVel + syncSpeed;
             }
         }
 
