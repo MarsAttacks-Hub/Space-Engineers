@@ -112,6 +112,10 @@ namespace IngameScript {
         bool keepAltitude = true;
         bool targFound = false;
         bool readyToFire = true;
+        bool assaultCanShoot = true;
+        bool artilleryCanShoot = true;
+        bool railgunsCanShoot = true;
+        bool smallRailgunsCanShoot = true;
         bool sunChasing = false;
         bool unlockGyrosOnce = true;
         bool deadManOnce = false;
@@ -404,6 +408,13 @@ namespace IngameScript {
                             readyToFire = data.Item2;
                             received = true;
                         }
+                    }
+                    if (igcMessage.Data is MyTuple<bool, bool, bool, bool>) {
+                        var data = (MyTuple<bool, bool, bool, bool>)igcMessage.Data;
+                        assaultCanShoot = data.Item1;
+                        artilleryCanShoot = data.Item2;
+                        railgunsCanShoot = data.Item3;
+                        smallRailgunsCanShoot = data.Item4;
                     }
                 }
             }
@@ -724,7 +735,15 @@ namespace IngameScript {
             sensorsCount++;
 
             double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
-            if (distance > 2000d && changedDirCount >= randomFireDelay) {
+            bool fireJolt = false;
+            if (distance > 2000d) {
+                fireJolt = true;
+            } else if (distance <= 2000d && distance > 1400d && !railgunsCanShoot && !artilleryCanShoot) {
+                fireJolt = true;
+            } else if (distance <= 1400d && distance > 800d && !assaultCanShoot && !smallRailgunsCanShoot) {
+                fireJolt = true;
+            }
+            if (fireJolt && changedDirCount >= randomFireDelay) {
                 SHOOTERPB.TryRun(argFireJolt);
                 PAINTERPB.TryRun(commandLaunch);
                 randomFireDelay = random.Next(10, 20);
@@ -786,6 +805,13 @@ namespace IngameScript {
                         }
                     }
 
+                    double minDistance = 2000d;
+                    if (!railgunsCanShoot && !artilleryCanShoot) {
+                        minDistance = 1400d;
+                        if (!assaultCanShoot && !smallRailgunsCanShoot) {
+                            minDistance = 800d;
+                        }
+                    }
                     entitiesA.Clear();
                     entitiesB.Clear();
                     FORWARDSENSOR.DetectedEntities(entitiesA);
@@ -797,10 +823,12 @@ namespace IngameScript {
                     } else if (entitiesB.Count > 0) {
                         randomDir.Z = -1;
                     } else {
-                        if (distance <= 800d) {
-                            randomDir.Z = 1;
-                        } else if (distance >= 2500d) {
+                        if (distance > minDistance) {
                             randomDir.Z = -1;
+                        } else if (distance <= minDistance) {
+                            randomDir.Z = 1;
+                        } else if (distance < 800d) {
+                            randomDir.Z = 1;
                         } else {
                             randomInt = random.Next(-1, 1);
                             randomDir.Z = randomInt;

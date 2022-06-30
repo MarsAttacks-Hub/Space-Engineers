@@ -80,14 +80,14 @@ namespace IngameScript {
         double rocketRange = 500d;
         readonly float gatlingSpeed = 400f;
         readonly float autocannonSpeed = 400f;
-        readonly double autocannonRange = 800d;//gatlingRange
         readonly float assaultSpeed = 500f;
-        readonly double assaultRange = 1400d;
         readonly float artillerySpeed = 500f;
-        readonly double artilleryRange = 2000d;
         readonly float railgunSpeed = 2000f;
-        readonly double railgunRange = 2000d;
         readonly float smallRailgunSpeed = 1000f;
+        readonly double autocannonRange = 800d;//gatlingRange
+        readonly double assaultRange = 1400d;
+        readonly double artilleryRange = 2000d;
+        readonly double railgunRange = 2000d;
         readonly double smallRailgunRange = 1400d;
         readonly int rocketROF = 4;//120rpm - 2rps - 0.03 rptick - 30 ticks
         readonly int autocannonsROF = 3;//150rpm - 2.5rps - 0.04 rptick - 24 ticks
@@ -964,6 +964,11 @@ namespace IngameScript {
             IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
+        void SendBroadcastGunsMessage(bool assaultCanShoot, bool artilleryCanShoot, bool railgunsCanShoot, bool smallRailgunsCanShoot) {
+            var tuple = MyTuple.Create(assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
+            IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
+        }
+
         void RemoveLostMissiles() {
             Dictionary<long, string> TempMissileIDs = new Dictionary<long, string>();
             foreach (var entry in MissileIDs) {
@@ -1383,6 +1388,8 @@ namespace IngameScript {
                 if (!gun.CanShoot()) { count++; }
             }
             if (count == SMALLRAILGUNS.Count) { smallRailgunsCanShoot = false; } else { smallRailgunsCanShoot = true; }
+
+            SendBroadcastGunsMessage(assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
         }
 
         void SyncGuns() {
