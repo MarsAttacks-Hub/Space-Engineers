@@ -252,26 +252,8 @@ namespace IngameScript {
         }
 
         public void Main(string arg) {
-            StringBuilder logger = new StringBuilder("");
-
             try {
-                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-                Echo($"REMOTES:{REMOTES.Count}");
-                Echo($"COCKPITS:{COCKPITS.Count}");
-                Echo($"GYROS:{GYROS.Count}");
-                Echo($"THRUSTERS:{THRUSTERS.Count}");
-                Echo($"JUMPERS:{JUMPERS.Count}");
-                Echo($"LIDARS:{LIDARS.Count}");
-                Echo($"ALARMS:{ALARMS.Count}");
-                Echo($"SURFACES:{SURFACES.Count}");
-                Echo($"ROTORS:{ROTORS.Count}");
-                Echo($"ROTORSINV:{ROTORSINV.Count}");
-                Echo($"MERGESPLUSX:{MERGESPLUSX.Count}");
-                Echo($"MERGESPLUSY:{MERGESPLUSY.Count}");
-                Echo($"MERGESPLUSZ:{MERGESPLUSZ.Count}");
-                Echo($"MERGESMINUSX:{MERGESMINUSX.Count}");
-                Echo($"MERGESMINUSY:{MERGESMINUSY.Count}");
-                Echo($"MERGESMINUSZ:{MERGESMINUSZ.Count}");
+                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
@@ -316,10 +298,7 @@ namespace IngameScript {
                 if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
-                    DEBUG.ReadText(debugLog, true);
-
-                    debugLog.Append(logger.ToString());
-
+                    //DEBUG.ReadText(debugLog, true);
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
@@ -745,7 +724,7 @@ namespace IngameScript {
             sensorsCount++;
 
             double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
-            if (distance > 1000d && changedDirCount >= randomFireDelay) {
+            if (distance > 2000d && changedDirCount >= randomFireDelay) {
                 SHOOTERPB.TryRun(argFireJolt);
                 PAINTERPB.TryRun(commandLaunch);
                 randomFireDelay = random.Next(10, 20);
@@ -820,7 +799,7 @@ namespace IngameScript {
                     } else {
                         if (distance <= 800d) {
                             randomDir.Z = 1;
-                        } else if (distance >= 1500d) {
+                        } else if (distance >= 2500d) {
                             randomDir.Z = -1;
                         } else {
                             randomInt = random.Next(-1, 1);

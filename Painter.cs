@@ -20,8 +20,9 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //PAINTER
         //TODO implement multyTargeting
+        //revisit LoadMissiles(),make it universal - meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
+        //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -906,13 +907,15 @@ namespace IngameScript {
                             tempMissileIDs.Add(missileId, data[0].Item1);
                         }
                     }
-                    if (igcMessage.Data is ImmutableArray<MyTuple<string>>) {//TODO error message from missile
-                        var data = (ImmutableArray<MyTuple<string>>)igcMessage.Data;
-                        DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
-                        debugLog = new StringBuilder("");
-                        //DEBUG.ReadText(debugLog, true);
-                        debugLog.Append("\n" + data[0].Item1 + "\n");
-                        DEBUG.WriteText(debugLog);
+                    if (igcMessage.Data is MyTuple<string, string>) {//error message from missile
+                        var data = (MyTuple<string, string>)igcMessage.Data;
+                        if (data.Item1 == "ERROR") {
+                            DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                            debugLog = new StringBuilder("");
+                            //DEBUG.ReadText(debugLog, true);
+                            debugLog.Append("\n" + data.Item2 + "\n");
+                            DEBUG.WriteText(debugLog);
+                        }
                     }
                 }
                 //eliminate duplicates by preferring entries from the first dictionary
@@ -1457,7 +1460,7 @@ namespace IngameScript {
             }
         }
 
-        bool LoadMissiles() {//TODO revisit, make it universal - meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
+        bool LoadMissiles() {
             List<IMyShipConnector> MISSILECONNECTORS = new List<IMyShipConnector>();
             GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(MISSILECONNECTORS, b => b.CustomName.Contains(missilePrefix));
             if (MISSILECONNECTORS.Count == 0) { return false; }

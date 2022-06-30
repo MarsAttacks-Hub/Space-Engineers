@@ -21,6 +21,7 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO add gravityConpensation
+        //add other missile guidances
         //make a better drome AI
         //HOMING MISSILE
 
@@ -161,22 +162,7 @@ namespace IngameScript {
 
         public void Main() {
             try {
-                Echo($"TBLOCKS:{TBLOCKS.Count}");
-                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-                Echo($"GYROS:{GYROS.Count}");
-                Echo($"THRUSTERS:{THRUSTERS.Count}");
-                Echo($"ALLTHRUSTERS:{ALLTHRUSTERS.Count}");
-                Echo($"SIDETHRUSTERS:{SIDETHRUSTERS.Count}");
-                Echo($"BACKWARDTHRUSTERS:{BACKWARDTHRUSTERS.Count}");
-                Echo($"UPWARDTHRUSTERS:{UPWARDTHRUSTERS.Count}");
-                Echo($"DOWNWARDTHRUSTERS:{DOWNWARDTHRUSTERS.Count}");
-                Echo($"MERGES:{MERGES.Count}");
-                Echo($"CONNECTORS:{CONNECTORS.Count}");
-                Echo($"GENERATORS:{GENERATORS.Count}");
-                Echo($"WARHEADS:{WARHEADS.Count}");
-                Echo($"ROCKETS:{ROCKETS.Count}");
-                Echo($"GATLINGS:{GATLINGS.Count}");
-                Echo($"TURRETS:{TURRETS.Count}");
+                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (ANTENNA.Enabled) {
                     GetMessages();
@@ -331,27 +317,16 @@ namespace IngameScript {
                 type = "Drone";
             }
             string info = command + "," + status + "," + type;
-
             var immArray = ImmutableArray.CreateBuilder<MyTuple<string, Vector3D, double, double>>();
-
             var tuple = MyTuple.Create(info, position, speed, distanceFromTarget);
-
             immArray.Add(tuple);
-
             bool messageSent = IGC.SendUnicastMessage(platFormId, platformTag, immArray.ToImmutable());
-
             return messageSent;
         }
 
         bool SendErrorMessage(String msg) {
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<string>>();
-
-            var tuple = MyTuple.Create(msg);
-
-            immArray.Add(tuple);
-
-            bool messageSent = IGC.SendUnicastMessage(platFormId, platformTag, immArray.ToImmutable());
-
+            var tuple = MyTuple.Create("ERROR", msg);
+            bool messageSent = IGC.SendUnicastMessage(platFormId, platformTag, tuple);
             return messageSent;
         }
 

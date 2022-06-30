@@ -101,20 +101,7 @@ namespace IngameScript {
 
         public void Main(string arg, UpdateType updateSource) {
             try {
-                Echo($"PROJECTORSDECOY:{PROJECTORSDECOY.Count}");
-                Echo($"PROJECTORSBOMB:{PROJECTORSBOMB.Count}");
-                Echo($"MERGESDECOY:{MERGESDECOY.Count}");
-                Echo($"GRAVGENS:{GRAVGENS.Count}");
-                Echo($"WELDERSDECOY:{WELDERSDECOY.Count}");
-                Echo($"HINGESDETACH:{HINGESDETACH.Count}");
-                Echo($"HINGESFRONT:{HINGESFRONT.Count}");
-                Echo($"HINGESJOLT:{HINGESJOLT.Count}");
-                Echo($"PISTONSDOUBLEOUTER:{PISTONSDOUBLEOUTER.Count}");
-                Echo($"PISTONSDOUBLEINNER:{PISTONSDOUBLEINNER.Count}");
-                Echo($"PISTONSFRONT:{PISTONSFRONT.Count}");
-                Echo($"PISTONSJOLT:{PISTONSJOLT.Count}");
-                Echo($"PROJECTORS:{PROJECTORS.Count}");
-                Echo($"WELDERSJOLT:{WELDERSJOLT.Count}");
+                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
@@ -146,7 +133,7 @@ namespace IngameScript {
                 if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
-                    DEBUG.ReadText(debugLog, true);
+                    //DEBUG.ReadText(debugLog, true);
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
