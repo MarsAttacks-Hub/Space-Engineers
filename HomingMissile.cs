@@ -21,6 +21,7 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO add gravityConpensation
+        //make a better drome AI
         //HOMING MISSILE
 
         readonly string antennaName = "A [M]1";

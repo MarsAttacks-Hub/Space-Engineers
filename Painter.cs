@@ -21,13 +21,14 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //PAINTER
+        //TODO implement multyTargeting
 
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
         readonly string lightsName = "[CRX] Rotating Light";
         readonly string turretsName = "[CRX] Turret";
         readonly string lcdsTargetName = "[CRX] LCD Target";
-        readonly string controllersName = "[CRX] Controller";//"Reference";
+        readonly string controllersName = "[CRX] Controller";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
         readonly string gyrosName = "[CRX] Gyro";
         readonly string alarmsName = "[CRX] Alarm Lidar";
@@ -35,7 +36,10 @@ namespace IngameScript {
         readonly string rocketsName = "[CRX] Rocket Launcher";
         readonly string gatlingsName = "[CRX] Gatling Gun";
         readonly string railgunsName = "[CRX] Railgun";
+        readonly string smallRailgunsName = "[CRX] Small Railgun";
+        readonly string autocannonsName = "[CRX] Autocannon";
         readonly string artilleryName = "[CRX] Artillery";
+        readonly string assaultName = "[CRX] Assault";
         readonly string projectorsMissilesName = "Missile";
         readonly string projectorsDronesName = "Drone";
         readonly string missileAntennasName = "A [M]";
@@ -65,56 +69,105 @@ namespace IngameScript {
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
 
-        readonly int fireDelay = 5;
         readonly bool creative = true;
         readonly int missilesCount = 2;
         readonly int autoMissilesDelay = 9;
         readonly int writeDelay = 1;
-        readonly float joltProjectileMaxSpeed = 958.21f;
-        readonly float rocketProjectileMaxSpeed = 200f;
-        double rocketProjectileMaxRange = 500d;
-        readonly float gatlingProjectileMaxSpeed = 400f;
-        readonly double gatlingProjectileMaxRange = 800d;
-        readonly double gunsMaxRange = 1500d;
-        readonly double railgunMaxRange = 1500d;
-        readonly double artilleryMaxRange = 1200d;
-        readonly float artilleryProjectileMaxSpeed = 1000f;//TODO
-        readonly float railgunProjectileMaxSpeed = 1000f;//TODO
+        readonly double gunsRange = 2000d;
+        readonly float joltSpeed = 958.21f;
+        readonly float rocketSpeed = 200f;
+        double rocketRange = 500d;
+        readonly float gatlingSpeed = 400f;
+        readonly float autocannonSpeed = 400f;
+        readonly double autocannonRange = 800d;//gatlingRange
+        readonly float assaultSpeed = 500f;
+        readonly double assaultRange = 1400d;
+        readonly float artillerySpeed = 500f;
+        readonly double artilleryRange = 2000d;
+        readonly float railgunSpeed = 2000f;
+        readonly double railgunRange = 2000d;
+        readonly float smallRailgunSpeed = 1000f;
+        readonly double smallRailgunRange = 1400d;
+        readonly int rocketROF = 4;//120rpm - 2rps - 0.03 rptick - 30 ticks
+        readonly int autocannonsROF = 3;//150rpm - 2.5rps - 0.04 rptick - 24 ticks
+        readonly int assaultROF = 2;//200rpm - 3.33rps - 0.055 rptick - 19 ticks
+        readonly int artilleryROF = 5;//80rpm - 1.33rps - 0.022 rptick - 46 ticks
+        readonly int railgunsROF = 19;//20rpm - 0.33rps - 0.0055 rptick - 181 ticks
+        readonly int smallRailgunsROF = 19;//20rpm - 0.33rps - 0.0055 rptick - 181 ticks
+        readonly int rocketRounds = 19;
+        readonly int autocannonsRounds = 200;
+        readonly int singleRound = 1;
+        readonly int rocketReload = 24;//4000ms - 240 ticks
+        readonly int autocannonsReload = 15;//2500ms - 150 ticks
+        readonly int assaultReload = 36;//6000ms - 360 ticks
+        readonly int artilleryReload = 72;//120000ms - 720 ticks
+        readonly int railgunsReload = 24;//4000ms - 240 ticks
+        readonly int smallRailgunsReload = 24;//4000ms - 240 ticks
         readonly int fudgeAttempts = 8;
         readonly double aimP = 1;
         readonly double aimI = 0;
         readonly double aimD = 1;
         readonly double integralWindupLimit = 0;
+        readonly bool sequenceWeapons = false;
 
-        int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Artillery - 4 Railguns
+        int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
         int selectedPayLoad = 0;//0 Missiles - 1 Drones
         bool autoFire = true;
         bool autoMissiles = false;
         bool autoSwitchGuns = true;
-        bool sequenceWeapons = false;
-        int fireCount = 0;
-        int weaponIndex = 0;
+        int rocketDelay = 1;
+        int autocannonsDelay = 1;
+        int assaultDelay = 1;
+        int artilleryDelay = 1;
+        int railgunsDelay = 1;
+        int smallRailgunsDelay = 1;
+        int rocketCount = 0;
+        int rocketIndex = 0;
+        int autocannonsCount = 0;
+        int autocannonsIndex = 0;
+        int assaultCount = 0;
+        int assaultIndex = 0;
+        int artilleryCount = 0;
+        int artilleryIndex = 0;
+        int railgunsCount = 0;
+        int railgunsIndex = 0;
+        int smallRailgunsCount = 0;
+        int smallRailgunsIndex = 0;
         int selectedMissile = 1;
         int cockpitTargetSurface = 0;
         int autoMissilesCounter = 0;
+        int writeCount = 0;
         long currentTick = 1;
         long lostTicks = 0;
-        bool doOnce = false;
-        bool rocketsOnce = false;
-        bool gatlingsOnce = false;
-        bool artilleryOnce = false;
-        bool railgunsOnce = false;
-        bool missilesLoaded = false;
-        int writeCount = 0;
-        bool fudgeVectorSwitch = false;
         double fudgeFactor = 5;
+        bool missilesLoaded = false;
+        bool fudgeVectorSwitch = false;
         bool readyToFire = false;
-        bool readyToFireOnce = true;
         bool gatlingAmmoFound = true;
         bool missileAmmoFound = true;
         bool artilleryAmmoFound = true;
         bool railgunAmmoFound = true;
-        bool decoyRan = false;
+        bool smallRailgunAmmoFound = true;
+        bool assaultAmmoFound = true;
+        bool autocannonAmmoFound = true;
+        bool rocketsCanShoot = true;
+        bool autocannonsCanShoot = true;
+        bool assaultCanShoot = true;
+        bool artilleryCanShoot = true;
+        bool railgunsCanShoot = true;
+        bool smallRailgunsCanShoot = true;
+        bool decoyRanOnce = false;
+        bool doOnce = false;
+        bool gatlingsOnce = false;
+        bool readyToFireOnce = true;
+        bool maxRangeOnce = false;
+        bool cannotFireOnce = true;
+        bool rocketsOnce = false;
+        bool artilleryOnce = false;
+        bool railgunsOnce = false;
+        bool smallRailgunsOnce = false;
+        bool assaultOnce = false;
+        bool autocannonOnce = false;
 
         Vector3D targetPosition;
         string targetName = null;
@@ -140,10 +193,13 @@ namespace IngameScript {
         public List<IMyProjector> PROJECTORSMISSILES = new List<IMyProjector>();
         public List<IMyProjector> TEMPPROJECTORS = new List<IMyProjector>();
         public List<IMyRadioAntenna> MISSILEANTENNAS = new List<IMyRadioAntenna>();
-        public List<IMyUserControllableGun> ROCKETS = new List<IMyUserControllableGun>();
         public List<IMyUserControllableGun> GATLINGS = new List<IMyUserControllableGun>();
-        public List<IMyUserControllableGun> ARTILLERY = new List<IMyUserControllableGun>();
-        public List<IMyUserControllableGun> RAILGUNS = new List<IMyUserControllableGun>();
+        public List<Gun> AUTOCANNONS = new List<Gun>();
+        public List<Gun> ROCKETS = new List<Gun>();
+        public List<Gun> ARTILLERY = new List<Gun>();
+        public List<Gun> RAILGUNS = new List<Gun>();
+        public List<Gun> SMALLRAILGUNS = new List<Gun>();
+        public List<Gun> ASSAULT = new List<Gun>();
         public List<IMyCargoContainer> CARGOS = new List<IMyCargoContainer>();
         public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
         public List<IMyInventory> inventories = new List<IMyInventory>();
@@ -158,9 +214,11 @@ namespace IngameScript {
 
         readonly MyItemType missileAmmo = MyItemType.MakeAmmo("Missile200mm");
         readonly MyItemType gatlingAmmo = MyItemType.MakeAmmo("NATO_25x184mm");
+        readonly MyItemType autocannonAmmo = MyItemType.MakeAmmo("AutocannonClip");
+        readonly MyItemType assaultAmmo = MyItemType.MakeAmmo("MediumCalibreAmmo");
         readonly MyItemType artilleryAmmo = MyItemType.MakeAmmo("LargeCalibreAmmo");
         readonly MyItemType railgunAmmo = MyItemType.MakeAmmo("LargeRailgunAmmo");
-        //readonly MyItemType assaultAmmo = MyItemType.MakeAmmo("MediumCalibreAmmo");
+        readonly MyItemType smallRailgunAmmo = MyItemType.MakeAmmo("SmallRailgunAmmo");
         readonly MyItemType iceOre = MyItemType.MakeOre("Ice");
 
         Dictionary<long, string> MissileIDs = new Dictionary<long, string>();
@@ -185,14 +243,11 @@ namespace IngameScript {
         void Setup() {
             UNILISTENER = IGC.UnicastListener;
             BROADCASTLISTENER = IGC.RegisterBroadcastListener(antennaTag);
-
             GetBlocks();
             SetBlocks();
             GetMissileAntennas();
             SetMissileAntennas();
-
             InitPIDControllers();
-
             if (selectedPayLoad == 0) {
                 TEMPPROJECTORS = PROJECTORSMISSILES;
                 foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = true; }
@@ -202,33 +257,19 @@ namespace IngameScript {
                 foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = true; }
                 foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = false; }
             }
-
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
-
             autoMissilesCounter = autoMissilesDelay + 1;
+            SetGunsDelay();
         }
 
         public void Main(string arg) {
             try {
-                Echo($"MISSILEANTENNAS:{MISSILEANTENNAS.Count}");
-                Echo($"LIDARS:{LIDARS.Count}");
-                Echo($"CONTROLLERS:{CONTROLLERS.Count}");
-                Echo($"COCKPITS:{COCKPITS.Count}");
-                Echo($"TURRETS:{TURRETS.Count}");
-                Echo($"LIGHTS:{LIGHTS.Count}");
-                Echo($"SURFACES:{SURFACES.Count}");
-                Echo($"ALARMS:{ALARMS.Count}");
-                Echo($"GYROS:{GYROS.Count}");
-                Echo($"WELDERS:{WELDERS.Count}");
-                Echo($"ROCKETS:{ROCKETS.Count}");
-                Echo($"GATLINGS:{GATLINGS.Count}");
-                Echo($"PROJECTORSMISSILES:{PROJECTORSMISSILES.Count}");
-                Echo($"PROJECTORSDRONES:{PROJECTORSDRONES.Count}");
-                Echo($"CARGOS:{CARGOS.Count}");
+                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 RemoveLostMissiles();
                 GetMessages();
                 ReadMessages();
+                CanShootGuns();
 
                 if (targetName != null) {
                     if (lostTicks > ticksScanDelay) {//if lidars or turrets doesn't detect a enemy for some time reset the script
@@ -280,6 +321,8 @@ namespace IngameScript {
                     TurretsDetection(false);
                 }
 
+                SyncGuns();
+
                 bool completed = CheckProjectors();
                 if (!completed) {
                     missilesLoaded = false;
@@ -301,9 +344,10 @@ namespace IngameScript {
             } catch (Exception e) {
                 DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                 debugLog = new StringBuilder("");
-                DEBUG.ReadText(debugLog, true);
+                //DEBUG.ReadText(debugLog, true);
                 debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                 DEBUG.WriteText(debugLog);
+                Setup();
             }
         }
 
@@ -391,7 +435,6 @@ namespace IngameScript {
             }
             MyIniParseResult result;
             myIni.TryParse(cockpit.CustomData, sectionTag, out result);
-
             if (!string.IsNullOrEmpty(myIni.Get(sectionTag, cockpitTargetSurfaceKey).ToString())) {
                 cockpitTargetSurface = myIni.Get(sectionTag, cockpitTargetSurfaceKey).ToInt32();
                 SURFACES.Add(cockpit.GetSurface(cockpitTargetSurface));
@@ -566,7 +609,6 @@ namespace IngameScript {
                     }
                 }
             }
-
             if (!targetFound) {
                 fudgeFactor++;
             } else {
@@ -593,7 +635,6 @@ namespace IngameScript {
                     }
                 }
             }
-
             if (!targetFound) {
                 fudgeFactor++;
             } else {
@@ -604,17 +645,14 @@ namespace IngameScript {
 
         Vector3D CalculateFudgeVector(Vector3D targetDirection) {
             fudgeVectorSwitch = !fudgeVectorSwitch;
-
             if (!fudgeVectorSwitch) {
                 return Vector3D.Zero;
             }
-
             var perpVector1 = Vector3D.CalculatePerpendicularVector(targetDirection);
             var perpVector2 = Vector3D.Cross(perpVector1, targetDirection);
             if (!Vector3D.IsUnit(ref perpVector2)) {
                 perpVector2.Normalize();
             }
-
             float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             var randomVector = (2.0 * random.NextDouble() - 1.0) * perpVector1 + (2.0 * random.NextDouble() - 1.0) * perpVector2;
             return randomVector * fudgeFactor * elapsedTime;
@@ -668,30 +706,57 @@ namespace IngameScript {
             Vector3D targetPos = targetPosition + (targetInfo.Velocity * elapsedTime);
             Vector3D aimDirection;
             double distanceFromTarget = Vector3D.Distance(targetPos, REF.GetPosition());
-            if (distanceFromTarget > gunsMaxRange) {
-                aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
+            if (distanceFromTarget > gunsRange) {
+                aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltSpeed, REF);
                 if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
-                    aimDirection = BulletDrop(distanceFromTarget, aimDirection, CONTROLLER.GetNaturalGravity());
+                    aimDirection = BulletDrop(distanceFromTarget, joltSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
                 }
             } else {
-                switch (weaponType) {
+                switch (weaponType) {//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
                     case 0:
-                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltProjectileMaxSpeed, REF);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, joltSpeed, REF);
                         if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
-                            aimDirection = BulletDrop(distanceFromTarget, aimDirection, CONTROLLER.GetNaturalGravity());
+                            aimDirection = BulletDrop(distanceFromTarget, joltSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
                         }
                         break;
                     case 1:
-                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, rocketProjectileMaxSpeed, REF);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, rocketSpeed, REF);
                         break;
                     case 2:
-                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, gatlingProjectileMaxSpeed, REF);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, gatlingSpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
+                            aimDirection = BulletDrop(distanceFromTarget, gatlingSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
                         break;
                     case 3:
-                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, artilleryProjectileMaxSpeed, REF);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, autocannonSpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
+                            aimDirection = BulletDrop(distanceFromTarget, autocannonSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
                         break;
                     case 4:
-                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, railgunProjectileMaxSpeed, REF);
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, assaultSpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
+                            aimDirection = BulletDrop(distanceFromTarget, assaultSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
+                        break;
+                    case 5:
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, artillerySpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
+                            aimDirection = BulletDrop(distanceFromTarget, artillerySpeed, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
+                        break;
+                    case 6:
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, railgunSpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
+                            aimDirection = BulletDrop(distanceFromTarget, railgunSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
+                        break;
+                    case 7:
+                        aimDirection = ComputeInterceptWithLeading(targetPos, targetInfo.Velocity, smallRailgunSpeed, REF);
+                        if (!Vector3D.IsZero(CONTROLLER.GetNaturalGravity())) {
+                            aimDirection = BulletDrop(distanceFromTarget, smallRailgunSpeed, aimDirection, CONTROLLER.GetNaturalGravity());
+                        }
                         break;
                     default:
                         aimDirection = targetPos - REF.GetPosition();
@@ -700,11 +765,8 @@ namespace IngameScript {
             }
             double yawAngle, pitchAngle, rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, CONTROLLER.WorldMatrix.Up, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
             double yawSpeed = yawController.Control(yawAngle);
-            double pitchSpeed = pitchController.Control(pitchAngle);
-            //double rollSpeed = rollController.Control(rollAngle);
-
+            double pitchSpeed = pitchController.Control(pitchAngle); //double rollSpeed = rollController.Control(rollAngle);
             double userRoll = 0d;
             foreach (IMyShipController cntrllr in CONTROLLERS) {
                 if (cntrllr.IsUnderControl) {
@@ -720,9 +782,7 @@ namespace IngameScript {
             } else {
                 userRoll = rollController.Control(userRoll);
             }
-
             ApplyGyroOverride(pitchSpeed, yawSpeed, userRoll, GYROS, CONTROLLER.WorldMatrix);
-
             Vector3D forwardVec = CONTROLLER.WorldMatrix.Forward;
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance) {
@@ -743,53 +803,42 @@ namespace IngameScript {
 
         Vector3D GetPredictedTargetPosition(IMyTerminalBlock gun, IMyShipController shooter, Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed) {
             float shootDelay = 0;
-
             Vector3D muzzlePosition = gun.GetPosition();
-
             Vector3D toTarget = targetPosition - muzzlePosition;
             Vector3D shooterVelocity = shooter.GetShipVelocities().LinearVelocity;
-
             Vector3D diffVelocity = targetVelocity - shooterVelocity;
-
             float a = (float)diffVelocity.LengthSquared() - projectileSpeed * projectileSpeed;
             float b = 2 * Vector3.Dot(diffVelocity, toTarget);
             float c = (float)toTarget.LengthSquared();
-
             float p = -b / (2 * a);
             float q = (float)Math.Sqrt((b * b) - 4 * a * c) / (2 * a);
-
             float t1 = p - q;
             float t2 = p + q;
             float t;
-
             if (t1 > t2 && t2 > 0) {
                 t = t2;
             } else {
                 t = t1;
             }
-
             t += shootDelay;
-
             Vector3D predictedPosition = targetPosition + diffVelocity * t;
             //Vector3 bulletPath = predictedPosition - muzzlePosition;
             //timeToHit = bulletPath.Length() / projectileSpeed;
             return predictedPosition;
         }
 
-        Vector3D BulletDrop(double distanceFromTarget, Vector3D desiredDirection, Vector3D gravity) {
-            double timeToTarget = distanceFromTarget / joltProjectileMaxSpeed;
+        Vector3D BulletDrop(double distanceFromTarget, double projectileMaxSpeed, Vector3D desiredDirection, Vector3D gravity) {
+            double timeToTarget = distanceFromTarget / projectileMaxSpeed;
             desiredDirection -= 0.5 * gravity * timeToTarget * timeToTarget;
             return desiredDirection;
         }
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
             desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
-
             MatrixD transposedWm;
             MatrixD.Transpose(ref worldMatrix, out transposedWm);
             Vector3D.Rotate(ref desiredForwardVector, ref transposedWm, out desiredForwardVector);
             Vector3D.Rotate(ref desiredUpVector, ref transposedWm, out desiredUpVector);
-
             Vector3D leftVector = Vector3D.Cross(desiredUpVector, desiredForwardVector);
             Vector3D axis;
             double angle;
@@ -799,21 +848,17 @@ namespace IngameScript {
             } else {
                 leftVector = VectorMath.SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
-
                 //Create matrix
                 MatrixD targetMatrix = MatrixD.Zero;
                 targetMatrix.Forward = desiredForwardVector;
                 targetMatrix.Left = leftVector;
                 targetMatrix.Up = upVector;
-
                 axis = new Vector3D(targetMatrix.M23 - targetMatrix.M32,
                                     targetMatrix.M31 - targetMatrix.M13,
                                     targetMatrix.M12 - targetMatrix.M21);
-
                 double trace = targetMatrix.M11 + targetMatrix.M22 + targetMatrix.M33;
                 angle = Math.Acos(MathHelper.Clamp((trace - 1) * 0.5, -1, 1));
             }
-
             if (Vector3D.IsZero(axis)) {
                 angle = desiredForwardVector.Z < 0 ? 0 : Math.PI;
                 yaw = angle;
@@ -821,7 +866,6 @@ namespace IngameScript {
                 roll = 0;
                 return;
             }
-
             axis = VectorMath.SafeNormalize(axis);
             //Because gyros rotate about -X -Y -Z, we need to negate our angles
             yaw = -axis.Y * angle;
@@ -850,14 +894,10 @@ namespace IngameScript {
                 Dictionary<long, MyTuple<double, double, string>> tempMissilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
                 while (UNILISTENER.HasPendingMessage) {
                     var igcMessage = UNILISTENER.AcceptMessage();
-
                     long missileId = igcMessage.Source;
-
                     if (igcMessage.Data is ImmutableArray<MyTuple<string, Vector3D, double, double>>) {
                         var data = (ImmutableArray<MyTuple<string, Vector3D, double, double>>)igcMessage.Data;
-
                         received = true;
-
                         var tup = MyTuple.Create(data[0].Item4, data[0].Item3, data[0].Item1);
                         if (!tempMissilesInfo.ContainsKey(missileId)) {
                             tempMissilesInfo.Add(missileId, tup);
@@ -866,14 +906,11 @@ namespace IngameScript {
                             tempMissileIDs.Add(missileId, data[0].Item1);
                         }
                     }
-
-                    if (igcMessage.Data is ImmutableArray<MyTuple<string>>)//error message from missile
-                    {
+                    if (igcMessage.Data is ImmutableArray<MyTuple<string>>) {//TODO error message from missile
                         var data = (ImmutableArray<MyTuple<string>>)igcMessage.Data;
-
                         DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                         debugLog = new StringBuilder("");
-                        DEBUG.ReadText(debugLog, true);
+                        //DEBUG.ReadText(debugLog, true);
                         debugLog.Append("\n" + data[0].Item1 + "\n");
                         DEBUG.WriteText(debugLog);
                     }
@@ -901,30 +938,18 @@ namespace IngameScript {
 
         void SendMissileBroadcastMessage(string cmd) {
             Vector3D targetPos = targetPosition;
-
             long fakeId = 0;
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
-                MyTuple<Vector3, Vector3D>>>();
-
-            var tuple = MyTuple.Create(MyTuple.Create(fakeId, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix, creative),
-              MyTuple.Create(targetInfo.Velocity, targetPos));
-
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3, Vector3D>>>();
+            var tuple = MyTuple.Create(MyTuple.Create(fakeId, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix, creative), MyTuple.Create(targetInfo.Velocity, targetPos));
             immArray.Add(tuple);
-
             IGC.SendBroadcastMessage(missileAntennaTag, immArray.ToImmutable());
         }
 
         bool SendMissileUnicastMessage(string cmd, long id) {
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>,
-                MyTuple<Vector3, Vector3D>>>();
-
-            var tuple = MyTuple.Create(MyTuple.Create(id, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix, creative),
-                MyTuple.Create(targetInfo.Velocity, targetPosition));
-
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3, Vector3D>>>();
+            var tuple = MyTuple.Create(MyTuple.Create(id, cmd, CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.WorldMatrix, creative), MyTuple.Create(targetInfo.Velocity, targetPosition));
             immArray.Add(tuple);
-
             bool uniMessageSent = IGC.SendUnicastMessage(id, missileAntennaTag, immArray.ToImmutable());
-
             if (!uniMessageSent) {
                 LostMissileIDs.Add(id);
             }
@@ -968,39 +993,29 @@ namespace IngameScript {
         void ResetTargeter() {
             UnlockShip();
             TurnAlarmOff();
-            TurnGunsOff();
+            ResetGuns();
             ClearLogs();
-
             targetName = null;
             targetDiameter = 0;
             targetInfo = default(MyDetectedEntityInfo);
             targetPosition = default(Vector3D);
-
             currentTick = 1;
             lostTicks = 0;
             selectedMissile = 1;
             doOnce = false;
-            rocketsOnce = false;
-            gatlingsOnce = false;
-            artilleryOnce = false;
-            railgunsOnce = false;
-
             autoMissilesCounter = autoMissilesDelay + 1;
             missilesLoaded = false;
             fudgeFactor = 5;
-
             foreach (var id in MissileIDs) {
                 if (!id.Value.Contains(commandLost)) {
                     SendMissileUnicastMessage(commandLost, id.Key);
                 }
             }
-
             SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
         }
 
         void ActivateTargeter() {
-            if (!doOnce)//things to run once when a enemy is detected
-            {
+            if (!doOnce) {//things to run once when a enemy is detected
                 TurnAlarmOn();
                 doOnce = true;
             }
@@ -1052,27 +1067,38 @@ namespace IngameScript {
                 missileAmmoFound = true;
                 artilleryAmmoFound = true;
                 railgunAmmoFound = true;
+                smallRailgunAmmoFound = true;
+                assaultAmmoFound = true;
+                autocannonAmmoFound = true;
             } else {
                 gatlingAmmoFound = false;
                 missileAmmoFound = false;
                 artilleryAmmoFound = false;
                 railgunAmmoFound = false;
-
+                smallRailgunAmmoFound = false;
+                assaultAmmoFound = false;
+                autocannonAmmoFound = false;
                 inventories.Clear();
-                inventories.AddRange(ROCKETS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+                inventories.AddRange(ROCKETS.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
                 missileAmmoFound = CheckItems(inventories, missileAmmo);
-
                 inventories.Clear();
                 inventories.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
                 gatlingAmmoFound = CheckItems(inventories, gatlingAmmo);
-
                 inventories.Clear();
-                inventories.AddRange(ARTILLERY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+                inventories.AddRange(AUTOCANNONS.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
+                autocannonAmmoFound = CheckItems(inventories, autocannonAmmo);
+                inventories.Clear();
+                inventories.AddRange(ARTILLERY.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
                 artilleryAmmoFound = CheckItems(inventories, artilleryAmmo);
-
                 inventories.Clear();
-                inventories.AddRange(RAILGUNS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
+                inventories.AddRange(RAILGUNS.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
                 railgunAmmoFound = CheckItems(inventories, railgunAmmo);
+                inventories.Clear();
+                inventories.AddRange(SMALLRAILGUNS.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
+                smallRailgunAmmoFound = CheckItems(inventories, smallRailgunAmmo);
+                inventories.Clear();
+                inventories.AddRange(ASSAULT.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
+                assaultAmmoFound = CheckItems(inventories, assaultAmmo);
             }
         }
 
@@ -1091,175 +1117,358 @@ namespace IngameScript {
 
         void ManageGuns() {
             if (autoFire) {
-                if (readyToFire) {
-                    readyToFireOnce = true;
-                    double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
-                    if (distanceFromTarget < gunsMaxRange) {
-                        if (!decoyRan) {
-                            decoyRan = SHOOTERPB.TryRun(argFireDecoy);
+                double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                if (autoSwitchGuns) {
+                    if (distanceFromTarget < gunsRange) {
+                        maxRangeOnce = true;
+                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                            decoyRanOnce = SHOOTERPB.TryRun(argFireDecoy);
                         }
-                        if (autoSwitchGuns) {
-                            rocketProjectileMaxRange = 500d;
-                            if (distanceFromTarget < rocketProjectileMaxRange && missileAmmoFound) {
-                                if (!rocketsOnce) {
-                                    weaponType = 1;
-                                    rocketsOnce = true;
-                                    gatlingsOnce = false;
-                                    artilleryOnce = false;
-                                    railgunsOnce = false;
-                                    if (!sequenceWeapons) { foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; } }
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
+                        if (weaponType != 2 && weaponType != 3 && gatlingsOnce) {
+                            foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
+                            gatlingsOnce = false;
+                        }
+                        rocketRange = 500d;
+                        if (distanceFromTarget < rocketRange && missileAmmoFound && rocketsCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 5) {
+                                    weaponType = 5;
+                                    return;
                                 }
-                                if (sequenceWeapons) { SequenceWeapons(ROCKETS); }
-                            } else if (distanceFromTarget < gatlingProjectileMaxRange && gatlingAmmoFound) {
-                                if (!gatlingsOnce) {
-                                    weaponType = 2;
-                                    gatlingsOnce = true;
-                                    rocketsOnce = false;
-                                    artilleryOnce = false;
-                                    railgunsOnce = false;
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
-                                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
+                                if (!rocketsOnce) { SwitchGun(false, true, true, true, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
+                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
                                 }
-                            } else if (distanceFromTarget < artilleryMaxRange && artilleryAmmoFound) {
-                                if (!artilleryOnce) {
+                            }
+                        } else if (distanceFromTarget < autocannonRange && (autocannonAmmoFound || gatlingAmmoFound)) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 3) {
                                     weaponType = 3;
-                                    artilleryOnce = true;
-                                    railgunsOnce = false;
-                                    gatlingsOnce = false;
-                                    rocketsOnce = false;
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = true; }
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
+                                    return;
                                 }
-                            } else if (distanceFromTarget < railgunMaxRange && railgunAmmoFound) {
-                                if (!railgunsOnce) {
+                                if (!gatlingsOnce && gatlingAmmoFound) {
+                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
+                                    gatlingsOnce = true;
+                                }
+                                if (autocannonAmmoFound && autocannonsCanShoot) {
+                                    if (!autocannonOnce) { SwitchGun(true, false, true, true, true, true); }
+                                    if (sequenceWeapons) {
+                                        SequenceWeapons(AUTOCANNONS, autocannonsDelay, ref autocannonsCount, ref autocannonsIndex);
+                                    } else { foreach (Gun gun in AUTOCANNONS) { gun.Shoot(); } }
+                                }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < assaultRange && assaultAmmoFound && assaultCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 4) {
                                     weaponType = 4;
-                                    railgunsOnce = true;
-                                    artilleryOnce = false;
-                                    gatlingsOnce = false;
-                                    rocketsOnce = false;
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = true; }
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
+                                    return;
                                 }
-                            } else if (rocketsOnce || gatlingsOnce || artilleryOnce || railgunsOnce) {
-                                weaponType = 0;
-                                ResetGuns();
+                                if (!assaultOnce) { SwitchGun(true, true, false, true, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
+                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < smallRailgunRange && smallRailgunAmmoFound && smallRailgunsCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 7) {
+                                    weaponType = 7;
+                                    return;
+                                }
+                                if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, true, false); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
+                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < artilleryRange && artilleryAmmoFound && artilleryCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 5) {
+                                    weaponType = 5;
+                                    return;
+                                }
+                                if (!artilleryOnce) { SwitchGun(true, true, true, false, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
+                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < railgunRange && railgunAmmoFound && railgunsCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 6) {
+                                    weaponType = 6;
+                                    return;
+                                }
+                                if (!railgunsOnce) { SwitchGun(true, true, true, true, false, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
+                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
                             }
                         } else {
-                            rocketProjectileMaxRange = 800d;
-                            if (weaponType == 1 && distanceFromTarget < rocketProjectileMaxRange && missileAmmoFound) {
-                                if (!rocketsOnce) {
-                                    rocketsOnce = true;
-                                    gatlingsOnce = false;
-                                    artilleryOnce = false;
-                                    railgunsOnce = false;
-                                    if (!sequenceWeapons) { foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = true; } }
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
-                                }
-                                if (sequenceWeapons) { SequenceWeapons(ROCKETS); }
-                            } else if (weaponType == 2 && distanceFromTarget < gatlingProjectileMaxRange && gatlingAmmoFound) {
-                                if (!gatlingsOnce) {
-                                    gatlingsOnce = true;
-                                    rocketsOnce = false;
-                                    artilleryOnce = false;
-                                    railgunsOnce = false;
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
-                                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
-                                }
-                            } else if (weaponType == 3 && distanceFromTarget < artilleryMaxRange && artilleryAmmoFound) {
-                                if (!artilleryOnce) {
-                                    artilleryOnce = true;
-                                    railgunsOnce = false;
-                                    gatlingsOnce = false;
-                                    rocketsOnce = false;
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = true; }
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
-                                }
-                            } else if (weaponType == 4 && distanceFromTarget < railgunMaxRange && railgunAmmoFound) {
-                                if (!railgunsOnce) {
-                                    railgunsOnce = true;
-                                    artilleryOnce = false;
-                                    gatlingsOnce = false;
-                                    rocketsOnce = false;
-                                    foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = true; }
-                                    foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-                                    foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
-                                }
-                            } else if (rocketsOnce || gatlingsOnce || artilleryOnce || railgunsOnce) {
+                            if (cannotFireOnce) {
+                                cannotFireOnce = false;
+                                weaponType = 0;
                                 ResetGuns();
                             }
                         }
                     } else {
-                        if (rocketsOnce || gatlingsOnce || artilleryOnce || railgunsOnce) {
+                        if (maxRangeOnce) {
+                            maxRangeOnce = false;
+                            weaponType = 0;
                             ResetGuns();
                         }
                     }
                 } else {
-                    if (readyToFireOnce) {
-                        readyToFireOnce = false;
-                        ResetGuns();
+                    if (distanceFromTarget < gunsRange) {
+                        maxRangeOnce = true;
+                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                            decoyRanOnce = SHOOTERPB.TryRun(argFireDecoy);
+                        }
+                        if (readyToFire) {
+                            readyToFireOnce = true;
+                            if (weaponType != 2 && weaponType != 3 && gatlingsOnce) {
+                                foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
+                                gatlingsOnce = false;
+                            }
+                            rocketRange = 800d;
+                            if (weaponType == 1 && distanceFromTarget < rocketRange && missileAmmoFound && rocketsCanShoot) {
+                                cannotFireOnce = true;
+                                if (!rocketsOnce) { SwitchGun(false, true, true, true, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
+                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
+                            } else if ((weaponType == 2 || weaponType == 3) && distanceFromTarget < autocannonRange && (autocannonAmmoFound || gatlingAmmoFound) && autocannonsCanShoot) {
+                                cannotFireOnce = true;
+                                if (!gatlingsOnce && gatlingAmmoFound) {
+                                    foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
+                                    gatlingsOnce = true;
+                                }
+                                if (autocannonAmmoFound && autocannonsCanShoot) {
+                                    if (!autocannonOnce) { SwitchGun(true, false, true, true, true, true); }
+                                    if (sequenceWeapons) {
+                                        SequenceWeapons(AUTOCANNONS, autocannonsDelay, ref autocannonsCount, ref autocannonsIndex);
+                                    } else { foreach (Gun gun in AUTOCANNONS) { gun.Shoot(); } }
+                                }
+                            } else if (weaponType == 4 && distanceFromTarget < assaultRange && assaultAmmoFound && assaultCanShoot) {
+                                cannotFireOnce = true;
+                                if (!assaultOnce) { SwitchGun(true, true, false, true, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
+                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
+                            } else if (weaponType == 7 && distanceFromTarget < smallRailgunRange && smallRailgunAmmoFound && smallRailgunsCanShoot) {
+                                cannotFireOnce = true;
+                                if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, true, false); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
+                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
+                            } else if (weaponType == 5 && distanceFromTarget < artilleryRange && artilleryAmmoFound && artilleryCanShoot) {
+                                cannotFireOnce = true;
+                                if (!artilleryOnce) { SwitchGun(true, true, true, false, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
+                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
+                            } else if (weaponType == 6 && distanceFromTarget < railgunRange && railgunAmmoFound && railgunsCanShoot) {
+                                cannotFireOnce = true;
+                                if (!railgunsOnce) { SwitchGun(true, true, true, true, false, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
+                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                            } else {
+                                if (cannotFireOnce) {
+                                    cannotFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else {
+                            if (readyToFireOnce) {
+                                readyToFireOnce = false;
+                                ResetGuns();
+                            }
+                        }
+                    } else {
+                        if (maxRangeOnce) {
+                            maxRangeOnce = false;
+                            ResetGuns();
+                        }
                     }
                 }
             }
         }
 
-        void ResetGuns() {
-            TurnGunsOff();
-            railgunsOnce = false;
-            artilleryOnce = false;
-            rocketsOnce = false;
-            gatlingsOnce = false;
-            sequenceWeapons = false;
-            decoyRan = false;
+        void SwitchGun(bool rockets, bool autocannons, bool assault, bool artillery, bool railguns, bool smallRailguns) {
+            foreach (Gun block in ROCKETS) { block.paused = rockets; }
+            foreach (Gun block in AUTOCANNONS) { block.paused = autocannons; }
+            foreach (Gun block in ASSAULT) { block.paused = assault; }
+            foreach (Gun block in ARTILLERY) { block.paused = artillery; }
+            foreach (Gun block in RAILGUNS) { block.paused = railguns; }
+            foreach (Gun block in SMALLRAILGUNS) { block.paused = smallRailguns; }
+            rocketsOnce = !rockets;
+            autocannonOnce = !autocannons;
+            assaultOnce = !assault;
+            artilleryOnce = !artillery;
+            railgunsOnce = !railguns;
+            smallRailgunsOnce = !smallRailguns;
         }
 
-        void SequenceWeapons(List<IMyUserControllableGun> weapons) {
-            if (fireCount == fireDelay) {
-                weapons[weaponIndex].ShootOnce();
-                fireCount = 0;
+        void CanShootGuns() {
+            int count = 0;
+            foreach (Gun gun in ROCKETS) {
+                if (!gun.CanShoot()) { count++; }
             }
-            weaponIndex++;
-            if (weaponIndex >= weapons.Count) { weaponIndex = 0; }
-            fireCount++;
+            if (count == ROCKETS.Count) { rocketsCanShoot = false; } else { rocketsCanShoot = true; }
+            count = 0;
+            foreach (Gun gun in AUTOCANNONS) {
+                if (!gun.CanShoot()) { count++; }
+            }
+            if (count == AUTOCANNONS.Count) { autocannonsCanShoot = false; } else { autocannonsCanShoot = true; }
+            count = 0;
+            foreach (Gun gun in ASSAULT) {
+                if (!gun.CanShoot()) { count++; }
+            }
+            if (count == ASSAULT.Count) { assaultCanShoot = false; } else { assaultCanShoot = true; }
+            count = 0;
+            foreach (Gun gun in ARTILLERY) {
+                if (!gun.CanShoot()) { count++; }
+            }
+            if (count == ARTILLERY.Count) { artilleryCanShoot = false; } else { artilleryCanShoot = true; }
+            count = 0;
+            foreach (Gun gun in RAILGUNS) {
+                if (!gun.CanShoot()) { count++; }
+            }
+            if (count == RAILGUNS.Count) { railgunsCanShoot = false; } else { railgunsCanShoot = true; }
+            count = 0;
+            foreach (Gun gun in SMALLRAILGUNS) {
+                if (!gun.CanShoot()) { count++; }
+            }
+            if (count == SMALLRAILGUNS.Count) { smallRailgunsCanShoot = false; } else { smallRailgunsCanShoot = true; }
         }
 
-        void TurnGunsOff() {
+        void SyncGuns() {
+            foreach (Gun gun in ROCKETS) { gun.Update(); }
+            foreach (Gun gun in AUTOCANNONS) { gun.Update(); }
+            foreach (Gun gun in ASSAULT) { gun.Update(); }
+            foreach (Gun gun in ARTILLERY) { gun.Update(); }
+            foreach (Gun gun in RAILGUNS) { gun.Update(); }
+            foreach (Gun gun in SMALLRAILGUNS) { gun.Update(); }
+        }
+
+        void ResetGuns() {
             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-            foreach (IMyUserControllableGun block in ROCKETS) { block.Shoot = false; }
-            foreach (IMyUserControllableGun block in ARTILLERY) { block.Shoot = false; }
-            foreach (IMyUserControllableGun block in RAILGUNS) { block.Shoot = false; }
+            SwitchGun(true, true, true, true, true, true);
+            ResetGunsInit();
+            gatlingsOnce = false;
+            decoyRanOnce = false;
         }
 
-        bool LoadMissiles()//meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
-        {
+        void ResetGunsInit() {
+            rocketsOnce = false;
+            autocannonOnce = false;
+            assaultOnce = false;
+            artilleryOnce = false;
+            railgunsOnce = false;
+            smallRailgunsOnce = false;
+        }
+
+        void SequenceWeapons(List<Gun> guns, int delay, ref int count, ref int index) {
+            if (count == delay) {
+                guns[index].Shoot();
+                count = 0;
+            }
+            index++;
+            if (index >= guns.Count) { index = 0; }
+            count++;
+        }
+
+        void SetGunsDelay() {
+            if (ROCKETS.Count > 0) {
+                rocketDelay = (int)Math.Ceiling(rocketROF / (double)ROCKETS.Count);
+                if (rocketDelay == 0) {
+                    rocketDelay = 1;
+                }
+            }
+            if (AUTOCANNONS.Count > 0) {
+                autocannonsDelay = (int)Math.Ceiling(autocannonsROF / (double)AUTOCANNONS.Count);
+                if (autocannonsDelay == 0) {
+                    autocannonsDelay = 1;
+                }
+            }
+            if (ASSAULT.Count > 0) {
+                assaultDelay = (int)Math.Ceiling(assaultROF / (double)ASSAULT.Count);
+                if (assaultDelay == 0) {
+                    assaultDelay = 1;
+                }
+            }
+            if (ARTILLERY.Count > 0) {
+                artilleryDelay = (int)Math.Ceiling(artilleryROF / (double)ARTILLERY.Count);
+                if (artilleryDelay == 0) {
+                    artilleryDelay = 1;
+                }
+            }
+            if (RAILGUNS.Count > 0) {
+                railgunsDelay = (int)Math.Ceiling(railgunsROF / (double)RAILGUNS.Count);
+                if (railgunsDelay == 0) {
+                    railgunsDelay = 1;
+                }
+            }
+            if (SMALLRAILGUNS.Count > 0) {
+                smallRailgunsDelay = (int)Math.Ceiling(smallRailgunsROF / (double)SMALLRAILGUNS.Count);
+                if (smallRailgunsDelay == 0) {
+                    smallRailgunsDelay = 1;
+                }
+            }
+        }
+
+        bool LoadMissiles() {//TODO revisit, make it universal - meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
             List<IMyShipConnector> MISSILECONNECTORS = new List<IMyShipConnector>();
             GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(MISSILECONNECTORS, b => b.CustomName.Contains(missilePrefix));
             if (MISSILECONNECTORS.Count == 0) { return false; }
             foreach (IMyShipConnector block in MISSILECONNECTORS) { block.Connect(); }
-
             bool allFilled = false;
             if (creative) {
                 allFilled = true;
             } else {
                 List<IMyTerminalBlock> MISSILEBLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
                 List<IMyInventory> MISSILEINVENTORIES = new List<IMyInventory>();
-                if (selectedPayLoad == 0)//missiles
-                {
+                if (selectedPayLoad == 0) {//missiles
                     MISSILEBLOCKSWITHINVENTORY.Clear();
                     GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix) && block is IMyGasGenerator);
                     MISSILEINVENTORIES.Clear();
@@ -1283,8 +1492,7 @@ namespace IngameScript {
                     if (loaded == MISSILEINVENTORIES.Count) {
                         allFilled = true;
                     }
-                } else if (selectedPayLoad == 1)//drones
-                  {
+                } else if (selectedPayLoad == 1) {//drones
                     MISSILEBLOCKSWITHINVENTORY.Clear();
                     GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(MISSILEBLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(missilePrefix) && (block is IMyGasGenerator || block is IMySmallGatlingGun || block is IMyLargeGatlingTurret));//&& !(block is IMyGasTank)); IMyLargeTurretBase
                     int inventoriesCount = 0;
@@ -1361,12 +1569,15 @@ namespace IngameScript {
             foreach (IMyTextSurface surface in SURFACES) {
                 StringBuilder text = new StringBuilder("");
                 string gun;
-                switch (weaponType) {
+                switch (weaponType) {//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
                     case 0: gun = "None"; break;
                     case 1: gun = "Rockets"; break;
                     case 2: gun = "Gatlings"; break;
-                    case 3: gun = "Artillery"; break;
-                    case 4: gun = "Railgun"; break;
+                    case 3: gun = "Autocannon"; break;
+                    case 4: gun = "Assault"; break;
+                    case 5: gun = "Artillery"; break;
+                    case 6: gun = "Railguns"; break;
+                    case 7: gun = "Small Railguns"; break;
                     default: gun = "None"; break;
                 }
                 text.Append("Guns: " + gun + ", ");
@@ -1387,16 +1598,12 @@ namespace IngameScript {
                 } else {
                     targetLog.Append(" Loaded\n");
                 }
-
                 targetLog.Append("Target Name: ").Append(targetInfo.Name).Append(", ");
-
                 string targX = targetInfo.Position.X.ToString("0.00");
                 string targY = targetInfo.Position.Y.ToString("0.00");
                 string targZ = targetInfo.Position.Z.ToString("0.00");
                 targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
-
                 targetLog.Append("Target Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append(", ");
-
                 double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
                 targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
             }
@@ -1429,14 +1636,32 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORSDRONES, b => b.CustomName.Contains(projectorsDronesName));
             COCKPITS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, b => b.CustomName.Contains(cockpitsName));
-            ROCKETS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(ROCKETS, b => b.CustomName.Contains(rocketsName));
             GATLINGS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(GATLINGS, b => b.CustomName.Contains(gatlingsName));
+            List<IMyUserControllableGun> guns = new List<IMyUserControllableGun>();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, block => block.CustomName.Contains(autocannonsName));
+            AUTOCANNONS.Clear();
+            foreach (IMyUserControllableGun gun in guns) { AUTOCANNONS.Add(new Gun(gun, autocannonsRounds, autocannonsReload, autocannonsROF)); }
+            guns.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, b => b.CustomName.Contains(rocketsName));
+            ROCKETS.Clear();
+            foreach (IMyUserControllableGun gun in guns) { ROCKETS.Add(new Gun(gun, rocketRounds, rocketReload, rocketROF)); }
+            guns.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, block => block.CustomName.Contains(railgunsName));
             RAILGUNS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(RAILGUNS, block => block.CustomName.Contains(railgunsName));
+            foreach (IMyUserControllableGun gun in guns) { RAILGUNS.Add(new Gun(gun, singleRound, railgunsReload, railgunsROF)); }
+            guns.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, block => block.CustomName.Contains(artilleryName));
             ARTILLERY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(ARTILLERY, block => block.CustomName.Contains(artilleryName));
+            foreach (IMyUserControllableGun gun in guns) { ARTILLERY.Add(new Gun(gun, singleRound, artilleryReload, artilleryROF)); }
+            guns.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, block => block.CustomName.Contains(smallRailgunsName));
+            SMALLRAILGUNS.Clear();
+            foreach (IMyUserControllableGun gun in guns) { SMALLRAILGUNS.Add(new Gun(gun, singleRound, smallRailgunsReload, smallRailgunsROF)); }
+            guns.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, block => block.CustomName.Contains(assaultName));
+            ASSAULT.Clear();
+            foreach (IMyUserControllableGun gun in guns) { ASSAULT.Add(new Gun(gun, singleRound, assaultReload, assaultROF)); }
             CARGOS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(CARGOS, b => b.CustomName.Contains(cargoName));
             CARGOINVENTORIES.Clear();
@@ -1456,7 +1681,6 @@ namespace IngameScript {
                 cam.Enabled = true;
                 cam.EnableRaycast = true;
             }
-
             foreach (IMyGyro block in GYROS) {
                 block.Enabled = true;
                 block.Yaw = 0f;
@@ -1465,7 +1689,6 @@ namespace IngameScript {
                 block.GyroOverride = false;
                 block.GyroPower = 1;
             }
-
             ANTENNA.Enabled = true;
             ANTENNA.EnableBroadcasting = true;
         }
@@ -1486,55 +1709,45 @@ namespace IngameScript {
             public static Vector3D SafeNormalize(Vector3D a) {
                 if (Vector3D.IsZero(a))
                     return Vector3D.Zero;
-
                 if (Vector3D.IsUnit(ref a))
                     return a;
-
                 return Vector3D.Normalize(a);
             }
 
-            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1)//reflect a over b
-            {
+            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) {//reflect a over b
                 Vector3D project_a = Projection(a, b);
                 Vector3D reject_a = a - project_a;
                 return project_a - reject_a * rejectionFactor;
             }
 
-            public static Vector3D Rejection(Vector3D a, Vector3D b)//reject a on b
-            {
+            public static Vector3D Rejection(Vector3D a, Vector3D b) {//reject a on b
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return Vector3D.Zero;
-
                 return a - a.Dot(b) / b.LengthSquared() * b;
             }
 
             public static Vector3D Projection(Vector3D a, Vector3D b) {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return Vector3D.Zero;
-
                 return a.Dot(b) / b.LengthSquared() * b;
             }
 
             public static double ScalarProjection(Vector3D a, Vector3D b) {
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
-
                 if (Vector3D.IsUnit(ref b))
                     return a.Dot(b);
-
                 return a.Dot(b) / b.Length();
             }
 
-            public static double AngleBetween(Vector3D a, Vector3D b)//returns radians
-            {
+            public static double AngleBetween(Vector3D a, Vector3D b) {//returns radians
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
                 else
                     return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
             }
 
-            public static double CosBetween(Vector3D a, Vector3D b)//returns radians
-            {
+            public static double CosBetween(Vector3D a, Vector3D b) {//returns radians
                 if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
                     return 0;
                 else
@@ -1587,16 +1800,13 @@ namespace IngameScript {
             public double Control(double error) {
                 //Compute derivative term
                 var errorDerivative = (error - _lastError) * _inverseTimeStep;
-
                 if (_firstRun) {
                     errorDerivative = 0;
                     _firstRun = false;
                 }
-
                 //Compute integral term
                 if (!_integralDecay) {
                     _errorSum += error * _timeStep;
-
                     //Clamp integral term
                     if (_errorSum > _upperBound)
                         _errorSum = _upperBound;
@@ -1605,10 +1815,8 @@ namespace IngameScript {
                 } else {
                     _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
                 }
-
                 //Store this error as last error
                 _lastError = error;
-
                 //Construct output
                 this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
                 return this.Value;
@@ -1624,6 +1832,92 @@ namespace IngameScript {
                 _errorSum = 0;
                 _lastError = 0;
                 _firstRun = true;
+            }
+        }
+
+        public class Gun {
+            public IMyUserControllableGun gun;
+            public bool isReloading;
+            public bool hasShot;
+            public bool paused;
+            static readonly MyDefinitionId electricityId = new MyDefinitionId(typeof(MyObjectBuilder_GasProperties), "Electricity");
+            readonly MyResourceSinkComponent sink;
+            const float idlePowerDraw = 0.0002f;
+            const float epsilon = 1e-6f;
+            readonly int rounds;
+            int roundsCount = 0;
+            readonly int reloadTime;
+            int reloadTimeCount = 0;
+            readonly int fireRate;
+            int fireRateCount = 0;
+
+            public Gun(IMyUserControllableGun weapon, int _rounds, int _reloadTime, int rof) {
+                gun = weapon;
+                sink = gun.Components.Get<MyResourceSinkComponent>();
+                rounds = _rounds;
+                reloadTime = _reloadTime;
+                fireRate = rof;
+                isReloading = false;
+                hasShot = false;
+            }
+
+            public void Shoot() {
+                if (hasShot) {
+                    fireRateCount++;
+                    if (fireRateCount == fireRate) {
+                        fireRateCount = 0;
+                        hasShot = false;
+                    }
+                }
+                if (!IsRecharging() && !isReloading && !hasShot) {
+                    gun.ShootOnce();
+                    roundsCount++;
+                    hasShot = true;
+                    return;
+                }
+                if (roundsCount == rounds) {
+                    isReloading = true;
+                    reloadTimeCount++;
+                }
+                if (reloadTimeCount == reloadTime) {
+                    isReloading = false;
+                    reloadTimeCount = 0;
+                    roundsCount = 0;
+                }
+            }
+
+            public void Update() {
+                if (paused) {
+                    if (hasShot) {
+                        fireRateCount++;
+                        if (fireRateCount == fireRate) {
+                            fireRateCount = 0;
+                            hasShot = false;
+                        }
+                    }
+                    if (roundsCount == rounds) {
+                        isReloading = true;
+                        reloadTimeCount++;
+                    }
+                    if (reloadTimeCount == reloadTime) {
+                        isReloading = false;
+                        reloadTimeCount = 0;
+                        roundsCount = 0;
+                    }
+                }
+            }
+
+            public bool CanShoot() {
+                if (IsRecharging() || isReloading || hasShot) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+
+            bool IsRecharging() {
+                if (sink == null) { return false; }
+                return sink.MaxRequiredInputByType(electricityId) > (idlePowerDraw + epsilon);
             }
         }
 
