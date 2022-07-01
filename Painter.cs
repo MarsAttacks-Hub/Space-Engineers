@@ -1420,9 +1420,12 @@ namespace IngameScript {
 
         void SequenceWeapons(List<Gun> guns, int delay, ref int count, ref int index) {
             if (count == delay) {
-                guns[index].Shoot();
+                for (int i = 0; i < guns.Count; i++) {
+                    if (i == index) { guns[i].Shoot();
+                    } else { guns[i].Update(); }
+                }
                 count = 0;
-            }
+            } else { foreach (Gun gun in guns) { gun.Update(); } }
             index++;
             if (index >= guns.Count) { index = 0; }
             count++;
