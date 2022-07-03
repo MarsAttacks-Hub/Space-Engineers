@@ -528,8 +528,17 @@ namespace IngameScript {
                         mouseYaw = yawController.Control(mouseYaw);
                     }
 
-                    ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, matrix);
-
+                    if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
+                        if (unlockGyrosOnce) {
+                            UnlockGyros();
+                            lastForwardVector = Vector3D.Zero;
+                            lastUpVector = Vector3D.Zero;
+                            unlockGyrosOnce = false;
+                        }
+                    } else {
+                        ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, matrix);
+                        unlockGyrosOnce = true;
+                    }
                 } else {
                     double speed = controller.GetShipSpeed();
                     if (speed > minSpeed) {
@@ -572,14 +581,27 @@ namespace IngameScript {
                             mouseRoll = rollController.Control(mouseRoll);
                         }
 
-                        ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
-
+                        if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
+                            if (unlockGyrosOnce) {
+                                UnlockGyros();
+                                lastForwardVector = Vector3D.Zero;
+                                lastUpVector = Vector3D.Zero;
+                                unlockGyrosOnce = false;
+                            }
+                        } else {
+                            ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, controller.WorldMatrix);
+                            unlockGyrosOnce = true;
+                        }
                         lastForwardVector = controller.WorldMatrix.Forward;
                         lastUpVector = controller.WorldMatrix.Up;
                     }
+                    if (unlockGyrosOnce) {
+                        UnlockGyros();
+                        lastForwardVector = Vector3D.Zero;
+                        lastUpVector = Vector3D.Zero;
+                        unlockGyrosOnce = false;
+                    }
                 }
-
-                unlockGyrosOnce = true;
             } else {
                 if (unlockGyrosOnce) {
                     UnlockGyros();
