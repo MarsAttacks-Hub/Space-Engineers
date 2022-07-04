@@ -1040,7 +1040,7 @@ namespace IngameScript {
             if (blocks.Count > 0) {
                 int totItems = 0;
                 List<IMyInventory> inventories = new List<IMyInventory>();
-                foreach (IMyUserControllableGun block in blocks) {
+                foreach (IMyTerminalBlock block in blocks) {
                     inventories.Add(block.GetInventory());
                     totItems += block.GetInventory().GetItemAmount(item).ToIntSafe();
                 }
