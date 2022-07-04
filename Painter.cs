@@ -22,6 +22,7 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO implement multyTargeting
         //revisit LoadMissiles(),make it universal - meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
+        //reverse gun shoot order from long range to short range
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";

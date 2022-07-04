@@ -61,18 +61,19 @@ namespace IngameScript {
         readonly string cockpitPowerSurfaceKey = "cockpitPowerSurface";
         readonly string managerTag = "[MANAGER]";
         readonly double tankThresold = 20;
-        //readonly float batteryChargeDrain = 12f;//12Mw
-        //readonly int chargeDelay = 50;
 
         const string argTogglePB = "TogglePB";
 
-        //int chargeCount = 50; 
         int cockpitPowerSurface = 2;
         int firstRun = 1;
         int ticks = 0;
-        bool togglePB = false;
-        bool isControlled = true;
         string powerStatus;
+        bool isControlled = true;
+        bool togglePB = false;
+        bool solarPowerOnce = true;
+        bool greenPowerOnce = true;
+        bool hydrogenPowerOnce = true;
+        bool fullSteamOnce = true;
 
         double tankCapacityPercent;
         float terminalCurrentInput;
@@ -559,58 +560,50 @@ namespace IngameScript {
                 registeredhEngMaxOutput = hEngMaxOutput;
                 firstRun = 0;
             }
-            float greenEnergy = solarMaxOutput + turbineMaxOutput + battsCurrentOutput;
-            float solarEnergy = solarMaxOutput + turbineMaxOutput;
-            if (shipInput < solarEnergy) {//TODO
-                powerStatus = "Solar Power";
-                foreach (IMyPowerProducer block in HENGINES) { block.Enabled = false; }
-                foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
-                foreach (IMyBatteryBlock block in BATTERIES) {
-                    block.ChargeMode = ChargeMode.Recharge;
+            if (shipInput < (solarMaxOutput + turbineMaxOutput)) {
+                if (solarPowerOnce) {
+                    greenPowerOnce = true;
+                    hydrogenPowerOnce = true;
+                    fullSteamOnce = true;
+                    powerStatus = "Solar Power";
+                    foreach (IMyPowerProducer block in HENGINES) { block.Enabled = false; }
+                    foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
+                    foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Recharge; }
+                    solarPowerOnce = false;
                 }
-                /*
-                if (chargeCount >= chargeDelay) {
-                    BATTERIES.Sort((bat, bat2) => (bat.CurrentStoredPower > bat2.CurrentStoredPower ? 1 : -1));//asc
-                    float powerDifference = solarEnergy - shipInput;
-                    int battsToRecharge = (int)(powerDifference / batteryChargeDrain);
-                    battsToRecharge = battsToRecharge == 0 ? 1 : battsToRecharge;
-                    int count = 0;
-                    foreach (IMyBatteryBlock block in BATTERIES) {
-                        if (count < battsToRecharge) {
-                            block.ChargeMode = ChargeMode.Recharge;
-                        } else {
-                            block.ChargeMode = ChargeMode.Auto;
-                        }
-                        count++;
-                    }
-                    chargeCount = 0;
+            } else if ((shipInput + battsCurrentInput) < (solarMaxOutput + turbineMaxOutput + battsCurrentOutput)) {
+                if (greenPowerOnce) {
+                    solarPowerOnce = true;
+                    hydrogenPowerOnce = true;
+                    fullSteamOnce = true;
+                    powerStatus = "Green Power";
+                    foreach (IMyPowerProducer block in HENGINES) { block.Enabled = false; }
+                    foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
+                    foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                    greenPowerOnce = false;
                 }
-                chargeCount++;
-                */
-            } else if ((shipInput + battsCurrentInput) < greenEnergy) {
-                //chargeCount = chargeDelay;
-                powerStatus = "Green Power";
-                foreach (IMyPowerProducer block in HENGINES) { block.Enabled = false; }
-                foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
-                foreach (IMyBatteryBlock block in BATTERIES) {
-                    block.ChargeMode = ChargeMode.Auto;
-                }
-            } else if ((shipInput + battsCurrentInput) < (registeredhEngMaxOutput + greenEnergy) && tankCapacityPercent > tankThresold) {
-                //chargeCount = chargeDelay;
-                powerStatus = "Hydrogen Power";
-                foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
-                foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
-                foreach (IMyBatteryBlock block in BATTERIES) {
-                    block.ChargeMode = ChargeMode.Auto;
+            } else if ((shipInput + battsCurrentInput) < (registeredhEngMaxOutput + solarMaxOutput + turbineMaxOutput + battsCurrentOutput) && tankCapacityPercent > tankThresold) {
+                if (hydrogenPowerOnce) {
+                    greenPowerOnce = true;
+                    solarPowerOnce = true;
+                    fullSteamOnce = true;
+                    powerStatus = "Hydrogen Power";
+                    foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
+                    foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
+                    foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                    hydrogenPowerOnce = false;
                 }
             } else {
-                //chargeCount = chargeDelay;
-                powerStatus = "Full Steam";
-                foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
-                foreach (IMyBatteryBlock block in BATTERIES) {
-                    block.ChargeMode = ChargeMode.Auto;
+                if (fullSteamOnce) {
+                    greenPowerOnce = true;
+                    solarPowerOnce = true;
+                    hydrogenPowerOnce = true;
+                    powerStatus = "Full Steam";
+                    foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
+                    foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                    foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
+                    fullSteamOnce = false;
                 }
-                foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
             }
         }
 
@@ -629,7 +622,7 @@ namespace IngameScript {
             foreach (IMyTerminalBlock block in TERMINALS) {
                 if (!block.IsWorking) continue;
                 if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) {
-                    if (block is IMyJumpDrive) {
+                    if (block is IMyJumpDrive || block.CustomName.Contains("Railgun")) {
                         terminalCurrentInput += sink.CurrentInputByType(electricityId);
                         terminalMaxRequiredInput += sink.CurrentInputByType(electricityId);
                     } else {
@@ -812,7 +805,7 @@ namespace IngameScript {
             foreach (KeyValuePair<MyDefinitionId, double> entry in ammosDict) {
                 ammosLog.Append($"{entry.Key.SubtypeId}: ").Append($"{(int)entry.Value}, ");
                 count++;
-                if (count > 3) {
+                if (count > 2) {
                     ammosLog.Append("\n");
                     count = 0;
                 }
