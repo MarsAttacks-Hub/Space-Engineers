@@ -65,7 +65,7 @@ namespace IngameScript {
         const string argTogglePB = "TogglePB";
 
         int cockpitPowerSurface = 2;
-        int firstRun = 1;
+        //int firstRun = 1;
         int ticks = 0;
         string powerStatus;
         bool isControlled = true;
@@ -83,7 +83,12 @@ namespace IngameScript {
         float hEngMaxOutput;
         float solarMaxOutput;
         float turbineMaxOutput;
-        float registeredhEngMaxOutput;
+        //float registeredhEngMaxOutput;//TODO
+        float hEngCurrentOutput;
+        float reactorsMaxOutput;
+        float reactorsCurrentOutput;
+        float battsMaxOutput;
+        public Dictionary<string, float> battsCurrentStoredPower = new Dictionary<string, float>();
 
         public List<IMyTerminalBlock> TERMINALS = new List<IMyTerminalBlock>();
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
@@ -388,6 +393,14 @@ namespace IngameScript {
         void Setup() {
             GetBlocks();
 
+            foreach (var block in REACTORS) { block.Enabled = true; }
+            foreach (var block in HENGINES) { block.Enabled = true; }
+            foreach (var block in BATTERIES) { block.Enabled = true; block.ChargeMode = ChargeMode.Auto; }
+
+            GetBatteriesMaxInOut();
+            GetHydrogenEnginesMaxOutput();
+            GetReactorsMaxOutput();
+
             BROADCASTLISTENER = IGC.RegisterBroadcastListener(managerTag);
 
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
@@ -552,14 +565,10 @@ namespace IngameScript {
         }
 
         void PowerManager() {
-            if (!isControlled) { PowerFlow(terminalCurrentInput); } else { PowerFlow(terminalMaxRequiredInput); }//!IsPiloted()
+            if (!isControlled) { PowerFlow(terminalCurrentInput); } else { PowerFlow(terminalMaxRequiredInput); }
         }
 
         void PowerFlow(float shipInput) {
-            if (firstRun == 1 && hEngMaxOutput > 1) {
-                registeredhEngMaxOutput = hEngMaxOutput;
-                firstRun = 0;
-            }
             if (shipInput < (solarMaxOutput + turbineMaxOutput)) {
                 if (solarPowerOnce) {
                     greenPowerOnce = true;
@@ -571,7 +580,7 @@ namespace IngameScript {
                     foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Recharge; }
                     solarPowerOnce = false;
                 }
-            } else if ((shipInput + battsCurrentInput) < (solarMaxOutput + turbineMaxOutput + battsCurrentOutput)) {
+            } else if (shipInput < (solarMaxOutput + turbineMaxOutput + battsMaxOutput)) {
                 if (greenPowerOnce) {
                     solarPowerOnce = true;
                     hydrogenPowerOnce = true;
@@ -582,7 +591,7 @@ namespace IngameScript {
                     foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                     greenPowerOnce = false;
                 }
-            } else if ((shipInput + battsCurrentInput) < (registeredhEngMaxOutput + solarMaxOutput + turbineMaxOutput + battsCurrentOutput) && tankCapacityPercent > tankThresold) {
+            } else if (shipInput < (hEngMaxOutput + solarMaxOutput + turbineMaxOutput + battsMaxOutput) && tankCapacityPercent > tankThresold) {
                 if (hydrogenPowerOnce) {
                     greenPowerOnce = true;
                     solarPowerOnce = true;
@@ -608,15 +617,16 @@ namespace IngameScript {
         }
 
         void CalcPower() {
-            GetPowInOut();
-            GetBatteriesInOut();
-            GetSolarsOutput();
-            GetTurbinesOutput();
-            GetHydrogenEnginesOutput();
+            GetPowInput();
+            GetBatteriesCurrentInOut();
+            GetSolarsCurrentOutput();
+            GetTurbinesCurrentOutput();
+            GetHydrogenEnginesCurrentOutput();
+            GetReactorsCurrentOutput();
             GetPercentTanksCapacity();
         }
 
-        void GetPowInOut() {
+        void GetPowInput() {
             terminalCurrentInput = 0;
             terminalMaxRequiredInput = 0;
             foreach (IMyTerminalBlock block in TERMINALS) {
@@ -633,7 +643,7 @@ namespace IngameScript {
             }
         }
 
-        void GetSolarsOutput() {
+        void GetSolarsCurrentOutput() {
             solarMaxOutput = 0;
             foreach (IMySolarPanel block in SOLARS) {
                 if (!block.IsWorking) continue;
@@ -641,33 +651,65 @@ namespace IngameScript {
             }
         }
 
-        void GetTurbinesOutput() {
+        void GetTurbinesCurrentOutput() {
             turbineMaxOutput = 0;
             foreach (IMyPowerProducer block in TURBINES) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) {
-                    //turbineCurrentOutput += source.CurrentOutputByType(electricityId);
-                    turbineMaxOutput += source.MaxOutputByType(electricityId);
-                }
+                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { turbineMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
-        void GetHydrogenEnginesOutput() {
-            hEngMaxOutput = 0;
-            float maxOutput = 0;
+        void GetHydrogenEnginesCurrentOutput() {
+            hEngCurrentOutput = 0;
             foreach (IMyPowerProducer block in HENGINES) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { maxOutput += source.MaxOutputByType(electricityId); }
+                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { hEngCurrentOutput += source.CurrentOutputByType(electricityId); }
             }
-            hEngMaxOutput = maxOutput;
         }
 
-        void GetBatteriesInOut() {
+        void GetHydrogenEnginesMaxOutput() {
+            hEngMaxOutput = 0;
+            foreach (IMyPowerProducer block in HENGINES) {
+                if (!block.IsWorking) continue;
+                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { hEngMaxOutput += source.MaxOutputByType(electricityId); }
+            }
+        }
+
+        void GetReactorsCurrentOutput() {
+            reactorsCurrentOutput = 0;
+            foreach (IMyPowerProducer block in REACTORS) {
+                if (!block.IsWorking) continue;
+                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { reactorsCurrentOutput += source.CurrentOutputByType(electricityId); }
+            }
+        }
+
+        void GetReactorsMaxOutput() {
+            reactorsMaxOutput = 0;
+            foreach (IMyPowerProducer block in REACTORS) {
+                if (!block.IsWorking) continue;
+                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { reactorsMaxOutput += source.MaxOutputByType(electricityId); }
+            }
+        }
+
+        void GetBatteriesCurrentInOut() {
+            battsCurrentStoredPower.Clear();
             battsCurrentInput = 0;
             battsCurrentOutput = 0;
             foreach (IMyBatteryBlock block in BATTERIES) {
+                if (!block.IsWorking) continue;
                 if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) { battsCurrentInput += sink.CurrentInputByType(electricityId); }
                 if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { battsCurrentOutput += source.CurrentOutputByType(electricityId); }
+                battsCurrentStoredPower.Add(block.CustomName, block.CurrentStoredPower);
+            }
+        }
+
+        void GetBatteriesMaxInOut() {
+            //battsMaxInput = 0;
+            battsMaxOutput = 0;
+            foreach (IMyBatteryBlock block in BATTERIES) {
+                if (!block.IsWorking) continue;
+                //if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) { battsMaxInput += sink.MaxRequiredInputByType(electricityId); }
+                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { battsMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
@@ -695,33 +737,52 @@ namespace IngameScript {
             powerLog.Clear();
             powerLog.Append("Status: ").Append(powerStatus).Append(", ");
             powerLog.Append("\n");
-            powerLog.Append("Current Input: ").Append(terminalCurrentInput.ToString("0.00")).Append(", ");
-            powerLog.Append("Max Req. Input: ").Append(terminalMaxRequiredInput.ToString("0.00")).Append("\n");
-            powerLog.Append("Solar Power: ").Append(solarMaxOutput.ToString("0.00")).Append("\n");
-            if (turbineMaxOutput > 0) { powerLog.Append("Turbines Power: ").Append(turbineMaxOutput.ToString("0.00")).Append("\n"); }
-            powerLog.Append("Batteries Curr. In: ").Append(battsCurrentInput.ToString("0.00")).Append(", ");
-            powerLog.Append("Out: ").Append(battsCurrentOutput.ToString("0.00")).Append("\n");
-            powerLog.Append("H2Tanks Fill: ").Append(tankCapacityPercent.ToString("0.00")).Append("%\n");
-            powerLog.Append("H2Engine Max Out: ").Append(registeredhEngMaxOutput.ToString("0.00")).Append("\n");
+            powerLog.Append("Current Input: ").Append(terminalCurrentInput.ToString("0.0")).Append(", ");
+            powerLog.Append("Max Req. Input: ").Append(terminalMaxRequiredInput.ToString("0.0")).Append("\n");
+            powerLog.Append("Solar Power: ").Append(solarMaxOutput.ToString("0.0")).Append("\n");
+            if (turbineMaxOutput > 0) { powerLog.Append("Turbines Power: ").Append(turbineMaxOutput.ToString("0.0")).Append("\n"); }
+            powerLog.Append("Batteries Curr. In: ").Append(battsCurrentInput.ToString("0.0")).Append(", ");
+            powerLog.Append("Curr. Out: ").Append(battsCurrentOutput.ToString("0.0")).Append("\n");
+            powerLog.Append("Batteries Max Out: ").Append(battsMaxOutput.ToString("0.0")).Append("\n");
+            powerLog.Append("H2Engines Curr. Out: ").Append(hEngCurrentOutput.ToString("0.0")).Append(", ");
+            powerLog.Append("Max Out: ").Append(hEngMaxOutput.ToString("0.0")).Append("\n");
+            powerLog.Append("Reactors Curr. Out: ").Append(reactorsCurrentOutput.ToString("0.0")).Append(", ");
+            powerLog.Append("Max Out: ").Append(reactorsMaxOutput.ToString("0.0")).Append("\n");
+            powerLog.Append("H2Tanks Fill: ").Append(tankCapacityPercent.ToString("0.0")).Append("%\n");
             double num;
             oreDict.TryGetValue(iceOre, out num);
             powerLog.Append("Ice: ").Append(num.ToString("0.0")).Append(", ");
             ingotsDict.TryGetValue(uraniumIngot, out num);
             powerLog.Append("Uranium: ").Append(num.ToString("0.0")).Append("\n");
+            powerLog.Append("Batteries stored power:\n");
+            int count = 0;
+            foreach (var storedPow in battsCurrentStoredPower) {
+                powerLog.Append(storedPow.Value.ToString("0.0"));
+                if (count > 5) {
+                    powerLog.Append("\n");
+                    count = 0;
+                } else {
+                    powerLog.Append(", ");
+                }
+                count++;
+            }
+            if (count != 0) {
+                powerLog.Append("\n");
+            }
             ammosDict.TryGetValue(gatlingAmmo, out num);
             powerLog.Append("Gatling: ").Append(num.ToString("0.0")).Append(", ");
             ammosDict.TryGetValue(autocannonAmmo, out num);
-            powerLog.Append("Autocannon: ").Append(num.ToString("0.0")).Append(", ");
+            powerLog.Append("Autocannon: ").Append(num.ToString("0.0")).Append("\n");
             ammosDict.TryGetValue(missileAmmo, out num);
-            powerLog.Append("Rockets: ").Append(num.ToString("0.0")).Append("\n");
+            powerLog.Append("Rockets: ").Append(num.ToString("0.0")).Append(", ");
             ammosDict.TryGetValue(assaultAmmo, out num);
-            powerLog.Append("Assault: ").Append(num.ToString("0.0")).Append(", ");
+            powerLog.Append("Assault: ").Append(num.ToString("0.0")).Append("\n");
             ammosDict.TryGetValue(artilleryAmmo, out num);
             powerLog.Append("Artillery: ").Append(num.ToString("0.0")).Append(", ");
             ammosDict.TryGetValue(railgunAmmo, out num);
             powerLog.Append("Sabot: ").Append(num.ToString("0.0")).Append(", ");
             ammosDict.TryGetValue(smallRailgunAmmo, out num);
-            powerLog.Append("Small sabot: ").Append(num.ToString("0.0")).Append("\n");
+            powerLog.Append("S. Sabot: ").Append(num.ToString("0.0")).Append("\n");
         }
 
         void ReadInventoryInfos() {
