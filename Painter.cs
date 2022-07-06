@@ -135,7 +135,7 @@ namespace IngameScript {
         long currentTick = 1;
         long lostTicks = 0;
         double fudgeFactor = 5;
-        bool joltReady = false;
+        bool joltReady = true;
         bool missilesLoaded = false;
         bool fudgeVectorSwitch = false;
         bool readyToFire = false;
@@ -1373,29 +1373,19 @@ namespace IngameScript {
 
         void CanShootGuns() {
             int count = 0;
-            foreach (Gun gun in ROCKETS) {
-                if (!gun.CanShoot()) { count++; }
-            }
+            foreach (Gun gun in ROCKETS) { if (!gun.CanShoot()) { count++; } }
             if (count == ROCKETS.Count) { rocketsCanShoot = false; } else { rocketsCanShoot = true; }
             count = 0;
-            foreach (Gun gun in ASSAULT) {
-                if (!gun.CanShoot()) { count++; }
-            }
+            foreach (Gun gun in ASSAULT) { if (!gun.CanShoot()) { count++; } }
             if (count == ASSAULT.Count) { assaultCanShoot = false; } else { assaultCanShoot = true; }
             count = 0;
-            foreach (Gun gun in ARTILLERY) {
-                if (!gun.CanShoot()) { count++; }
-            }
+            foreach (Gun gun in ARTILLERY) { if (!gun.CanShoot()) { count++; } }
             if (count == ARTILLERY.Count) { artilleryCanShoot = false; } else { artilleryCanShoot = true; }
             count = 0;
-            foreach (Gun gun in RAILGUNS) {
-                if (!gun.CanShoot()) { count++; }
-            }
+            foreach (Gun gun in RAILGUNS) { if (!gun.CanShoot()) { count++; } }
             if (count == RAILGUNS.Count) { railgunsCanShoot = false; } else { railgunsCanShoot = true; }
             count = 0;
-            foreach (Gun gun in SMALLRAILGUNS) {
-                if (!gun.CanShoot()) { count++; }
-            }
+            foreach (Gun gun in SMALLRAILGUNS) { if (!gun.CanShoot()) { count++; } }
             if (count == SMALLRAILGUNS.Count) { smallRailgunsCanShoot = false; } else { smallRailgunsCanShoot = true; }
 
             SendBroadcastGunsMessage(weaponType, assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
@@ -1411,6 +1401,7 @@ namespace IngameScript {
 
         void ResetGuns() {
             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
+            foreach (IMyUserControllableGun block in AUTOCANNONS) { block.Shoot = false; }
             SwitchGun(true, true, true, true, true);
             ResetGunsInit();
             gatlingsOnce = false;
