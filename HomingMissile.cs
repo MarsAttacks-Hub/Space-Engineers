@@ -37,7 +37,7 @@ namespace IngameScript {
         readonly string downwardThrustersName = "Dnw";
 
         readonly string antennaTag = "[MISSILE]";
-        readonly string platformTag = "[RELAY]";
+        readonly string platformTag = "[PAINTER]";
 
         const string commandLaunch = "Launch";
         const string commandUpdate = "Update";

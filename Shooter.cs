@@ -42,6 +42,7 @@ namespace IngameScript {
         readonly string merges3Name = "3 Jolt";
 
         readonly string navigatorTag = "[NAVIGATOR]";
+        readonly string painterTag = "[PAINTER]";
 
         const string argToggleDecoy = "ToggleDecoy";
         const string argSwitch = "Switch";
@@ -293,10 +294,10 @@ namespace IngameScript {
             }
         }
 
-        void SendBroadcastMessage(bool readyToFire) {//TODO
+        void SendBroadcastMessage(bool readyToFire) {
             string variable = "readyToFire";
             var tuple = MyTuple.Create(variable, readyToFire);
-            IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         bool CheckProjectors(List<IMyProjector> projectors, List<IMyShipWelder> welders) {

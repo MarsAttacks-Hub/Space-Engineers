@@ -22,6 +22,8 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO add generate orbital gps function
+        //use lidars instead of sensors for randomMagneticDrive
+        //receive weaponType from Painter so jolt can be fired accurately or check distance above 2000?
         //generate orbital gps above target 
         //land function
         //NAVIGATOR
@@ -57,7 +59,6 @@ namespace IngameScript {
         readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
         readonly string debugPanelName = "[CRX] Debug";
         readonly string painterName = "[CRX] PB Painter";
-        readonly string shooterName = "[CRX] PB Shooter";
 
         readonly string navigatorTag = "[NAVIGATOR]";
         readonly string managerTag = "[MANAGER]";
@@ -77,12 +78,10 @@ namespace IngameScript {
         const string argSunchaseOff = "SunchaseOff";
         const string argUnlockFromTarget = "Clear";
         const string argLockTarget = "Lock";
-        const string argLaunchDecoy = "LaunchDecoy";
-        const string argFireJolt = "FireJolt";
-        const string commandLaunch = "Launch";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
+        readonly bool keepAltitude = true;
         readonly bool useRoll = false;
         readonly double aimP = 1d;
         readonly double aimI = 0d;
@@ -102,16 +101,13 @@ namespace IngameScript {
         readonly int randomDelay = 10;
         readonly int sensorsDelay = 5;
         int impactDetectionDelay = 5;
-        int randomFireDelay = 10;
 
         bool magneticDrive = true;
         bool controlDampeners = true;
         bool idleThrusters = false;
         bool aimTarget = false;
         bool useGyrosToStabilize = true;
-        bool keepAltitude = true;
         bool targFound = false;
-        bool readyToFire = true;
         bool assaultCanShoot = true;
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
@@ -122,7 +118,6 @@ namespace IngameScript {
         bool toggleThrustersOnce = false;
         bool returnOnce = true;
         bool lockTargetOnce = true;
-        bool launchDecoyOnce = true;
         bool isPilotedOnce = true;
         bool initMagneticDriveOnce = true;
         bool initAutoMagneticDriveOnce = true;
@@ -142,7 +137,6 @@ namespace IngameScript {
         int tickCount = 0;
         int randomCount = 50;
         int sensorsCount = 10;
-        int changedDirCount = 10;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
 
@@ -188,7 +182,6 @@ namespace IngameScript {
         IMyThrust FORWARDTHRUST;
         IMyThrust BACKWARDTHRUST;
         IMyProgrammableBlock PAINTERPB;
-        IMyProgrammableBlock SHOOTERPB;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
         IMyTextPanel LCDSUNCHASER;
@@ -277,7 +270,7 @@ namespace IngameScript {
                     TurretsDetection();
                     Vector3D trgP, trgV;
                     ManageTarget(out trgP, out trgV);
-                    CheckTarget(controller, REMOTE, trgP, trgV, gravity);
+                    CheckTarget(controller, REMOTE, trgP, trgV);
                 }
 
                 ManageWaypoints(REMOTE, isUnderControl);
@@ -306,6 +299,7 @@ namespace IngameScript {
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
+                Setup();
             }
         }
 
@@ -401,20 +395,13 @@ namespace IngameScript {
                         targVelVec = data.Item3;
                         received = true;
                     }
-                    if (igcMessage.Data is MyTuple<string, bool>) {
-                        var data = (MyTuple<string, bool>)igcMessage.Data;
-                        string variable = data.Item1;
-                        if (variable == "readyToFire") {
-                            readyToFire = data.Item2;
-                            received = true;
-                        }
-                    }
-                    if (igcMessage.Data is MyTuple<bool, bool, bool, bool>) {
-                        var data = (MyTuple<bool, bool, bool, bool>)igcMessage.Data;
-                        assaultCanShoot = data.Item1;
-                        artilleryCanShoot = data.Item2;
-                        railgunsCanShoot = data.Item3;
-                        smallRailgunsCanShoot = data.Item4;
+                    if (igcMessage.Data is MyTuple<int, bool, bool, bool, bool>) {
+                        var data = (MyTuple<int, bool, bool, bool, bool>)igcMessage.Data;
+                        //weaponType = data.Item1;
+                        assaultCanShoot = data.Item2;
+                        artilleryCanShoot = data.Item3;
+                        railgunsCanShoot = data.Item4;
+                        smallRailgunsCanShoot = data.Item5;
                     }
                 }
             }
@@ -734,7 +721,7 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3 RandomMagneticDrive(Vector3D targPos, IMyTerminalBlock tBlock) {
+        Vector3 RandomMagneticDrive(Vector3D targPos, IMyTerminalBlock tBlock) {//TODO use lidars
             bool detectedOwner = false;
             if (sensorsCount >= sensorsDelay) {
                 List<MyDetectedEntityInfo> entities = new List<MyDetectedEntityInfo>();
@@ -756,23 +743,7 @@ namespace IngameScript {
             }
             sensorsCount++;
 
-            double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
-            bool fireJolt = false;
-            if (distance > 2000d) {
-                fireJolt = true;
-            } else if (distance <= 2000d && distance > 1400d && !railgunsCanShoot && !artilleryCanShoot) {
-                fireJolt = true;
-            } else if (distance <= 1400d && distance > 800d && !assaultCanShoot && !smallRailgunsCanShoot) {
-                fireJolt = true;
-            }
-            if (fireJolt && changedDirCount >= randomFireDelay) {
-                SHOOTERPB.TryRun(argFireJolt);
-                PAINTERPB.TryRun(commandLaunch);
-                randomFireDelay = random.Next(10, 20);
-                changedDirCount = 0;
-            }
-
-            if (!detectedOwner && readyToFire) {
+            if (!detectedOwner) {
                 if (randomCount >= randomDelay) {
                     randomDir = new Vector3();
                     int randomInt;
@@ -845,6 +816,7 @@ namespace IngameScript {
                     } else if (entitiesB.Count > 0) {
                         randomDir.Z = -1;
                     } else {
+                        double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
                         if (distance > minDistance) {
                             randomDir.Z = -1;
                         } else if (distance <= minDistance) {
@@ -857,7 +829,6 @@ namespace IngameScript {
                         }
                     }
                     randomCount = 0;
-                    changedDirCount++;
                 }
                 randomCount++;
 
@@ -1044,7 +1015,7 @@ namespace IngameScript {
             }
         }
 
-        void CheckTarget(IMyShipController controller, IMyRemoteControl remote, Vector3D trgP, Vector3D trgV, Vector3D gravity) {
+        void CheckTarget(IMyShipController controller, IMyRemoteControl remote, Vector3D trgP, Vector3D trgV) {
             if (!Vector3D.IsZero(trgP)) {
                 if (lockTargetOnce) {
                     bool aligned;
@@ -1062,26 +1033,11 @@ namespace IngameScript {
                         impactDetectionDelay = 5;
                     }
                 }
-
-                if (launchDecoyOnce) {
-                    double dist = Vector3D.Distance(trgP, LIDARS[0].GetPosition());
-                    if (Vector3D.IsZero(gravity) && dist < 800d) {
-                        SHOOTERPB.TryRun(argLaunchDecoy);
-                    }
-                    launchDecoyOnce = false;
-                    keepAltitude = false;//TODO
-                }
-
                 CheckCollisions(remote, trgP, trgV);
-
             } else {
                 if (!lockTargetOnce) {
                     PAINTERPB.TryRun(argUnlockFromTarget);
                     lockTargetOnce = true;
-                }
-                if (!launchDecoyOnce) {
-                    launchDecoyOnce = true;
-                    keepAltitude = true;//TODO
                 }
                 if (!Vector3D.IsZero(returnPosition)) {
                     escapePosition = Vector3D.Zero;
@@ -1096,7 +1052,7 @@ namespace IngameScript {
         void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {
             BoundingBoxD gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
             MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
-            double time = 80.0d;
+            double time = 80.0d;//TODO
             Vector3D targetFuturePosition = targetPos + (targetVelocity * time);
             LineD line = new LineD(targetPos, targetFuturePosition);
             double? hitDist = obb.Intersects(ref line);
@@ -1657,7 +1613,6 @@ namespace IngameScript {
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
             LCDSUNCHASER = GridTerminalSystem.GetBlockWithName(sunChaserPanelName) as IMyTextPanel;
             PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
-            SHOOTERPB = GridTerminalSystem.GetBlockWithName(shooterName) as IMyProgrammableBlock;
             SENSORS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(SENSORS, block => block.CustomName.Contains(sensorsName));
             foreach (IMySensorBlock sensor in SENSORS) {

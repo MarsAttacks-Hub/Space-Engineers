@@ -20,9 +20,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO implement multyTargeting
-        //revisit LoadMissiles(),make it universal - meant to load missiles or drones with hidrogen thrusters and gatling guns/turrets
-        //reverse gun shoot order from long range to short range
+        //TODO revisit LoadMissiles(),make it universal
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -46,7 +44,7 @@ namespace IngameScript {
         readonly string projectorsDronesName = "Drone";
         readonly string missileAntennasName = "A [M]";
         readonly string missilePrefix = "[M]";
-        readonly string antennaTag = "[RELAY]";
+        readonly string painterTag = "[PAINTER]";
         readonly string missileAntennaTag = "[MISSILE]";
         readonly string navigatorTag = "[NAVIGATOR]";
         readonly string decoyName = "[CRX] PB Shooter";
@@ -67,6 +65,7 @@ namespace IngameScript {
         const string argToggleAllGuns = "ToggleAllGuns";
 
         const string argFireDecoy = "LaunchDecoy";
+        const string argFireJolt = "FireJolt";
 
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
@@ -91,16 +90,13 @@ namespace IngameScript {
         readonly double railgunRange = 2000d;
         readonly double smallRailgunRange = 1400d;
         readonly int rocketROF = 4;//120rpm - 2rps - 0.03 rptick - 30 ticks
-        readonly int autocannonsROF = 3;//150rpm - 2.5rps - 0.04 rptick - 24 ticks
         readonly int assaultROF = 2;//200rpm - 3.33rps - 0.055 rptick - 19 ticks
         readonly int artilleryROF = 5;//80rpm - 1.33rps - 0.022 rptick - 46 ticks
         readonly int railgunsROF = 19;//20rpm - 0.33rps - 0.0055 rptick - 181 ticks
         readonly int smallRailgunsROF = 19;//20rpm - 0.33rps - 0.0055 rptick - 181 ticks
         readonly int rocketRounds = 19;
-        readonly int autocannonsRounds = 200;
         readonly int singleRound = 1;
         readonly int rocketReload = 24;//4000ms - 240 ticks
-        readonly int autocannonsReload = 15;//2500ms - 150 ticks
         readonly int assaultReload = 36;//6000ms - 360 ticks
         readonly int artilleryReload = 72;//120000ms - 720 ticks
         readonly int railgunsReload = 24;//4000ms - 240 ticks
@@ -118,15 +114,12 @@ namespace IngameScript {
         bool autoMissiles = false;
         bool autoSwitchGuns = true;
         int rocketDelay = 1;
-        int autocannonsDelay = 1;
         int assaultDelay = 1;
         int artilleryDelay = 1;
         int railgunsDelay = 1;
         int smallRailgunsDelay = 1;
         int rocketCount = 0;
         int rocketIndex = 0;
-        int autocannonsCount = 0;
-        int autocannonsIndex = 0;
         int assaultCount = 0;
         int assaultIndex = 0;
         int artilleryCount = 0;
@@ -142,6 +135,7 @@ namespace IngameScript {
         long currentTick = 1;
         long lostTicks = 0;
         double fudgeFactor = 5;
+        bool joltReady = false;
         bool missilesLoaded = false;
         bool fudgeVectorSwitch = false;
         bool readyToFire = false;
@@ -153,7 +147,6 @@ namespace IngameScript {
         bool assaultAmmoFound = true;
         bool autocannonAmmoFound = true;
         bool rocketsCanShoot = true;
-        bool autocannonsCanShoot = true;
         bool assaultCanShoot = true;
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
@@ -196,7 +189,7 @@ namespace IngameScript {
         public List<IMyProjector> TEMPPROJECTORS = new List<IMyProjector>();
         public List<IMyRadioAntenna> MISSILEANTENNAS = new List<IMyRadioAntenna>();
         public List<IMyUserControllableGun> GATLINGS = new List<IMyUserControllableGun>();
-        public List<Gun> AUTOCANNONS = new List<Gun>();
+        public List<IMyUserControllableGun> AUTOCANNONS = new List<IMyUserControllableGun>();
         public List<Gun> ROCKETS = new List<Gun>();
         public List<Gun> ARTILLERY = new List<Gun>();
         public List<Gun> RAILGUNS = new List<Gun>();
@@ -244,7 +237,7 @@ namespace IngameScript {
 
         void Setup() {
             UNILISTENER = IGC.UnicastListener;
-            BROADCASTLISTENER = IGC.RegisterBroadcastListener(antennaTag);
+            BROADCASTLISTENER = IGC.RegisterBroadcastListener(painterTag);
             GetBlocks();
             SetBlocks();
             GetMissileAntennas();
@@ -269,6 +262,7 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 RemoveLostMissiles();
+                GetBroadcastMessages();
                 GetMessages();
                 ReadMessages();
                 CanShootGuns();
@@ -926,6 +920,24 @@ namespace IngameScript {
             return received;
         }
 
+        bool GetBroadcastMessages() {
+            bool received = false;
+            if (BROADCASTLISTENER.HasPendingMessage) {
+                while (BROADCASTLISTENER.HasPendingMessage) {
+                    var igcMessage = BROADCASTLISTENER.AcceptMessage();
+                    if (igcMessage.Data is MyTuple<string, bool>) {
+                        var data = (MyTuple<string, bool>)igcMessage.Data;
+                        string variable = data.Item1;
+                        if (variable == "readyToFire") {
+                            joltReady = data.Item2;
+                            received = true;
+                        }
+                    }
+                }
+            }
+            return received;
+        }
+
         void ReadMessages() {
             missileLog.Clear();
             if (MissileIDs.Count() > 0) {
@@ -965,8 +977,8 @@ namespace IngameScript {
             IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
-        void SendBroadcastGunsMessage(bool assaultCanShoot, bool artilleryCanShoot, bool railgunsCanShoot, bool smallRailgunsCanShoot) {
-            var tuple = MyTuple.Create(assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
+        void SendBroadcastGunsMessage(int weaponType, bool assaultCanShoot, bool artilleryCanShoot, bool railgunsCanShoot, bool smallRailgunsCanShoot) {
+            var tuple = MyTuple.Create(weaponType, assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
             IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
@@ -1094,7 +1106,7 @@ namespace IngameScript {
                 inventories.AddRange(GATLINGS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
                 gatlingAmmoFound = CheckItems(inventories, gatlingAmmo);
                 inventories.Clear();
-                inventories.AddRange(AUTOCANNONS.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
+                inventories.AddRange(AUTOCANNONS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
                 autocannonAmmoFound = CheckItems(inventories, autocannonAmmo);
                 inventories.Clear();
                 inventories.AddRange(ARTILLERY.SelectMany(block => Enumerable.Range(0, block.gun.InventoryCount).Select(block.gun.GetInventory)));
@@ -1133,12 +1145,32 @@ namespace IngameScript {
                         if (!decoyRanOnce && distanceFromTarget < 800d) {
                             decoyRanOnce = SHOOTERPB.TryRun(argFireDecoy);
                         }
-                        if (weaponType != 2 && weaponType != 3 && gatlingsOnce) {
+                        if (weaponType != 2 && weaponType != 3 && (gatlingsOnce || autocannonOnce)) {
                             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
+                            foreach (IMyUserControllableGun block in AUTOCANNONS) { block.Shoot = false; }
                             gatlingsOnce = false;
+                            autocannonOnce = false;
                         }
                         rocketRange = 500d;
-                        if (distanceFromTarget < rocketRange && missileAmmoFound && rocketsCanShoot) {
+                        if (distanceFromTarget < railgunRange && railgunAmmoFound && railgunsCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 6) {
+                                    weaponType = 6;
+                                    return;
+                                }
+                                if (!railgunsOnce) { SwitchGun(true, true, true, false, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
+                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < artilleryRange && artilleryAmmoFound && artilleryCanShoot) {
                             cannotFireOnce = true;
                             if (readyToFire) {
                                 readyToFireOnce = true;
@@ -1146,10 +1178,46 @@ namespace IngameScript {
                                     weaponType = 5;
                                     return;
                                 }
-                                if (!rocketsOnce) { SwitchGun(false, true, true, true, true, true); }
+                                if (!artilleryOnce) { SwitchGun(true, true, false, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
-                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
+                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
+                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < smallRailgunRange && smallRailgunAmmoFound && smallRailgunsCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 7) {
+                                    weaponType = 7;
+                                    return;
+                                }
+                                if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, false); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
+                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
+                            } else {
+                                if (readyToFireOnce) {
+                                    readyToFireOnce = false;
+                                    ResetGuns();
+                                }
+                            }
+                        } else if (distanceFromTarget < assaultRange && assaultAmmoFound && assaultCanShoot) {
+                            cannotFireOnce = true;
+                            if (readyToFire) {
+                                readyToFireOnce = true;
+                                if (weaponType != 4) {
+                                    weaponType = 4;
+                                    return;
+                                }
+                                if (!assaultOnce) { SwitchGun(true, false, true, true, true); }
+                                if (sequenceWeapons) {
+                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
+                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1168,11 +1236,9 @@ namespace IngameScript {
                                     foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
                                     gatlingsOnce = true;
                                 }
-                                if (autocannonAmmoFound && autocannonsCanShoot) {
-                                    if (!autocannonOnce) { SwitchGun(true, false, true, true, true, true); }
-                                    if (sequenceWeapons) {
-                                        SequenceWeapons(AUTOCANNONS, autocannonsDelay, ref autocannonsCount, ref autocannonsIndex);
-                                    } else { foreach (Gun gun in AUTOCANNONS) { gun.Shoot(); } }
+                                if (!autocannonOnce && autocannonAmmoFound) {
+                                    foreach (IMyUserControllableGun block in AUTOCANNONS) { block.Shoot = true; }
+                                    autocannonOnce = true;
                                 }
                             } else {
                                 if (readyToFireOnce) {
@@ -1180,43 +1246,7 @@ namespace IngameScript {
                                     ResetGuns();
                                 }
                             }
-                        } else if (distanceFromTarget < assaultRange && assaultAmmoFound && assaultCanShoot) {
-                            cannotFireOnce = true;
-                            if (readyToFire) {
-                                readyToFireOnce = true;
-                                if (weaponType != 4) {
-                                    weaponType = 4;
-                                    return;
-                                }
-                                if (!assaultOnce) { SwitchGun(true, true, false, true, true, true); }
-                                if (sequenceWeapons) {
-                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
-                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
-                            } else {
-                                if (readyToFireOnce) {
-                                    readyToFireOnce = false;
-                                    ResetGuns();
-                                }
-                            }
-                        } else if (distanceFromTarget < smallRailgunRange && smallRailgunAmmoFound && smallRailgunsCanShoot) {
-                            cannotFireOnce = true;
-                            if (readyToFire) {
-                                readyToFireOnce = true;
-                                if (weaponType != 7) {
-                                    weaponType = 7;
-                                    return;
-                                }
-                                if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, true, false); }
-                                if (sequenceWeapons) {
-                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
-                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
-                            } else {
-                                if (readyToFireOnce) {
-                                    readyToFireOnce = false;
-                                    ResetGuns();
-                                }
-                            }
-                        } else if (distanceFromTarget < artilleryRange && artilleryAmmoFound && artilleryCanShoot) {
+                        } else if (distanceFromTarget < rocketRange && missileAmmoFound && rocketsCanShoot) {
                             cannotFireOnce = true;
                             if (readyToFire) {
                                 readyToFireOnce = true;
@@ -1224,28 +1254,10 @@ namespace IngameScript {
                                     weaponType = 5;
                                     return;
                                 }
-                                if (!artilleryOnce) { SwitchGun(true, true, true, false, true, true); }
+                                if (!rocketsOnce) { SwitchGun(false, true, true, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
-                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
-                            } else {
-                                if (readyToFireOnce) {
-                                    readyToFireOnce = false;
-                                    ResetGuns();
-                                }
-                            }
-                        } else if (distanceFromTarget < railgunRange && railgunAmmoFound && railgunsCanShoot) {
-                            cannotFireOnce = true;
-                            if (readyToFire) {
-                                readyToFireOnce = true;
-                                if (weaponType != 6) {
-                                    weaponType = 6;
-                                    return;
-                                }
-                                if (!railgunsOnce) { SwitchGun(true, true, true, true, false, true); }
-                                if (sequenceWeapons) {
-                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
-                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
+                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1266,6 +1278,9 @@ namespace IngameScript {
                             ResetGuns();
                         }
                     }
+                    if (readyToFire && joltReady && weaponType == 0) {//TODO check roll and speed?
+                        SHOOTERPB.TryRun(argFireJolt);//PAINTERPB.TryRun(commandLaunch);
+                    }
                 } else {
                     if (distanceFromTarget < gunsRange) {
                         maxRangeOnce = true;
@@ -1274,50 +1289,50 @@ namespace IngameScript {
                         }
                         if (readyToFire) {
                             readyToFireOnce = true;
-                            if (weaponType != 2 && weaponType != 3 && gatlingsOnce) {
+                            if (weaponType != 2 && weaponType != 3 && (gatlingsOnce || autocannonOnce)) {
                                 foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
+                                foreach (IMyUserControllableGun block in AUTOCANNONS) { block.Shoot = false; }
                                 gatlingsOnce = false;
+                                autocannonOnce = false;
                             }
                             rocketRange = 800d;
                             if (weaponType == 1 && distanceFromTarget < rocketRange && missileAmmoFound && rocketsCanShoot) {
                                 cannotFireOnce = true;
-                                if (!rocketsOnce) { SwitchGun(false, true, true, true, true, true); }
+                                if (!rocketsOnce) { SwitchGun(false, true, true, true, true); }
                                 if (sequenceWeapons) {
                                     SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
                                 } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
-                            } else if ((weaponType == 2 || weaponType == 3) && distanceFromTarget < autocannonRange && (autocannonAmmoFound || gatlingAmmoFound) && autocannonsCanShoot) {
+                            } else if ((weaponType == 2 || weaponType == 3) && distanceFromTarget < autocannonRange && (autocannonAmmoFound || gatlingAmmoFound)) {
                                 cannotFireOnce = true;
                                 if (!gatlingsOnce && gatlingAmmoFound) {
                                     foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = true; }
                                     gatlingsOnce = true;
                                 }
-                                if (autocannonAmmoFound && autocannonsCanShoot) {
-                                    if (!autocannonOnce) { SwitchGun(true, false, true, true, true, true); }
-                                    if (sequenceWeapons) {
-                                        SequenceWeapons(AUTOCANNONS, autocannonsDelay, ref autocannonsCount, ref autocannonsIndex);
-                                    } else { foreach (Gun gun in AUTOCANNONS) { gun.Shoot(); } }
+                                if (!autocannonOnce && autocannonAmmoFound) {
+                                    foreach (IMyUserControllableGun block in AUTOCANNONS) { block.Shoot = true; }
+                                    autocannonOnce = true;
                                 }
                             } else if (weaponType == 4 && distanceFromTarget < assaultRange && assaultAmmoFound && assaultCanShoot) {
                                 cannotFireOnce = true;
-                                if (!assaultOnce) { SwitchGun(true, true, false, true, true, true); }
+                                if (!assaultOnce) { SwitchGun(true, false, true, true, true); }
                                 if (sequenceWeapons) {
                                     SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
                                 } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
                             } else if (weaponType == 7 && distanceFromTarget < smallRailgunRange && smallRailgunAmmoFound && smallRailgunsCanShoot) {
                                 cannotFireOnce = true;
-                                if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, true, false); }
+                                if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, false); }
                                 if (sequenceWeapons) {
                                     SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
                                 } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
                             } else if (weaponType == 5 && distanceFromTarget < artilleryRange && artilleryAmmoFound && artilleryCanShoot) {
                                 cannotFireOnce = true;
-                                if (!artilleryOnce) { SwitchGun(true, true, true, false, true, true); }
+                                if (!artilleryOnce) { SwitchGun(true, true, false, true, true); }
                                 if (sequenceWeapons) {
                                     SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
                                 } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
                             } else if (weaponType == 6 && distanceFromTarget < railgunRange && railgunAmmoFound && railgunsCanShoot) {
                                 cannotFireOnce = true;
-                                if (!railgunsOnce) { SwitchGun(true, true, true, true, false, true); }
+                                if (!railgunsOnce) { SwitchGun(true, true, true, false, true); }
                                 if (sequenceWeapons) {
                                     SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
                                 } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
@@ -1343,15 +1358,13 @@ namespace IngameScript {
             }
         }
 
-        void SwitchGun(bool rockets, bool autocannons, bool assault, bool artillery, bool railguns, bool smallRailguns) {
+        void SwitchGun(bool rockets, bool assault, bool artillery, bool railguns, bool smallRailguns) {
             foreach (Gun block in ROCKETS) { block.paused = rockets; }
-            foreach (Gun block in AUTOCANNONS) { block.paused = autocannons; }
             foreach (Gun block in ASSAULT) { block.paused = assault; }
             foreach (Gun block in ARTILLERY) { block.paused = artillery; }
             foreach (Gun block in RAILGUNS) { block.paused = railguns; }
             foreach (Gun block in SMALLRAILGUNS) { block.paused = smallRailguns; }
             rocketsOnce = !rockets;
-            autocannonOnce = !autocannons;
             assaultOnce = !assault;
             artilleryOnce = !artillery;
             railgunsOnce = !railguns;
@@ -1364,11 +1377,6 @@ namespace IngameScript {
                 if (!gun.CanShoot()) { count++; }
             }
             if (count == ROCKETS.Count) { rocketsCanShoot = false; } else { rocketsCanShoot = true; }
-            count = 0;
-            foreach (Gun gun in AUTOCANNONS) {
-                if (!gun.CanShoot()) { count++; }
-            }
-            if (count == AUTOCANNONS.Count) { autocannonsCanShoot = false; } else { autocannonsCanShoot = true; }
             count = 0;
             foreach (Gun gun in ASSAULT) {
                 if (!gun.CanShoot()) { count++; }
@@ -1390,12 +1398,11 @@ namespace IngameScript {
             }
             if (count == SMALLRAILGUNS.Count) { smallRailgunsCanShoot = false; } else { smallRailgunsCanShoot = true; }
 
-            SendBroadcastGunsMessage(assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
+            SendBroadcastGunsMessage(weaponType, assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
         }
 
         void SyncGuns() {
             foreach (Gun gun in ROCKETS) { gun.Update(); }
-            foreach (Gun gun in AUTOCANNONS) { gun.Update(); }
             foreach (Gun gun in ASSAULT) { gun.Update(); }
             foreach (Gun gun in ARTILLERY) { gun.Update(); }
             foreach (Gun gun in RAILGUNS) { gun.Update(); }
@@ -1404,15 +1411,15 @@ namespace IngameScript {
 
         void ResetGuns() {
             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
-            SwitchGun(true, true, true, true, true, true);
+            SwitchGun(true, true, true, true, true);
             ResetGunsInit();
             gatlingsOnce = false;
+            autocannonOnce = false;
             decoyRanOnce = false;
         }
 
         void ResetGunsInit() {
             rocketsOnce = false;
-            autocannonOnce = false;
             assaultOnce = false;
             artilleryOnce = false;
             railgunsOnce = false;
@@ -1422,7 +1429,8 @@ namespace IngameScript {
         void SequenceWeapons(List<Gun> guns, int delay, ref int count, ref int index) {
             if (count == delay) {
                 for (int i = 0; i < guns.Count; i++) {
-                    if (i == index) { guns[i].Shoot();
+                    if (i == index) {
+                        guns[i].Shoot();
                     } else { guns[i].Update(); }
                 }
                 count = 0;
@@ -1437,12 +1445,6 @@ namespace IngameScript {
                 rocketDelay = (int)Math.Ceiling(rocketROF / (double)ROCKETS.Count);
                 if (rocketDelay == 0) {
                     rocketDelay = 1;
-                }
-            }
-            if (AUTOCANNONS.Count > 0) {
-                autocannonsDelay = (int)Math.Ceiling(autocannonsROF / (double)AUTOCANNONS.Count);
-                if (autocannonsDelay == 0) {
-                    autocannonsDelay = 1;
                 }
             }
             if (ASSAULT.Count > 0) {
@@ -1652,11 +1654,9 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, b => b.CustomName.Contains(cockpitsName));
             GATLINGS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(GATLINGS, b => b.CustomName.Contains(gatlingsName));
-            List<IMyUserControllableGun> guns = new List<IMyUserControllableGun>();
-            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, block => block.CustomName.Contains(autocannonsName));
             AUTOCANNONS.Clear();
-            foreach (IMyUserControllableGun gun in guns) { AUTOCANNONS.Add(new Gun(gun, autocannonsRounds, autocannonsReload, autocannonsROF)); }
-            guns.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(AUTOCANNONS, block => block.CustomName.Contains(autocannonsName));
+            List<IMyUserControllableGun> guns = new List<IMyUserControllableGun>();
             GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(guns, b => b.CustomName.Contains(rocketsName));
             ROCKETS.Clear();
             foreach (IMyUserControllableGun gun in guns) { ROCKETS.Add(new Gun(gun, rocketRounds, rocketReload, rocketROF)); }
