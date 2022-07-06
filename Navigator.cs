@@ -23,7 +23,6 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO add generate orbital gps function
         //use lidars instead of sensors for randomMagneticDrive
-        //receive weaponType from Painter so jolt can be fired accurately or check distance above 2000?
         //generate orbital gps above target 
         //land function
         //NAVIGATOR

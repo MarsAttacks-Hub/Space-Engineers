@@ -796,7 +796,7 @@ namespace IngameScript {
             terminalblocks.AddRange(ARTILLERY);
             terminalblocks.AddRange(RAILGUNS);
             terminalblocks.AddRange(SMALLRAILGUNS);
-            ReadInventoriesFillPercent(terminalblocks, 2);
+            ReadInventoriesFillPercent(terminalblocks, 3);
             terminalblocks.Clear();
             terminalblocks.AddRange(ASSAULTTURRETS);
             ReadInventoriesFillPercent(terminalblocks, 1);

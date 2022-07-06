@@ -41,7 +41,6 @@ namespace IngameScript {
         readonly string merges2Name = "2 Jolt";
         readonly string merges3Name = "3 Jolt";
 
-        readonly string navigatorTag = "[NAVIGATOR]";
         readonly string painterTag = "[PAINTER]";
 
         const string argToggleDecoy = "ToggleDecoy";
