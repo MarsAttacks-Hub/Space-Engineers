@@ -20,7 +20,10 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO revisit LoadMissiles(),make it universal
+        //TODO
+        //revisit LoadMissiles(),make it universal
+        //revisit the raycasting logic, 1 raycast max per tick, also use milliseconds instead of ticks
+        //when missing the target on raycast runs at update1 and raycast next ticks
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -102,10 +105,16 @@ namespace IngameScript {
         readonly int railgunsReload = 24;//4000ms - 240 ticks
         readonly int smallRailgunsReload = 24;//4000ms - 240 ticks
         readonly int fudgeAttempts = 8;
-        readonly double aimP = 1;
-        readonly double aimI = 0;
-        readonly double aimD = 1;
-        readonly double integralWindupLimit = 0;
+        readonly double yawAimP = 5d;
+        readonly double yawAimI = 0d;
+        readonly double yawAimD = 5d;
+        readonly double pitchAimP = 5d;
+        readonly double pitchAimI = 0d;
+        readonly double pitchAimD = 5d;
+        readonly double rollAimP = 1d;
+        readonly double rollAimI = 0d;
+        readonly double rollAimD = 1d;
+        readonly double integralWindupLimit = 0d;
         readonly bool sequenceWeapons = false;
 
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
@@ -464,8 +473,7 @@ namespace IngameScript {
 
         bool AcquireTarget() {
             bool targetFound = false;
-            if (targetName == null)//case argLock
-            {
+            if (targetName == null) {//case argLock
                 targetFound = ScanTarget(false);
                 if (!targetFound) {
                     fudgeFactor = 5;
@@ -478,7 +486,6 @@ namespace IngameScript {
                 }
                 if (targetFound) {
                     targetFound = ScanTargetCenter(true);
-
                     if (!targetFound) {
                         if (targetInfo.HitPosition.HasValue) {
                             targetPosition = targetInfo.HitPosition.Value;
@@ -486,9 +493,11 @@ namespace IngameScript {
                     }
                 }
             } else {
-                if (currentTick == ticksScanDelay)//if target is not lost scan every some ticks
-                {
-                    targetFound = ScanDelayedTarget();
+                if (currentTick == ticksScanDelay) {//if target is not lost scan every some ticks
+                    targetFound = ScanDelayedTarget(targetInfo.Position);
+                    if (!targetFound) {
+                        targetFound = ScanDelayedTarget(targetPosition);
+                    }
                     if (!targetFound) {
                         fudgeFactor = 5;
                         for (int i = 0; i < fudgeAttempts; i++) {
@@ -559,9 +568,9 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool ScanDelayedTarget() {
+        bool ScanDelayedTarget(Vector3D enemyPos) {
             bool targetFound = false;
-            Vector3D trgtPos = targetPosition;
+            Vector3D trgtPos = enemyPos;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             Vector3D targetPos = trgtPos + (targetInfo.Velocity * elapsedTime);
@@ -1140,7 +1149,7 @@ namespace IngameScript {
             if (autoFire) {
                 double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                 if (autoSwitchGuns) {
-                    if (distanceFromTarget < gunsRange) {
+                    if (distanceFromTarget <= gunsRange) {
                         maxRangeOnce = true;
                         if (!decoyRanOnce && distanceFromTarget < 800d) {
                             decoyRanOnce = SHOOTERPB.TryRun(argFireDecoy);
@@ -1269,6 +1278,7 @@ namespace IngameScript {
                                 cannotFireOnce = false;
                                 weaponType = 0;
                                 ResetGuns();
+                                return;
                             }
                         }
                     } else {
@@ -1276,10 +1286,11 @@ namespace IngameScript {
                             maxRangeOnce = false;
                             weaponType = 0;
                             ResetGuns();
+                            return;
                         }
                     }
-                    if (readyToFire && joltReady && weaponType == 0) {//TODO check roll and speed?
-                        SHOOTERPB.TryRun(argFireJolt);//PAINTERPB.TryRun(commandLaunch);
+                    if (readyToFire && joltReady && weaponType == 0) {
+                        SHOOTERPB.TryRun(argFireJolt);
                     }
                 } else {
                     if (distanceFromTarget < gunsRange) {
@@ -1336,6 +1347,8 @@ namespace IngameScript {
                                 if (sequenceWeapons) {
                                     SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
                                 } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                            } else if (weaponType == 0 && joltReady) {
+                                SHOOTERPB.TryRun(argFireJolt);
                             } else {
                                 if (cannotFireOnce) {
                                     cannotFireOnce = false;
@@ -1761,9 +1774,9 @@ namespace IngameScript {
         }
 
         void InitPIDControllers() {
-            yawController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
-            pitchController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
-            rollController = new PID(aimP, aimI, aimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            yawController = new PID(yawAimP, yawAimI, yawAimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            pitchController = new PID(pitchAimP, pitchAimI, pitchAimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
+            rollController = new PID(rollAimP, rollAimI, rollAimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
         public class PID {
