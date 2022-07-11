@@ -22,7 +22,6 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO add generate orbital gps function
-        //use lidars instead of sensors for randomMagneticDrive
         //generate orbital gps above target 
         //land function
         //NAVIGATOR
@@ -104,6 +103,7 @@ namespace IngameScript {
         readonly int escapeDelay = 10;
         readonly int randomDelay = 10;
         readonly int sensorsDelay = 5;
+        readonly int collisionCheckDelay = 10;
         int impactDetectionDelay = 5;
 
         bool magneticDrive = true;
@@ -136,13 +136,14 @@ namespace IngameScript {
         float prevSunPower = 0f;
         int cockpitRangeFinderSurface = 4;
         int planetSelector = 0;
+        int sunAlignmentStep = 0;
+        int selectedSunAlignmentStep;
         int impactDetectionCount = 5;
         int escapeCount = 10;
         int tickCount = 0;
         int randomCount = 50;
         int sensorsCount = 10;
-        int sunAlignmentStep = 0;
-        int selectedSunAlignmentStep;
+        int collisionCheckCount = 0;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float rpsOverRpm = (float)(Math.PI / 30);
@@ -212,7 +213,7 @@ namespace IngameScript {
         Vector3D targPos = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
         Vector3 randomDir = new Vector3();
-        Vector3D lastVelocity;
+        Vector3D lastVelocity = Vector3D.Zero;
         Vector3D maxAccel;
         Vector3D minAccel;
 
@@ -465,11 +466,9 @@ namespace IngameScript {
                     Vector3D horizonVec = Vector3D.Cross(gravity, leftVec);
                     double pitchAngle, rollAngle, yawAngle;
                     GetRotationAnglesSimultaneous(horizonVec, -gravity, matrix, out pitchAngle, out yawAngle, out rollAngle);
-
                     double mouseYaw = controller.RotationIndicator.Y;
                     double mousePitch = controller.RotationIndicator.X;
                     double mouseRoll = controller.RollIndicator;
-
                     if (mousePitch != 0d) {
                         mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
                     }
@@ -478,7 +477,6 @@ namespace IngameScript {
                     } else {
                         mousePitch = pitchController.Control(mousePitch);
                     }
-
                     if (mouseRoll != 0d) {
                         mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
                     }
@@ -487,7 +485,6 @@ namespace IngameScript {
                     } else {
                         mouseRoll = rollController.Control(mouseRoll);
                     }
-
                     double speed = controller.GetShipSpeed();
                     yawAngle = 0;
                     if (speed > minSpeed) {
@@ -497,11 +494,9 @@ namespace IngameScript {
                         }
                         if (!useRoll) { lastUpVector = Vector3D.Zero; };
                         GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
                         lastForwardVector = controller.WorldMatrix.Forward;
                         lastUpVector = controller.WorldMatrix.Up;
                     }
-
                     if (mouseYaw != 0d) {
                         mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
                     }
@@ -510,7 +505,6 @@ namespace IngameScript {
                     } else {
                         mouseYaw = yawController.Control(mouseYaw);
                     }
-
                     if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
                         if (unlockGyrosOnce) {
                             UnlockGyros();
@@ -532,11 +526,9 @@ namespace IngameScript {
                         }
                         if (!useRoll) { lastUpVector = Vector3D.Zero; };
                         GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
                         double mouseYaw = controller.RotationIndicator.Y;
                         double mousePitch = controller.RotationIndicator.X;
                         double mouseRoll = controller.RollIndicator;
-
                         if (mouseYaw != 0d) {
                             mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
                         }
@@ -545,7 +537,6 @@ namespace IngameScript {
                         } else {
                             mouseYaw = yawController.Control(mouseYaw);
                         }
-
                         if (mousePitch != 0d) {
                             mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
                         }
@@ -554,7 +545,6 @@ namespace IngameScript {
                         } else {
                             mousePitch = pitchController.Control(mousePitch);
                         }
-
                         if (mouseRoll != 0d) {
                             mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
                         }
@@ -563,7 +553,6 @@ namespace IngameScript {
                         } else {
                             mouseRoll = rollController.Control(mouseRoll);
                         }
-
                         if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
                             if (unlockGyrosOnce) {
                                 UnlockGyros();
@@ -602,9 +591,7 @@ namespace IngameScript {
                     sunChasing = false;
                     initMagneticDriveOnce = false;
                 }
-
                 SyncRotors();
-
                 if (isAutoPiloted) {
                     Vector3 dir = AutoMagneticDrive();
                     SetPower(dir);
@@ -613,15 +600,13 @@ namespace IngameScript {
                         foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                         initAutoMagneticDriveOnce = true;
                     }
-
                     if (!isUnderControl && targetFound) {
                         if (initRandomMagneticDriveOnce) {
                             foreach (IMySensorBlock sensor in SENSORS) { sensor.Enabled = true; }
                             controller.DampenersOverride = false;
                             initRandomMagneticDriveOnce = false;
                         }
-
-                        Vector3 dir = RandomMagneticDrive(targPos, LIDARS[0]);
+                        Vector3 dir = RandomMagneticDrive(targPos, controller);
                         SetPower(dir);
                     } else {
                         if (!initRandomMagneticDriveOnce) {
@@ -630,7 +615,6 @@ namespace IngameScript {
                             controller.DampenersOverride = true;
                             initRandomMagneticDriveOnce = true;
                         }
-
                         Vector3 dir = MagneticDrive(controller, gravity);
                         if (!isUnderControl) {
                             dir = KeepAltitude(dir, controller, idleThrusters, keepAltitude, gravity);
@@ -645,7 +629,6 @@ namespace IngameScript {
                     IdleMagneticDrive(idleThrusters);
                     initMagneticDriveOnce = true;
                 }
-
                 if (tickCount == tickDelay) {
                     if (controlDampeners) {
                         DeadMan(IsPiloted(true));
@@ -687,9 +670,7 @@ namespace IngameScript {
                 if (i == 0) {
                     thruster = thrust;
                     thrust.Enabled = true;
-                } else {
-                    thrust.Enabled = false;
-                }
+                } else { thrust.Enabled = false; }
                 i++;
             }
             return thruster;
@@ -703,22 +684,16 @@ namespace IngameScript {
                 RIGHTTHRUST = InitAutopilotMagneticDrive(RIGHTTHRUSTERS);
                 FORWARDTHRUST = InitAutopilotMagneticDrive(FORWARDTHRUSTERS);
                 BACKWARDTHRUST = InitAutopilotMagneticDrive(BACKWARDTHRUSTERS);
-
                 initAutoMagneticDriveOnce = false;
             }
-
             Vector3 dir = new Vector3();
             if (FORWARDTHRUST.CurrentThrust > 0) { dir.Z = -1; } else if (BACKWARDTHRUST.CurrentThrust > 0) { dir.Z = 1; }
-
             if (UPTHRUST.CurrentThrust > 0) { dir.Y = 1; } else if (DOWNTHRUST.CurrentThrust > 0) { dir.Y = -1; }
-
             if (LEFTTHRUST.CurrentThrust > 0) { dir.X = -1; } else if (RIGHTTHRUST.CurrentThrust > 0) { dir.X = 1; }
-
             return dir;
         }
 
-        Vector3 RandomMagneticDrive(Vector3D targPos, IMyTerminalBlock tBlock) {//TODO use lidars
-            /*
+        Vector3 RandomMagneticDrive(Vector3D targPos, IMyShipController controller) {
             bool detectedOwner = false;
             if (sensorsCount >= sensorsDelay) {
                 List<MyDetectedEntityInfo> entities = new List<MyDetectedEntityInfo>();
@@ -739,107 +714,101 @@ namespace IngameScript {
                 sensorsCount = 0;
             }
             sensorsCount++;
-
             if (!detectedOwner) {
-            */
-
-            if (randomCount >= randomDelay) {
-                randomDir = new Vector3();
-                int randomInt;
-
-                List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
-                List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
-                LEFTSENSOR.DetectedEntities(entitiesA);
-                RIGHTSENSOR.DetectedEntities(entitiesB);
-
-                bool goUp = false;
-                foreach (var entity in entitiesA) {
-                    if (entity.Type == MyDetectedEntityType.SmallGrid && (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Friends || entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner)) {
-                        goUp = true;
-                        break;
+                if (randomCount >= randomDelay) {
+                    randomDir = new Vector3();
+                    int randomInt;
+                    List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
+                    List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
+                    LEFTSENSOR.DetectedEntities(entitiesA);
+                    RIGHTSENSOR.DetectedEntities(entitiesB);
+                    bool goUp = false;
+                    foreach (var entity in entitiesA) {
+                        if (entity.Type == MyDetectedEntityType.SmallGrid && (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Friends || entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner)) {
+                            goUp = true;
+                            break;
+                        }
                     }
-                }
-                foreach (var entity in entitiesB) {
-                    if (entity.Type == MyDetectedEntityType.SmallGrid && (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Friends || entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner)) {
-                        goUp = true;
-                        break;
+                    foreach (var entity in entitiesB) {
+                        if (entity.Type == MyDetectedEntityType.SmallGrid && (entity.Relationship == MyRelationsBetweenPlayerAndBlock.Friends || entity.Relationship == MyRelationsBetweenPlayerAndBlock.Owner)) {
+                            goUp = true;
+                            break;
+                        }
                     }
-                }
-
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    randomDir.X = 0;
-                } else if (entitiesA.Count > 0) {
-                    randomDir.X = 1;
-                } else if (entitiesB.Count > 0) {
-                    randomDir.X = -1;
-                } else {
-                    randomInt = random.Next(-1, 1);
-                    randomDir.X = randomInt;
-                }
-
-                entitiesA.Clear();
-                entitiesB.Clear();
-                UPSENSOR.DetectedEntities(entitiesA);
-                DOWNSENSOR.DetectedEntities(entitiesB);
-
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    randomDir.Y = 0;
-                } else if (entitiesA.Count > 0) {
-                    randomDir.Y = -1;
-                } else if (entitiesB.Count > 0) {
-                    randomDir.Y = 1;
-                } else {
-                    if (goUp) {
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        randomDir.X = 0;
+                    } else if (entitiesA.Count > 0) {
+                        randomDir.X = 1;
+                    } else if (entitiesB.Count > 0) {
+                        randomDir.X = -1;
+                    } else {
+                        randomInt = random.Next(-1, 1);
+                        randomDir.X = randomInt;
+                    }
+                    entitiesA.Clear();
+                    entitiesB.Clear();
+                    UPSENSOR.DetectedEntities(entitiesA);
+                    DOWNSENSOR.DetectedEntities(entitiesB);
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        randomDir.Y = 0;
+                    } else if (entitiesA.Count > 0) {
+                        randomDir.Y = -1;
+                    } else if (entitiesB.Count > 0) {
                         randomDir.Y = 1;
                     } else {
-                        randomInt = random.Next(-1, 1);
-                        randomDir.Y = randomInt;
+                        if (goUp) {
+                            randomDir.Y = 1;
+                        } else {
+                            randomInt = random.Next(-1, 1);
+                            randomDir.Y = randomInt;
+                        }
                     }
-                }
-
-                double minDistance = 2000d;
-                if (!railgunsCanShoot && !artilleryCanShoot) {
-                    minDistance = 1400d;
-                    if (!assaultCanShoot && !smallRailgunsCanShoot) {
-                        minDistance = 800d;
+                    double minDistance = 2000d;
+                    if (!railgunsCanShoot && !artilleryCanShoot) {
+                        minDistance = 1400d;
+                        if (!assaultCanShoot && !smallRailgunsCanShoot) {
+                            minDistance = 800d;
+                        }
                     }
-                }
-                entitiesA.Clear();
-                entitiesB.Clear();
-                FORWARDSENSOR.DetectedEntities(entitiesA);
-                BACKWARDSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    randomDir.Z = 0;
-                } else if (entitiesA.Count > 0) {
-                    randomDir.Z = 1;
-                } else if (entitiesB.Count > 0) {
-                    randomDir.Z = -1;
-                } else {
-                    double distance = Vector3D.Distance(tBlock.GetPosition(), targPos);
-                    if (distance > minDistance) {
+                    entitiesA.Clear();
+                    entitiesB.Clear();
+                    FORWARDSENSOR.DetectedEntities(entitiesA);
+                    BACKWARDSENSOR.DetectedEntities(entitiesB);
+                    if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                        randomDir.Z = 0;
+                    } else if (entitiesA.Count > 0) {
+                        randomDir.Z = 1;
+                    } else if (entitiesB.Count > 0) {
                         randomDir.Z = -1;
-                    } else if (distance <= minDistance) {
-                        randomDir.Z = 1;
-                    } else if (distance < 800d) {
-                        randomDir.Z = 1;
                     } else {
-                        randomInt = random.Next(-1, 1);
-                        randomDir.Z = randomInt;
+                        double distance = Vector3D.Distance(controller.GetPosition(), targPos);
+                        if (distance > minDistance) {
+                            randomDir.Z = -1;
+                        } else if (distance <= minDistance) {
+                            randomDir.Z = 1;
+                        } else if (distance < 800d) {
+                            randomDir.Z = 1;
+                        } else {
+                            randomInt = random.Next(-1, 1);
+                            randomDir.Z = randomInt;
+                        }
                     }
+                    randomCount = 0;
                 }
-                randomCount = 0;
-            }
-            randomCount++;
-
-            return randomDir;
-
-            /*
+                randomCount++;
+                UpdateAcceleration(controller, Runtime.TimeSinceLastRun.TotalSeconds);
+                if (collisionCheckCount >= collisionCheckDelay) {
+                    double stopDistance = CalculateStopDistance(controller);
+                    RaycastStopPosition(controller, stopDistance, randomDir);
+                    collisionCheckCount = 0;
+                }
+                collisionCheckCount++;
+                return randomDir;
             } else {
                 randomCount = 0;
                 randomDir = Vector3.Zero;
                 return randomDir;
             }
-            */
         }
 
         Vector3 MagneticDrive(IMyShipController controller, Vector3D gravity) {
@@ -864,7 +833,6 @@ namespace IngameScript {
             if (Vector3D.IsZero(gravity) && !controller.DampenersOverride && dir.LengthSquared() == 0) {
                 return Vector3.Zero;
             }
-
             controller.Orientation.GetMatrix(out mtrx);
             Vector3 vel = controller.GetShipVelocities().LinearVelocity;
             vel = Vector3.Transform(vel, MatrixD.Transpose(controller.WorldMatrix.GetOrientation()));
@@ -872,7 +840,6 @@ namespace IngameScript {
             if (Math.Abs(vel.X) < minSpeed) { vel.X = 0; }
             if (Math.Abs(vel.Y) < minSpeed) { vel.Y = 0; }
             if (Math.Abs(vel.Z) < minSpeed) { vel.Z = 0; }
-
             return vel;
         }
 
@@ -962,9 +929,7 @@ namespace IngameScript {
             for (int i = 0; i < 3; ++i) {// Now we break the current velocity apart component by component
                 double velocityComponent = localVelocity.GetDim(i);
                 double stopDistComponent;
-                if (velocityComponent >= 0) {
-                    // We do MIN accel when the velocity is positive because we want the acceleration in the
-                    // OPPOSITE direction
+                if (velocityComponent >= 0) {// We do MIN accel when the velocity is positive because we want the acceleration in the OPPOSITE direction
                     stopDistComponent = (velocityComponent * velocityComponent) / (2 * minAccel.GetDim(i));
                 } else {
                     stopDistComponent = (velocityComponent * velocityComponent) / (2 * maxAccel.GetDim(i));
@@ -1001,6 +966,7 @@ namespace IngameScript {
                     lidar = GetCameraWithMaxRange(LIDARSRIGHT);
                     break;
             }
+            if (lidar == null) { return dir; }
             MyDetectedEntityInfo entityInfo = lidar.Raycast(stopPosition);//TODO
             if (!entityInfo.IsEmpty()) {
                 //dir = -normalizedVelocity;
@@ -1091,7 +1057,6 @@ namespace IngameScript {
                 impactDetectionCount = 0;
             }
             impactDetectionCount++;
-
             return targetFound;
         }
 
@@ -1144,7 +1109,7 @@ namespace IngameScript {
         void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {
             BoundingBoxD gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
             MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
-            double time = 80.0d;//TODO
+            double time = 30.0d;//TODO
             Vector3D targetFuturePosition = targetPos + (targetVelocity * time);
             LineD line = new LineD(targetPos, targetFuturePosition);
             double? hitDist = obb.Intersects(ref line);
@@ -1178,7 +1143,6 @@ namespace IngameScript {
                     isPilotedOnce = false;
                 }
             }
-
             if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
                 double dist = Vector3D.Distance(targetPosition, remote.GetPosition());
                 if (dist < stopDistance) {
@@ -1186,7 +1150,6 @@ namespace IngameScript {
                     targetPosition = Vector3D.Zero;
                 }
             }
-
             if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(escapePosition)) {
                 double dist = Vector3D.Distance(escapePosition, remote.GetPosition());
                 if (dist < stopDistance) {
@@ -1195,7 +1158,6 @@ namespace IngameScript {
                     escapePosition = Vector3D.Zero;
                 }
             }
-
             if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition) && Vector3D.IsZero(escapePosition)) {
                 double dist = Vector3D.Distance(returnPosition, remote.GetPosition());
                 if (dist < stopDistance) {
@@ -1210,11 +1172,10 @@ namespace IngameScript {
         void RangeFinder(IMyRemoteControl remote) {
             targetLog.Clear();
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
+            if (lidar == null) { return; }
             MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
-                foreach (var block in ALARMS) {
-                    block.Play();
-                }
+                foreach (var block in ALARMS) { block.Play(); }
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
                     Vector3D planetCenter = TARGET.Position;
                     Vector3D hitPosition = TARGET.HitPosition.Value;
@@ -1303,17 +1264,14 @@ namespace IngameScript {
         bool AimAtTarget(IMyShipController controller, Vector3D targetPos) {
             bool aligned = false;
             Vector3D aimDirection = targetPos - controller.GetPosition();
-
             double yawAngle;
             double pitchAngle;
             double rollAngle;
             GetRotationAnglesSimultaneous(aimDirection, controller.WorldMatrix.Up, controller.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-
             double yawSpeed = yawController.Control(yawAngle);
             double pitchSpeed = pitchController.Control(pitchAngle);
             double rollSpeed = rollController.Control(rollAngle);
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, controller.WorldMatrix);
-
             Vector3D forwardVec = controller.WorldMatrix.Forward;
             double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance) {
@@ -1333,12 +1291,10 @@ namespace IngameScript {
                         unlockSunChaseOnce = true;
                         sunChaseOnce = false;
                     }
-
                     double pitch = 0;
                     double yaw = 0;
                     float power = SOLAR.MaxOutput;
                     int powerDifference = Math.Sign(power - prevSunPower);
-
                     if (power < .02) {
                         if (unlockSunChaseOnce) {
                             UnlockGyros();
@@ -1357,7 +1313,6 @@ namespace IngameScript {
                         return;
                     }
                     unlockSunChaseOnce = true;
-
                     switch (sunAlignmentStep) {
                         case 0:
                             selectedSunAlignmentStep = 0;
@@ -1387,11 +1342,9 @@ namespace IngameScript {
                             yaw = moveYaw;
                             break;
                     }
-
                     double yawSpeed = yawController.Control(yaw);
                     double pitchSpeed = pitchController.Control(pitch);
                     ApplyGyroOverride(pitchSpeed, yawSpeed, 0d, GYROS, SOLAR.WorldMatrix);
-
                     prevSunPower = power;
                 } else {
                     foreach (IMySolarPanel solar in SOLARS) {
@@ -1412,12 +1365,10 @@ namespace IngameScript {
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
             desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
-
             MatrixD transposedWm;
             MatrixD.Transpose(ref worldMatrix, out transposedWm);
             Vector3D.Rotate(ref desiredForwardVector, ref transposedWm, out desiredForwardVector);
             Vector3D.Rotate(ref desiredUpVector, ref transposedWm, out desiredUpVector);
-
             Vector3D leftVector = Vector3D.Cross(desiredUpVector, desiredForwardVector);
             Vector3D axis;
             double angle;
@@ -1427,21 +1378,16 @@ namespace IngameScript {
             } else {
                 leftVector = VectorMath.SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
-
-                //Create matrix
-                MatrixD targetMatrix = MatrixD.Zero;
+                MatrixD targetMatrix = MatrixD.Zero;//Create matrix
                 targetMatrix.Forward = desiredForwardVector;
                 targetMatrix.Left = leftVector;
                 targetMatrix.Up = upVector;
-
                 axis = new Vector3D(targetMatrix.M23 - targetMatrix.M32,
                                     targetMatrix.M31 - targetMatrix.M13,
                                     targetMatrix.M12 - targetMatrix.M21);
-
                 double trace = targetMatrix.M11 + targetMatrix.M22 + targetMatrix.M33;
                 angle = Math.Acos(MathHelper.Clamp((trace - 1) * 0.5, -1, 1));
             }
-
             if (Vector3D.IsZero(axis)) {
                 angle = desiredForwardVector.Z < 0 ? 0 : Math.PI;
                 yaw = angle;
@@ -1449,7 +1395,6 @@ namespace IngameScript {
                 roll = 0;
                 return;
             }
-
             axis = VectorMath.SafeNormalize(axis);
             //Because gyros rotate about -X -Y -Z, we need to negate our angles
             yaw = -axis.Y * angle;
@@ -1460,7 +1405,6 @@ namespace IngameScript {
         void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed, List<IMyGyro> gyroList, MatrixD worldMatrix) {
             var rotationVec = new Vector3D(pitchSpeed, yawSpeed, rollSpeed);
             var relativeRotationVec = Vector3D.TransformNormal(rotationVec, worldMatrix);
-
             foreach (var thisGyro in gyroList) {
                 if (thisGyro.Closed)
                     continue;
@@ -1516,7 +1460,7 @@ namespace IngameScript {
 
         IMyCameraBlock GetCameraWithMaxRange(List<IMyCameraBlock> cameraList) {
             double maxRange = 0d;
-            IMyCameraBlock maxRangeCamera = cameraList[0];
+            IMyCameraBlock maxRangeCamera = null;
             foreach (IMyCameraBlock thisCamera in cameraList) {
                 if (thisCamera.AvailableScanRange > maxRange) {
                     maxRangeCamera = thisCamera;
@@ -1548,41 +1492,38 @@ namespace IngameScript {
             lidarsLog.Clear();
             lidarsLog.Append("Max Range: ").Append(maxScanRange.ToString("0.0")).Append("\n");
             IMyCameraBlock cam = GetCameraWithMaxRange(LIDARS);
-            lidarsLog.Append("Avail. Range: ").Append(cam.AvailableScanRange.ToString("0.0")).Append("\n");
+            if (cam != null) { lidarsLog.Append("Avail. Range: ").Append(cam.AvailableScanRange.ToString("0.0")).Append("\n"); }
         }
 
         void ReadJumpersInfos() {
             jumpersLog.Clear();
-            double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
-            jumpersLog.Append("Max Jump: ").Append(maxDistance.ToString("0.0")).Append("\n");
-
-            double currentJumpPercent = (double)JUMPERS[0].GetValueFloat("JumpDistance");
-            double currentJump = maxDistance / 100d * currentJumpPercent;
-            jumpersLog.Append("Curr. Jump: ").Append(currentJump.ToString("0.0")).Append(" (").Append(currentJumpPercent.ToString("0.00")).Append("%)\n");
-
-            double currentStoredPower = 0d;
-            double maxStoredPower = 0d;
-            StringBuilder timeRemainingBlldr = new StringBuilder();
-            foreach (IMyJumpDrive block in JUMPERS) {
-                MyJumpDriveStatus status = block.Status;
-
-                if (status == MyJumpDriveStatus.Charging) {
-                    string timeRemaining = block.DetailedInfo.ToString().Split('\n')[5];
-                    timeRemainingBlldr.Append(status.ToString()).Append(": ").Append(timeRemaining).Append("s, ");
-                } else {
-                    timeRemainingBlldr.Append(status.ToString()).Append(", ");
+            if (JUMPERS.Count != 0) {
+                double maxDistance = GetMaxJumpDistance(JUMPERS[0]);
+                jumpersLog.Append("Max Jump: ").Append(maxDistance.ToString("0.0")).Append("\n");
+                double currentJumpPercent = (double)JUMPERS[0].GetValueFloat("JumpDistance");
+                double currentJump = maxDistance / 100d * currentJumpPercent;
+                jumpersLog.Append("Curr. Jump: ").Append(currentJump.ToString("0.0")).Append(" (").Append(currentJumpPercent.ToString("0.00")).Append("%)\n");
+                double currentStoredPower = 0d;
+                double maxStoredPower = 0d;
+                StringBuilder timeRemainingBlldr = new StringBuilder();
+                foreach (IMyJumpDrive block in JUMPERS) {
+                    MyJumpDriveStatus status = block.Status;
+                    if (status == MyJumpDriveStatus.Charging) {
+                        string timeRemaining = block.DetailedInfo.ToString().Split('\n')[5];
+                        timeRemainingBlldr.Append(status.ToString()).Append(": ").Append(timeRemaining).Append("s, ");
+                    } else {
+                        timeRemainingBlldr.Append(status.ToString()).Append(", ");
+                    }
+                    currentStoredPower += block.CurrentStoredPower;
+                    maxStoredPower += block.MaxStoredPower;
                 }
-
-                currentStoredPower += block.CurrentStoredPower;
-                maxStoredPower += block.MaxStoredPower;
-            }
-            jumpersLog.Append("Status: ").Append(timeRemainingBlldr.ToString());
-
-            if (currentStoredPower > 0) {
-                double totJumpPercent = currentStoredPower / maxStoredPower * 100;
-                jumpersLog.Append("Stored Power: ").Append(totJumpPercent.ToString("0.00")).Append("%\n");
-            } else {
-                jumpersLog.Append("Stored Power: ").Append("0%\n");
+                jumpersLog.Append("Status: ").Append(timeRemainingBlldr.ToString());
+                if (currentStoredPower > 0) {
+                    double totJumpPercent = currentStoredPower / maxStoredPower * 100;
+                    jumpersLog.Append("Stored Power: ").Append(totJumpPercent.ToString("0.00")).Append("%\n");
+                } else {
+                    jumpersLog.Append("Stored Power: ").Append("0%\n");
+                }
             }
         }
 
@@ -1603,10 +1544,8 @@ namespace IngameScript {
             }
             MyIniParseResult result;
             myIni.TryParse(cockpit.CustomData, sectionTag, out result);
-
             if (!string.IsNullOrEmpty(myIni.Get(sectionTag, cockpitRangeFinderKey).ToString())) {
                 cockpitRangeFinderSurface = myIni.Get(sectionTag, cockpitRangeFinderKey).ToInt32();
-
                 SURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));
             }
         }
@@ -1698,11 +1637,7 @@ namespace IngameScript {
             }
             SOLARS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySolarPanel>(SOLARS, block => block.CustomName.Contains(solarsName));
-            foreach (IMySolarPanel solar in SOLARS) {
-                if (solar.IsFunctional && solar.Enabled && solar.IsWorking) {
-                    SOLAR = solar;
-                }
-            }
+            foreach (IMySolarPanel solar in SOLARS) { if (solar.IsFunctional && solar.Enabled && solar.IsWorking) { SOLAR = solar; } }
         }
 
         void InitPIDControllers() {
@@ -1748,32 +1683,23 @@ namespace IngameScript {
             }
 
             public double Control(double error) {
-                //Compute derivative term
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;
-
+                var errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
                 if (_firstRun) {
                     errorDerivative = 0;
                     _firstRun = false;
                 }
-
-                //Compute integral term
-                if (!_integralDecay) {
+                if (!_integralDecay) {//Compute integral term
                     _errorSum += error * _timeStep;
-
-                    //Clamp integral term
-                    if (_errorSum > _upperBound)
+                    if (_errorSum > _upperBound) {//Clamp integral term
                         _errorSum = _upperBound;
-                    else if (_errorSum < _lowerBound)
+                    } else if (_errorSum < _lowerBound) {
                         _errorSum = _lowerBound;
+                    }
                 } else {
                     _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
                 }
-
-                //Store this error as last error
-                _lastError = error;
-
-                //Construct output
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
+                _lastError = error;//Store this error as last error
+                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;//Construct output
                 return this.Value;
             }
 
@@ -1792,12 +1718,8 @@ namespace IngameScript {
 
         public static class VectorMath {
             public static Vector3D SafeNormalize(Vector3D a) {
-                if (Vector3D.IsZero(a))
-                    return Vector3D.Zero;
-
-                if (Vector3D.IsUnit(ref a))
-                    return a;
-
+                if (Vector3D.IsZero(a)) { return Vector3D.Zero; }
+                if (Vector3D.IsUnit(ref a)) { return a; }
                 return Vector3D.Normalize(a);
             }
 
@@ -1808,41 +1730,31 @@ namespace IngameScript {
             }
 
             public static Vector3D Rejection(Vector3D a, Vector3D b) {//reject a on b
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return Vector3D.Zero;
-
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return Vector3D.Zero; }
                 return a - a.Dot(b) / b.LengthSquared() * b;
             }
 
             public static Vector3D Projection(Vector3D a, Vector3D b) {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return Vector3D.Zero;
-
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return Vector3D.Zero; }
                 return a.Dot(b) / b.LengthSquared() * b;
             }
 
             public static double ScalarProjection(Vector3D a, Vector3D b) {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return 0;
-
-                if (Vector3D.IsUnit(ref b))
-                    return a.Dot(b);
-
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return 0; }
+                if (Vector3D.IsUnit(ref b)) { return a.Dot(b); }
                 return a.Dot(b) / b.Length();
             }
 
             public static double AngleBetween(Vector3D a, Vector3D b) {//returns radians
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
                     return 0;
-                else
-                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
+                } else { return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1)); }
             }
 
             public static double CosBetween(Vector3D a, Vector3D b) {//returns radians
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
                     return 0;
-                else
-                    return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
+                } else { return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1); }
             }
         }
 
