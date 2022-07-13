@@ -22,8 +22,6 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
         //revisit LoadMissiles(),make it universal
-        //revisit the raycasting logic, 1 raycast max per tick, also use milliseconds instead of ticks
-        //when missing the target on raycast runs at update1 and raycast next ticks
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
@@ -73,38 +71,40 @@ namespace IngameScript {
         readonly string sectionTag = "MissilesSettings";
         readonly string cockpitTargetSurfaceKey = "cockpitTargetSurface";
 
-        readonly bool creative = true;
+        readonly bool creative = true;//set true if playing creative mode
+        readonly bool sequenceWeapons = false;//set true to sequence Gun lists
         readonly int missilesCount = 2;
         readonly int autoMissilesDelay = 9;
         readonly int writeDelay = 1;
-        readonly double gunsRange = 2000d;
+        readonly int fudgeAttempts = 8;
+        readonly int rocketRounds = 19;
+        readonly int singleRound = 1;
         readonly float joltSpeed = 958.21f;
         readonly float rocketSpeed = 200f;
-        double rocketRange = 500d;
         readonly float gatlingSpeed = 400f;
         readonly float autocannonSpeed = 400f;
         readonly float assaultSpeed = 500f;
         readonly float artillerySpeed = 500f;
         readonly float railgunSpeed = 2000f;
         readonly float smallRailgunSpeed = 1000f;
+        readonly double angleTolerance = 1d;//degrees - threshold where guns start/stop to fire when aligning to the target
+        readonly double gunsRange = 2000d;//maximum guns range
+        double rocketRange = 500d;
         readonly double autocannonRange = 800d;//gatlingRange
         readonly double assaultRange = 1400d;
         readonly double artilleryRange = 2000d;
         readonly double railgunRange = 2000d;
         readonly double smallRailgunRange = 1400d;
-        readonly int rocketROF = 4;//120rpm - 2rps - 0.03 rptick - 30 ticks
-        readonly int assaultROF = 2;//200rpm - 3.33rps - 0.055 rptick - 19 ticks
-        readonly int artilleryROF = 5;//80rpm - 1.33rps - 0.022 rptick - 46 ticks
-        readonly int railgunsROF = 19;//20rpm - 0.33rps - 0.0055 rptick - 181 ticks
-        readonly int smallRailgunsROF = 19;//20rpm - 0.33rps - 0.0055 rptick - 181 ticks
-        readonly int rocketRounds = 19;
-        readonly int singleRound = 1;
-        readonly int rocketReload = 24;//4000ms - 240 ticks
-        readonly int assaultReload = 36;//6000ms - 360 ticks
-        readonly int artilleryReload = 72;//120000ms - 720 ticks
-        readonly int railgunsReload = 24;//4000ms - 240 ticks
-        readonly int smallRailgunsReload = 24;//4000ms - 240 ticks
-        readonly int fudgeAttempts = 8;
+        readonly double rocketROF = 0.583;//4 - 120rpm - 2rps - 0.03 rptick - 30 ticks
+        readonly double assaultROF = 0.33;//2 - 200rpm - 3.33rps - 0.055 rptick - 19 ticks
+        readonly double artilleryROF = 0.83;//5 - 80rpm - 1.33rps - 0.022 rptick - 46 ticks
+        readonly double railgunsROF = 3.083;//19 - 20rpm - 0.33rps - 0.0055 rptick - 181 ticks
+        readonly double smallRailgunsROF = 3.083;//19 - 20rpm - 0.33rps - 0.0055 rptick - 181 ticks
+        readonly double rocketReload = 4d;//24 - 4000ms - 240 ticks
+        readonly double assaultReload = 6d;//36 - 6000ms - 360 ticks
+        readonly double artilleryReload = 12d;//72 - 120000ms - 720 ticks
+        readonly double railgunsReload = 4d;//24 - 4000ms - 240 ticks
+        readonly double smallRailgunsReload = 4d;//24 - 4000ms - 240 ticks
         readonly double yawAimP = 5d;
         readonly double yawAimI = 0d;
         readonly double yawAimD = 5d;
@@ -115,13 +115,13 @@ namespace IngameScript {
         readonly double rollAimI = 0d;
         readonly double rollAimD = 1d;
         readonly double integralWindupLimit = 0d;
-        readonly bool sequenceWeapons = false;
 
+        bool autoFire = true;//set true to fire guns automatically
+        bool autoMissiles = false;//set true to fire missiles automatically
+        bool autoSwitchGuns = true;//set true to switch guns automatically depending on range etc.
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
         int selectedPayLoad = 0;//0 Missiles - 1 Drones
-        bool autoFire = true;
-        bool autoMissiles = false;
-        bool autoSwitchGuns = true;
+        int fudgeCount = 0;
         int rocketDelay = 1;
         int assaultDelay = 1;
         int artilleryDelay = 1;
@@ -141,9 +141,12 @@ namespace IngameScript {
         int cockpitTargetSurface = 0;
         int autoMissilesCounter = 0;
         int writeCount = 0;
-        long currentTick = 1;
-        long lostTicks = 0;
-        double fudgeFactor = 5;
+        double fudgeFactor = 5d;
+        double timeSinceLastLock = 0d;
+        double targetDiameter;
+        bool hasCenter = true;
+        bool scanCenter = false;
+        bool scanFudge = false;
         bool joltReady = true;
         bool missilesLoaded = false;
         bool fudgeVectorSwitch = false;
@@ -172,17 +175,14 @@ namespace IngameScript {
         bool smallRailgunsOnce = false;
         bool assaultOnce = false;
         bool autocannonOnce = false;
+        string targetName = null;
 
         Vector3D targetPosition;
-        string targetName = null;
-        double targetDiameter;
         MyDetectedEntityInfo targetInfo;
-
         readonly Random random = new Random();
+
         const float globalTimestep = 10.0f / 60.0f;
-        const long ticksScanDelay = 1;
         const double rad2deg = 180 / Math.PI;
-        const double angleTolerance = 1;//degrees
 
         public List<IMyCameraBlock> LIDARS = new List<IMyCameraBlock>();
         public List<IMyLightingBlock> LIGHTS = new List<IMyLightingBlock>();
@@ -276,21 +276,25 @@ namespace IngameScript {
                 ReadMessages();
                 CanShootGuns();
 
+                double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+
                 if (targetName != null) {
-                    if (lostTicks > ticksScanDelay) {//if lidars or turrets doesn't detect a enemy for some time reset the script
+                    if (fudgeCount > fudgeAttempts) {//if lidars or turrets doesn't detect a enemy for some time reset the script
                         ResetTargeter();
                         return;
                     }
 
                     ActivateTargeter();//things to run once when a enemy is detected
 
+                    double lastLock = timeSinceLastLock + timeSinceLastRun;
+
                     bool targetFound = TurretsDetection(true);
 
                     if (!targetFound) {
-                        targetFound = AcquireTarget();
+                        targetFound = AcquireTarget(lastLock);
                     }
 
-                    if (targetFound && currentTick == ticksScanDelay) {//send message to missiles every some ticks
+                    if (targetFound) {//send message to missiles
                         SendBroadcastTargetMessage(true, targetPosition, targetInfo.Velocity);
 
                         foreach (var id in MissileIDs) {
@@ -306,15 +310,21 @@ namespace IngameScript {
                         }
                     }
 
-                    LockOnTarget(LIDARS[0]);
-
-                    CalculateTicks(targetFound);
+                    IMyTerminalBlock refBlock;
+                    if (LIDARS.Count != 0) {
+                        refBlock = LIDARS[0];
+                    } else { refBlock = CONTROLLER; }
+                    LockOnTarget(refBlock, lastLock);
 
                     if (writeCount == writeDelay) {
                         CheckGunsAmmo();
                     }
 
-                    ManageGuns();
+                    ManageGuns(timeSinceLastRun);
+
+                    if (targetFound) {
+                        timeSinceLastLock = 0;
+                    } else { timeSinceLastLock += timeSinceLastRun; }
 
                     ReadTargetInfo();
                 } else {
@@ -323,10 +333,19 @@ namespace IngameScript {
                         return;
                     }
 
-                    TurretsDetection(false);
+                    bool targetFound = TurretsDetection(false);
+
+                    if (!targetFound) {
+                        if (scanFudge && fudgeCount <= fudgeAttempts) {
+                            arg = argLock;
+                        } else if (fudgeCount > fudgeAttempts) {
+                            scanFudge = false;
+                            fudgeCount = 0;
+                        }
+                    }
                 }
 
-                SyncGuns();
+                SyncGuns(timeSinceLastRun);
 
                 bool completed = CheckProjectors();
                 if (!completed) {
@@ -338,7 +357,7 @@ namespace IngameScript {
                 }
 
                 if (!String.IsNullOrEmpty(arg)) {
-                    ProcessArgs(arg);
+                    ProcessArgs(arg, (double)globalTimestep);
                 }
 
                 if (writeCount == writeDelay) {
@@ -356,9 +375,9 @@ namespace IngameScript {
             }
         }
 
-        void ProcessArgs(string arg) {
+        void ProcessArgs(string arg, double timeSinceLastRun) {
             switch (arg) {
-                case argLock: AcquireTarget(); break;
+                case argLock: AcquireTarget(timeSinceLastRun); break;
                 case commandLaunch:
                     if (missilesLoaded && targetName != null) {
                         foreach (IMyRadioAntenna block in MISSILEANTENNAS) {
@@ -471,41 +490,45 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool AcquireTarget() {
+        bool AcquireTarget(double timeSinceLastRun) {
             bool targetFound = false;
             if (targetName == null) {//case argLock
-                targetFound = ScanTarget(false);
-                if (!targetFound) {
-                    fudgeFactor = 5;
-                    for (int i = 0; i < fudgeAttempts; i++) {
-                        targetFound = ScanFudgeEmptyTarget();
-                        if (targetFound) {
-                            break;
-                        }
-                    }
-                }
-                if (targetFound) {
-                    targetFound = ScanTargetCenter(true);
+                if (!scanFudge) {
+                    targetFound = ScanTarget(false);
                     if (!targetFound) {
-                        if (targetInfo.HitPosition.HasValue) {
-                            targetPosition = targetInfo.HitPosition.Value;
-                        }
+                        scanFudge = true;
+                    }
+                } else {
+                    targetFound = ScanFudgeTarget((double)globalTimestep);
+                    if (!targetFound) {
+                        fudgeCount++;
+                    } else {
+                        scanFudge = true;
+                        fudgeCount = 0;
                     }
                 }
             } else {
-                if (currentTick == ticksScanDelay) {//if target is not lost scan every some ticks
-                    targetFound = ScanDelayedTarget(targetInfo.Position);
+                if (scanCenter && hasCenter) {
+                    targetFound = ScanDelayedTarget(targetInfo.Position, timeSinceLastRun);
                     if (!targetFound) {
-                        targetFound = ScanDelayedTarget(targetPosition);
+                        hasCenter = false;
                     }
-                    if (!targetFound) {
-                        fudgeFactor = 5;
-                        for (int i = 0; i < fudgeAttempts; i++) {
-                            targetFound = ScanFudgeTarget();
-                            if (targetFound) {
-                                break;
-                            }
+                } else {
+                    if (!scanFudge) {
+                        targetFound = ScanDelayedTarget(targetPosition, timeSinceLastRun);
+                        scanCenter = true;
+                        if (!targetFound) {
+                            scanFudge = true;
                         }
+                    }
+                }
+                if (!hasCenter && !targetFound && scanFudge) {
+                    targetFound = ScanFudgeDelayedTarget(timeSinceLastRun);
+                    if (!targetFound) {
+                        fudgeCount++;
+                    } else {
+                        scanFudge = false;
+                        fudgeCount = 0;
                     }
                 }
             }
@@ -538,42 +561,11 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool ScanTargetCenter(bool sameId) {
-            bool targetFound = false;
-            Vector3D targetPos = targetInfo.Position;
-            IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            double overshootDistance = targetDiameter / 2;
-            Vector3D testTargetPosition = targetPos + (Vector3D.Normalize(targetPos - lidar.GetPosition()) * overshootDistance);
-            double dist = Vector3D.Distance(testTargetPosition, lidar.GetPosition());
-            if (lidar.CanScan(dist)) {
-                MyDetectedEntityInfo entityInfo = lidar.Raycast(testTargetPosition);
-                if (!entityInfo.IsEmpty()) {
-                    if (sameId) {
-                        if (entityInfo.EntityId == targetInfo.EntityId) {
-                            targetName = entityInfo.Name;
-                            targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
-                            targetInfo = entityInfo;
-                            targetPosition = targetInfo.Position;
-                            targetFound = true;
-                        }
-                    } else {
-                        targetName = entityInfo.Name;
-                        targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
-                        targetInfo = entityInfo;
-                        targetPosition = targetInfo.Position;
-                        targetFound = true;
-                    }
-                }
-            }
-            return targetFound;
-        }
-
-        bool ScanDelayedTarget(Vector3D enemyPos) {
+        bool ScanDelayedTarget(Vector3D enemyPos, double timeSinceLastRun) {
             bool targetFound = false;
             Vector3D trgtPos = enemyPos;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            float elapsedTime = (currentTick + lostTicks) * globalTimestep;
-            Vector3D targetPos = trgtPos + (targetInfo.Velocity * elapsedTime);
+            Vector3D targetPos = trgtPos + (targetInfo.Velocity * (float)timeSinceLastRun);
             double overshootDistance = targetDiameter / 2;
             Vector3D testTargetPosition = targetPos + (Vector3D.Normalize(targetPos - lidar.GetPosition()) * overshootDistance);
             double dist = Vector3D.Distance(testTargetPosition, lidar.GetPosition());
@@ -592,13 +584,12 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool ScanFudgeTarget() {
+        bool ScanFudgeDelayedTarget(double timeSinceLastRun) {
             bool targetFound = false;
             Vector3D trgtPos = targetPosition;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            float elapsedTime = (currentTick + lostTicks) * globalTimestep;
-            Vector3D scanPosition = trgtPos + targetInfo.Velocity * elapsedTime;
-            scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition());
+            Vector3D scanPosition = trgtPos + targetInfo.Velocity * (float)timeSinceLastRun;
+            scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition(), timeSinceLastRun);
             double overshootDistance = targetDiameter / 2;
             scanPosition += Vector3D.Normalize(scanPosition - lidar.GetPosition()) * overshootDistance;
             double dist = Vector3D.Distance(scanPosition, lidar.GetPosition());
@@ -622,11 +613,11 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool ScanFudgeEmptyTarget() {
+        bool ScanFudgeTarget(double timeSinceLastRun) {
             bool targetFound = false;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             Vector3D scanPosition = Vector3D.Normalize(lidar.WorldMatrix.Forward) * 5000d;
-            scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition());
+            scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition(), timeSinceLastRun);
             double dist = Vector3D.Distance(scanPosition, lidar.GetPosition());
             if (lidar.CanScan(dist)) {
                 MyDetectedEntityInfo entityInfo = lidar.Raycast(scanPosition);
@@ -648,7 +639,7 @@ namespace IngameScript {
             return targetFound;
         }
 
-        Vector3D CalculateFudgeVector(Vector3D targetDirection) {
+        Vector3D CalculateFudgeVector(Vector3D targetDirection, double timeSinceLastRun) {
             fudgeVectorSwitch = !fudgeVectorSwitch;
             if (!fudgeVectorSwitch) {
                 return Vector3D.Zero;
@@ -658,35 +649,19 @@ namespace IngameScript {
             if (!Vector3D.IsUnit(ref perpVector2)) {
                 perpVector2.Normalize();
             }
-            float elapsedTime = (currentTick + lostTicks) * globalTimestep;
             var randomVector = (2.0 * random.NextDouble() - 1.0) * perpVector1 + (2.0 * random.NextDouble() - 1.0) * perpVector2;
-            return randomVector * fudgeFactor * elapsedTime;
+            return randomVector * fudgeFactor * (float)timeSinceLastRun;
         }
 
         void DetermineTargetPostion() {
             if (targetInfo.HitPosition.HasValue) {
                 targetPosition = targetInfo.HitPosition.Value;
-            } else {
-                targetPosition = targetInfo.Position;
-            }
-        }
-
-        void CalculateTicks(bool targetAquired) {
-            if (currentTick == ticksScanDelay) {
-                if (!targetAquired) {
-                    currentTick--;
-                    lostTicks++;
-                } else {
-                    lostTicks = 0;
-                    currentTick = 0;
-                }
-            }
-            currentTick++;
+            } else { targetPosition = targetInfo.Position; }
         }
 
         IMyCameraBlock GetCameraWithMaxRange(List<IMyCameraBlock> cameraList) {
             double maxRange = 0d;
-            IMyCameraBlock maxRangeCamera = cameraList[0];
+            IMyCameraBlock maxRangeCamera = null;
             foreach (IMyCameraBlock thisCamera in cameraList) {
                 if (thisCamera.AvailableScanRange > maxRange) {
                     maxRangeCamera = thisCamera;
@@ -706,9 +681,8 @@ namespace IngameScript {
             return false;
         }
 
-        void LockOnTarget(IMyTerminalBlock REF) {
-            float elapsedTime = (currentTick + lostTicks) * globalTimestep;
-            Vector3D targetPos = targetPosition + (targetInfo.Velocity * elapsedTime);
+        void LockOnTarget(IMyTerminalBlock REF, double timeSinceLastRun) {
+            Vector3D targetPos = targetPosition + (targetInfo.Velocity * (float)timeSinceLastRun);
             Vector3D aimDirection;
             double distanceFromTarget = Vector3D.Distance(targetPos, REF.GetPosition());
             if (distanceFromTarget > gunsRange) {
@@ -853,8 +827,7 @@ namespace IngameScript {
             } else {
                 leftVector = VectorMath.SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
-                //Create matrix
-                MatrixD targetMatrix = MatrixD.Zero;
+                MatrixD targetMatrix = MatrixD.Zero;//Create matrix
                 targetMatrix.Forward = desiredForwardVector;
                 targetMatrix.Left = leftVector;
                 targetMatrix.Up = upVector;
@@ -872,8 +845,7 @@ namespace IngameScript {
                 return;
             }
             axis = VectorMath.SafeNormalize(axis);
-            //Because gyros rotate about -X -Y -Z, we need to negate our angles
-            yaw = -axis.Y * angle;
+            yaw = -axis.Y * angle;//Because gyros rotate about -X -Y -Z, we need to negate our angles
             pitch = -axis.X * angle;
             roll = -axis.Z * angle;
         }
@@ -882,8 +854,7 @@ namespace IngameScript {
             var rotationVec = new Vector3D(pitchSpeed, yawSpeed, rollSpeed);
             var relativeRotationVec = Vector3D.TransformNormal(rotationVec, worldMatrix);
             foreach (var thisGyro in gyroList) {
-                if (thisGyro.Closed)
-                    continue;
+                if (thisGyro.Closed) { continue; }
                 var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(thisGyro.WorldMatrix));
                 thisGyro.Pitch = (float)transformedRotationVec.X;
                 thisGyro.Yaw = (float)transformedRotationVec.Y;
@@ -1029,13 +1000,16 @@ namespace IngameScript {
             targetDiameter = 0;
             targetInfo = default(MyDetectedEntityInfo);
             targetPosition = default(Vector3D);
-            currentTick = 1;
-            lostTicks = 0;
             selectedMissile = 1;
             doOnce = false;
             autoMissilesCounter = autoMissilesDelay + 1;
             missilesLoaded = false;
             fudgeFactor = 5;
+            scanFudge = false;
+            fudgeCount = 0;
+            timeSinceLastLock = 0d;
+            hasCenter = true;
+            scanCenter = false;
             foreach (var id in MissileIDs) {
                 if (!id.Value.Contains(commandLost)) {
                     SendMissileUnicastMessage(commandLost, id.Key);
@@ -1045,9 +1019,13 @@ namespace IngameScript {
         }
 
         void ActivateTargeter() {
-            if (!doOnce) {//things to run once when a enemy is detected
+            if (!doOnce) {
                 TurnAlarmOn();
                 doOnce = true;
+                scanFudge = false;
+                fudgeCount = 0;
+                fudgeFactor = 5d;
+                timeSinceLastLock = 0d;
             }
         }
 
@@ -1145,7 +1123,7 @@ namespace IngameScript {
             return itemFound;
         }
 
-        void ManageGuns() {
+        void ManageGuns(double timeSinceLastRun) {
             if (autoFire) {
                 double distanceFromTarget = Vector3D.Distance(targetPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
                 if (autoSwitchGuns) {
@@ -1171,8 +1149,8 @@ namespace IngameScript {
                                 }
                                 if (!railgunsOnce) { SwitchGun(true, true, true, false, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
-                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(timeSinceLastRun); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1189,8 +1167,8 @@ namespace IngameScript {
                                 }
                                 if (!artilleryOnce) { SwitchGun(true, true, false, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
-                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
+                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(timeSinceLastRun); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1207,8 +1185,8 @@ namespace IngameScript {
                                 }
                                 if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, false); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
-                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
+                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(timeSinceLastRun); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1225,8 +1203,8 @@ namespace IngameScript {
                                 }
                                 if (!assaultOnce) { SwitchGun(true, false, true, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
-                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
+                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(timeSinceLastRun); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1265,8 +1243,8 @@ namespace IngameScript {
                                 }
                                 if (!rocketsOnce) { SwitchGun(false, true, true, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
-                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
+                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(timeSinceLastRun); } }
                             } else {
                                 if (readyToFireOnce) {
                                     readyToFireOnce = false;
@@ -1295,7 +1273,7 @@ namespace IngameScript {
                 } else {
                     if (distanceFromTarget < gunsRange) {
                         maxRangeOnce = true;
-                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                        if (!decoyRanOnce && distanceFromTarget < autocannonRange) {
                             decoyRanOnce = SHOOTERPB.TryRun(argFireDecoy);
                         }
                         if (readyToFire) {
@@ -1311,8 +1289,8 @@ namespace IngameScript {
                                 cannotFireOnce = true;
                                 if (!rocketsOnce) { SwitchGun(false, true, true, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex);
-                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(); } }
+                                    SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in ROCKETS) { gun.Shoot(timeSinceLastRun); } }
                             } else if ((weaponType == 2 || weaponType == 3) && distanceFromTarget < autocannonRange && (autocannonAmmoFound || gatlingAmmoFound)) {
                                 cannotFireOnce = true;
                                 if (!gatlingsOnce && gatlingAmmoFound) {
@@ -1327,26 +1305,26 @@ namespace IngameScript {
                                 cannotFireOnce = true;
                                 if (!assaultOnce) { SwitchGun(true, false, true, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex);
-                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(); } }
+                                    SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in ASSAULT) { gun.Shoot(timeSinceLastRun); } }
                             } else if (weaponType == 7 && distanceFromTarget < smallRailgunRange && smallRailgunAmmoFound && smallRailgunsCanShoot) {
                                 cannotFireOnce = true;
                                 if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, false); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex);
-                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(); } }
+                                    SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(timeSinceLastRun); } }
                             } else if (weaponType == 5 && distanceFromTarget < artilleryRange && artilleryAmmoFound && artilleryCanShoot) {
                                 cannotFireOnce = true;
                                 if (!artilleryOnce) { SwitchGun(true, true, false, true, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex);
-                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(); } }
+                                    SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(timeSinceLastRun); } }
                             } else if (weaponType == 6 && distanceFromTarget < railgunRange && railgunAmmoFound && railgunsCanShoot) {
                                 cannotFireOnce = true;
                                 if (!railgunsOnce) { SwitchGun(true, true, true, false, true); }
                                 if (sequenceWeapons) {
-                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex);
-                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(); } }
+                                    SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex, timeSinceLastRun);
+                                } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(timeSinceLastRun); } }
                             } else if (weaponType == 0 && joltReady) {
                                 SHOOTERPB.TryRun(argFireJolt);
                             } else {
@@ -1400,16 +1378,15 @@ namespace IngameScript {
             count = 0;
             foreach (Gun gun in SMALLRAILGUNS) { if (!gun.CanShoot()) { count++; } }
             if (count == SMALLRAILGUNS.Count) { smallRailgunsCanShoot = false; } else { smallRailgunsCanShoot = true; }
-
             SendBroadcastGunsMessage(weaponType, assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
         }
 
-        void SyncGuns() {
-            foreach (Gun gun in ROCKETS) { gun.Update(); }
-            foreach (Gun gun in ASSAULT) { gun.Update(); }
-            foreach (Gun gun in ARTILLERY) { gun.Update(); }
-            foreach (Gun gun in RAILGUNS) { gun.Update(); }
-            foreach (Gun gun in SMALLRAILGUNS) { gun.Update(); }
+        void SyncGuns(double timeSinceLastRun) {
+            foreach (Gun gun in ROCKETS) { gun.Update(timeSinceLastRun); }
+            foreach (Gun gun in ASSAULT) { gun.Update(timeSinceLastRun); }
+            foreach (Gun gun in ARTILLERY) { gun.Update(timeSinceLastRun); }
+            foreach (Gun gun in RAILGUNS) { gun.Update(timeSinceLastRun); }
+            foreach (Gun gun in SMALLRAILGUNS) { gun.Update(timeSinceLastRun); }
         }
 
         void ResetGuns() {
@@ -1430,15 +1407,15 @@ namespace IngameScript {
             smallRailgunsOnce = false;
         }
 
-        void SequenceWeapons(List<Gun> guns, int delay, ref int count, ref int index) {
+        void SequenceWeapons(List<Gun> guns, int delay, ref int count, ref int index, double timeSinceLastRun) {
             if (count == delay) {
                 for (int i = 0; i < guns.Count; i++) {
                     if (i == index) {
-                        guns[i].Shoot();
-                    } else { guns[i].Update(); }
+                        guns[i].Shoot(timeSinceLastRun);
+                    } else { guns[i].Update(timeSinceLastRun); }
                 }
                 count = 0;
-            } else { foreach (Gun gun in guns) { gun.Update(); } }
+            } else { foreach (Gun gun in guns) { gun.Update(timeSinceLastRun); } }
             index++;
             if (index >= guns.Count) { index = 0; }
             count++;
@@ -1447,33 +1424,23 @@ namespace IngameScript {
         void SetGunsDelay() {
             if (ROCKETS.Count > 0) {
                 rocketDelay = (int)Math.Ceiling(rocketROF / (double)ROCKETS.Count);
-                if (rocketDelay == 0) {
-                    rocketDelay = 1;
-                }
+                if (rocketDelay == 0) { rocketDelay = 1; }
             }
             if (ASSAULT.Count > 0) {
                 assaultDelay = (int)Math.Ceiling(assaultROF / (double)ASSAULT.Count);
-                if (assaultDelay == 0) {
-                    assaultDelay = 1;
-                }
+                if (assaultDelay == 0) { assaultDelay = 1; }
             }
             if (ARTILLERY.Count > 0) {
                 artilleryDelay = (int)Math.Ceiling(artilleryROF / (double)ARTILLERY.Count);
-                if (artilleryDelay == 0) {
-                    artilleryDelay = 1;
-                }
+                if (artilleryDelay == 0) { artilleryDelay = 1; }
             }
             if (RAILGUNS.Count > 0) {
                 railgunsDelay = (int)Math.Ceiling(railgunsROF / (double)RAILGUNS.Count);
-                if (railgunsDelay == 0) {
-                    railgunsDelay = 1;
-                }
+                if (railgunsDelay == 0) { railgunsDelay = 1; }
             }
             if (SMALLRAILGUNS.Count > 0) {
                 smallRailgunsDelay = (int)Math.Ceiling(smallRailgunsROF / (double)SMALLRAILGUNS.Count);
-                if (smallRailgunsDelay == 0) {
-                    smallRailgunsDelay = 1;
-                }
+                if (smallRailgunsDelay == 0) { smallRailgunsDelay = 1; }
             }
         }
 
@@ -1610,23 +1577,19 @@ namespace IngameScript {
         }
 
         void ReadTargetInfo() {
-            if (currentTick == ticksScanDelay) {
-                targetLog.Clear();
-                targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString());
-                if (!missilesLoaded) {
-                    targetLog.Append(" Not Loaded\n");
-                } else {
-                    targetLog.Append(" Loaded\n");
-                }
-                targetLog.Append("Target Name: ").Append(targetInfo.Name).Append(", ");
-                string targX = targetInfo.Position.X.ToString("0.00");
-                string targY = targetInfo.Position.Y.ToString("0.00");
-                string targZ = targetInfo.Position.Z.ToString("0.00");
-                targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
-                targetLog.Append("Target Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append(", ");
-                double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
-                targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
-            }
+            targetLog.Clear();
+            targetLog.Append("Launching: ").Append(missileAntennasName).Append(selectedMissile.ToString());
+            if (!missilesLoaded) {
+                targetLog.Append(" Not Loaded\n");
+            } else { targetLog.Append(" Loaded\n"); }
+            targetLog.Append("Target Name: ").Append(targetInfo.Name).Append(", ");
+            string targX = targetInfo.Position.X.ToString("0.00");
+            string targY = targetInfo.Position.Y.ToString("0.00");
+            string targZ = targetInfo.Position.Z.ToString("0.00");
+            targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
+            targetLog.Append("Target Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append(", ");
+            double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
+            targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
         }
 
         void ClearLogs() {
@@ -1725,10 +1688,8 @@ namespace IngameScript {
 
         public static class VectorMath {
             public static Vector3D SafeNormalize(Vector3D a) {
-                if (Vector3D.IsZero(a))
-                    return Vector3D.Zero;
-                if (Vector3D.IsUnit(ref a))
-                    return a;
+                if (Vector3D.IsZero(a)) { return Vector3D.Zero; }
+                if (Vector3D.IsUnit(ref a)) { return a; }
                 return Vector3D.Normalize(a);
             }
 
@@ -1739,37 +1700,31 @@ namespace IngameScript {
             }
 
             public static Vector3D Rejection(Vector3D a, Vector3D b) {//reject a on b
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return Vector3D.Zero;
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return Vector3D.Zero; }
                 return a - a.Dot(b) / b.LengthSquared() * b;
             }
 
             public static Vector3D Projection(Vector3D a, Vector3D b) {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return Vector3D.Zero;
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return Vector3D.Zero; }
                 return a.Dot(b) / b.LengthSquared() * b;
             }
 
             public static double ScalarProjection(Vector3D a, Vector3D b) {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
-                    return 0;
-                if (Vector3D.IsUnit(ref b))
-                    return a.Dot(b);
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return 0; }
+                if (Vector3D.IsUnit(ref b)) { return a.Dot(b); }
                 return a.Dot(b) / b.Length();
             }
 
             public static double AngleBetween(Vector3D a, Vector3D b) {//returns radians
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
                     return 0;
-                else
-                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
+                } else { return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1)); }
             }
 
             public static double CosBetween(Vector3D a, Vector3D b) {//returns radians
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b))
+                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
                     return 0;
-                else
-                    return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1);
+                } else { return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1); }
             }
         }
 
@@ -1816,27 +1771,23 @@ namespace IngameScript {
             }
 
             public double Control(double error) {
-                //Compute derivative term
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;
+                var errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
                 if (_firstRun) {
                     errorDerivative = 0;
                     _firstRun = false;
                 }
-                //Compute integral term
-                if (!_integralDecay) {
+                if (!_integralDecay) {//Compute integral term
                     _errorSum += error * _timeStep;
-                    //Clamp integral term
-                    if (_errorSum > _upperBound)
+                    if (_errorSum > _upperBound) {//Clamp integral term
                         _errorSum = _upperBound;
-                    else if (_errorSum < _lowerBound)
+                    } else if (_errorSum < _lowerBound) {
                         _errorSum = _lowerBound;
+                    }
                 } else {
                     _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
                 }
-                //Store this error as last error
-                _lastError = error;
-                //Construct output
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
+                _lastError = error;//Store this error as last error
+                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;//Construct output
                 return this.Value;
             }
 
@@ -1864,12 +1815,12 @@ namespace IngameScript {
             const float epsilon = 1e-6f;
             readonly int rounds;
             int roundsCount = 0;
-            readonly int reloadTime;
-            int reloadTimeCount = 0;
-            readonly int fireRate;
-            int fireRateCount = 0;
+            readonly double reloadTime;
+            double reloadTimeCount = 0d;
+            readonly double fireRate;
+            double fireRateCount = 0d;
 
-            public Gun(IMyUserControllableGun weapon, int _rounds, int _reloadTime, int rof) {
+            public Gun(IMyUserControllableGun weapon, int _rounds, double _reloadTime, double rof) {
                 gun = weapon;
                 sink = gun.Components.Get<MyResourceSinkComponent>();
                 rounds = _rounds;
@@ -1879,11 +1830,11 @@ namespace IngameScript {
                 hasShot = false;
             }
 
-            public void Shoot() {
+            public void Shoot(double timeSinceLastRun) {
                 if (hasShot) {
-                    fireRateCount++;
-                    if (fireRateCount == fireRate) {
-                        fireRateCount = 0;
+                    fireRateCount += timeSinceLastRun;
+                    if (fireRateCount >= fireRate) {
+                        fireRateCount = 0d;
                         hasShot = false;
                     }
                 }
@@ -1895,31 +1846,31 @@ namespace IngameScript {
                 }
                 if (roundsCount == rounds) {
                     isReloading = true;
-                    reloadTimeCount++;
+                    reloadTimeCount += timeSinceLastRun;
                 }
-                if (reloadTimeCount == reloadTime) {
+                if (reloadTimeCount >= reloadTime) {
                     isReloading = false;
-                    reloadTimeCount = 0;
+                    reloadTimeCount = 0d;
                     roundsCount = 0;
                 }
             }
 
-            public void Update() {
+            public void Update(double timeSinceLastRun) {
                 if (paused) {
                     if (hasShot) {
-                        fireRateCount++;
-                        if (fireRateCount == fireRate) {
-                            fireRateCount = 0;
+                        fireRateCount += timeSinceLastRun;
+                        if (fireRateCount >= fireRate) {
+                            fireRateCount = 0d;
                             hasShot = false;
                         }
                     }
                     if (roundsCount == rounds) {
                         isReloading = true;
-                        reloadTimeCount++;
+                        reloadTimeCount += timeSinceLastRun;
                     }
-                    if (reloadTimeCount == reloadTime) {
+                    if (reloadTimeCount >= reloadTime) {
                         isReloading = false;
-                        reloadTimeCount = 0;
+                        reloadTimeCount = 0d;
                         roundsCount = 0;
                     }
                 }

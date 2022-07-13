@@ -87,6 +87,10 @@ namespace IngameScript {
         public List<IMyShipMergeBlock> MERGES3 = new List<IMyShipMergeBlock>();
 
         Program() {
+            Setup();
+        }
+
+        void Setup() {
             GetBlocks();
             if (selectedDrop == 0) {
                 TEMPPROJECTORS = PROJECTORSDECOY;
@@ -137,6 +141,7 @@ namespace IngameScript {
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
+                Setup();
             }
         }
 

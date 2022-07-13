@@ -23,6 +23,7 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO add generate orbital gps function
         //generate orbital gps above target 
+        //when hovering on planets and going too far from the stat position set waypoint and go back to start
         //land function
         //NAVIGATOR
 
