@@ -396,11 +396,11 @@ namespace IngameScript {
         void PrepareForLaunch() {
             foreach (IMyPowerProducer block in GENERATORS) {
                 block.Enabled = true;
-                if (block is IMyBatteryBlock) { (block as IMyBatteryBlock).ChargeMode = ChargeMode.Discharge; }
+                if (block is IMyBatteryBlock) { (block as IMyBatteryBlock).ChargeMode = ChargeMode.Auto; }
             }
-            foreach (IMyShipMergeBlock item in MERGES) { item.Enabled = false; }
-            foreach (IMyShipConnector item in CONNECTORS) { item.Disconnect(); item.Enabled = false; }
-            foreach (IMyThrust item in ALLTHRUSTERS) { item.Enabled = true; }
+            foreach (IMyShipMergeBlock block in MERGES) { block.Enabled = false; }
+            foreach (IMyShipConnector block in CONNECTORS) { block.Disconnect(); }//block.Enabled = false; 
+            foreach (IMyThrust block in ALLTHRUSTERS) { block.Enabled = true; }
         }
 
         void ManageMissileType(IMyShipController controller, double timeSinceLastRun, Vector3D gravity, Vector3D position) {

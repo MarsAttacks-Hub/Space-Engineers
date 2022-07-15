@@ -295,7 +295,7 @@ namespace IngameScript {
                     }
 
                     if (targetFound) {//send message to missiles
-                        SendBroadcastTargetMessage(true, targetPosition, targetInfo.Velocity);
+                        SendBroadcastTargetMessage(true, targetPosition, targetInfo.Velocity, targetInfo.Orientation);
 
                         foreach (var id in MissileIDs) {
                             SendMissileUnicastMessage(commandUpdate, id.Key);
@@ -952,8 +952,8 @@ namespace IngameScript {
             return uniMessageSent;
         }
 
-        void SendBroadcastTargetMessage(bool targFound, Vector3D targPos, Vector3D targVel) {
-            var tuple = MyTuple.Create(targFound, targPos, targVel);
+        void SendBroadcastTargetMessage(bool targFound, Vector3D targPos, Vector3D targVel, MatrixD targOrientation) {
+            var tuple = MyTuple.Create(targFound, targPos, targVel, targOrientation);
             IGC.SendBroadcastMessage(navigatorTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
@@ -1015,7 +1015,7 @@ namespace IngameScript {
                     SendMissileUnicastMessage(commandLost, id.Key);
                 }
             }
-            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
+            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero, default(MatrixD));
         }
 
         void ActivateTargeter() {
