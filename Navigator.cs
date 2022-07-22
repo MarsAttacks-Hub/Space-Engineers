@@ -60,10 +60,10 @@ namespace IngameScript {
         readonly string lcdsRangeFinderName = "[CRX] LCD RangeFinder";
         readonly string sunChaserPanelName = "[CRX] LCD SunChaser Toggle";
         readonly string debugPanelName = "[CRX] Debug";
-        readonly string painterName = "[CRX] PB Painter";
 
         readonly string navigatorTag = "[NAVIGATOR]";
         readonly string managerTag = "[MANAGER]";
+        readonly string painterTag = "[PAINTER]";
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
 
@@ -85,7 +85,6 @@ namespace IngameScript {
 
         readonly bool keepAltitude = true;
         readonly bool useRoll = false;
-        //readonly bool stopOnPlayerDetection = false;
         readonly double aimP = 1d;
         readonly double aimI = 0d;
         readonly double aimD = 1d;
@@ -141,6 +140,7 @@ namespace IngameScript {
         bool sunChaseOnce = true;
         bool unlockSunChaseOnce = true;
         bool keepAltitudeOnce = true;
+        bool sensorDetectionOnce = true;
         string selectedPlanet = "";
         double maxScanRange = 0d;
         double altitudeToKeep = 0d;
@@ -154,7 +154,7 @@ namespace IngameScript {
         int impactDetectionCount = 5;
         int tickCount = 0;
         int randomCount = 50;
-        int sensorsCount = 10;
+        int sensorsCount = 50;
         int collisionCheckCount = 0;
         int keepAltitudeCount = 0;
 
@@ -205,7 +205,6 @@ namespace IngameScript {
         IMyThrust RIGHTTHRUST;
         IMyThrust FORWARDTHRUST;
         IMyThrust BACKWARDTHRUST;
-        IMyProgrammableBlock PAINTERPB;
         IMyTextPanel LCDDEADMAN;
         IMyTextPanel LCDIDLETHRUSTERS;
         IMyTextPanel LCDSUNCHASER;
@@ -229,6 +228,7 @@ namespace IngameScript {
         Vector3D targPos = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
         Vector3 randomDir = Vector3.Zero;
+        Vector3 sensorDir = Vector3.Zero;
         Vector3D lastVelocity = Vector3D.Zero;
         Vector3D maxAccel;
         Vector3D minAccel;
@@ -431,6 +431,16 @@ namespace IngameScript {
             IGC.SendBroadcastMessage(managerTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
+        void SendBroadcastLockTargetMessage(bool lockTarget) {
+            if (lockTarget) {
+                var tuple = MyTuple.Create("Lock", argLockTarget);
+                IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
+            } else {
+                var tuple = MyTuple.Create("Clear", argUnlockFromTarget);
+                IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
+            }
+        }
+
         bool GetController() {
             if (CONTROLLER != null && (!CONTROLLER.IsUnderControl || !CONTROLLER.CanControlShip)) {
                 CONTROLLER = null;
@@ -611,8 +621,14 @@ namespace IngameScript {
                     initMagneticDriveOnce = false;
                 }
                 SyncRotors();
+                double altitude = minAltitude;
+                if (!Vector3D.IsZero(gravity)) {
+                    controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
+                }
                 if (isAutoPiloted) {
-                    if (Vector3.IsZero(dir)) { dir = AutoMagneticDrive(dir); }//TODO
+                    if (Vector3.IsZero(dir)) {
+                        dir = AutoMagneticDrive(dir);
+                    }
                 } else {
                     if (!initAutoMagneticDriveOnce) {
                         foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
@@ -620,41 +636,39 @@ namespace IngameScript {
                     }
                     if (!isUnderControl && targetFound) {
                         if (initRandomMagneticDriveOnce) {
-                            SetSensorsExtend();//TODO
                             controller.DampenersOverride = false;
                             initRandomMagneticDriveOnce = false;
                         }
-                        if (Vector3.IsZero(dir)) {//TODO
+                        if (Vector3.IsZero(dir)) {
                             RandomMagneticDrive();
                             dir = randomDir;
+
                             dir = KeepRightDistance(dir, targPos, controller);
-                            randomDir = dir;
                         }
                     } else {
                         if (!initRandomMagneticDriveOnce) {
                             randomDir = Vector3.Zero;
-                            foreach (IMySensorBlock sensor in SENSORS) {//TODO
-                                sensor.BackExtend = 0.1f;
-                                sensor.BottomExtend = 0.1f;
-                                sensor.FrontExtend = 0.1f;
-                                sensor.LeftExtend = 0.1f;
-                                sensor.RightExtend = 0.1f;
-                                sensor.TopExtend = 0.1f;
-                            }
                             controller.DampenersOverride = true;
                             initRandomMagneticDriveOnce = true;
                         }
-                        if (Vector3.IsZero(dir)) {//TODO
+                        if (Vector3.IsZero(dir)) {
                             dir = MagneticDrive(dir, controller, gravity, myVelocity);
-                            dir = KeepAltitude(isUnderControl, dir, controller, idleThrusters, keepAltitude, gravity);
+                            dir = KeepAltitude(isUnderControl, dir, controller, idleThrusters, keepAltitude, gravity, altitude);
                         }
                     }
                 }
 
                 dir = EvadeEnemy(dir, controller, targOrientation, targVelVec, targPos, controller.CubeGrid.WorldVolume.Center, myVelocity, gravity);
 
-                if (mySpeed > securitySpeed && !isAutoPiloted) {
-                    dir = SensorDetection(dir);//TODO delay
+                if (mySpeed > securitySpeed && !isAutoPiloted && (Vector3D.IsZero(gravity) || (!Vector3D.IsZero(gravity) && altitude > minAltitude))) {
+                    if (sensorDetectionOnce) {
+                        SetSensorsExtend();
+                        sensorDetectionOnce = false;
+                    }
+                    SensorDetection();
+                    dir.X = sensorDir.X != 0d ? sensorDir.X : dir.X;
+                    dir.Y = sensorDir.Y != 0d ? sensorDir.Y : dir.Y;
+                    dir.Z = sensorDir.Z != 0d ? sensorDir.Z : dir.Z;
 
                     UpdateAcceleration(controller, Runtime.TimeSinceLastRun.TotalSeconds, myVelocity);
                     if (collisionCheckCount >= collisionCheckDelay) {
@@ -663,6 +677,18 @@ namespace IngameScript {
                         collisionCheckCount = 0;
                     }
                     collisionCheckCount++;
+                } else {
+                    if (!sensorDetectionOnce) {
+                        foreach (IMySensorBlock sensor in SENSORS) {
+                            sensor.BackExtend = 0.1f;
+                            sensor.BottomExtend = 0.1f;
+                            sensor.FrontExtend = 0.1f;
+                            sensor.LeftExtend = 0.1f;
+                            sensor.RightExtend = 0.1f;
+                            sensor.TopExtend = 0.1f;
+                        }
+                        sensorDetectionOnce = true;
+                    }
                 }
 
                 SetPower(dir);
@@ -685,12 +711,8 @@ namespace IngameScript {
 
         void IdleMagneticDrive(bool idleThrusters) {
             SetPower(Vector3D.Zero);
-            foreach (IMyMotorStator block in ROTORS) {
-                block.TargetVelocityRPM = 0f;
-            }
-            foreach (IMyMotorStator block in ROTORSINV) {
-                block.TargetVelocityRPM = 0f;
-            }
+            foreach (IMyMotorStator block in ROTORS) { block.TargetVelocityRPM = 0f; }
+            foreach (IMyMotorStator block in ROTORSINV) { block.TargetVelocityRPM = 0f; }
             if (idleThrusters) {
                 foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = false; }
             }
@@ -723,21 +745,6 @@ namespace IngameScript {
             if (UPTHRUST.CurrentThrust > 0f) { dir.Y = 1f; } else if (DOWNTHRUST.CurrentThrust > 0f) { dir.Y = -1f; }
             if (LEFTTHRUST.CurrentThrust > 0f) { dir.X = -1f; } else if (RIGHTTHRUST.CurrentThrust > 0f) { dir.X = 1f; }
             return dir;
-        }
-
-        void RandomMagneticDrive() {
-            if (randomCount >= randomDelay) {
-                randomDir = new Vector3();
-                float randomFloat;
-                randomFloat = (float)random.Next(-1, 1);
-                randomDir.X = randomFloat;
-                randomFloat = (float)random.Next(-1, 1);
-                randomDir.Y = randomFloat;
-                randomFloat = (float)random.Next(-1, 1);
-                randomDir.Z = randomFloat;
-                randomCount = 0;
-            }
-            randomCount++;
         }
 
         Vector3 MagneticDrive(Vector3 dir, IMyShipController controller, Vector3D gravity, Vector3D myVelocity) {
@@ -830,6 +837,62 @@ namespace IngameScript {
             }
         }
 
+        void RandomMagneticDrive() {
+            if (randomCount >= randomDelay) {
+                randomDir = new Vector3();
+                float randomFloat;
+                randomFloat = (float)random.Next(-1, 1);
+                randomDir.X = randomFloat;
+                randomFloat = (float)random.Next(-1, 1);
+                randomDir.Y = randomFloat;
+                randomFloat = (float)random.Next(-1, 1);
+                randomDir.Z = randomFloat;
+                randomCount = 0;
+            }
+            randomCount++;
+        }
+
+        void SensorDetection() {
+            if (sensorsCount >= sensorsDelay) {
+                sensorDir = new Vector3();
+                List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
+                List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
+                LEFTSENSOR.DetectedEntities(entitiesA);
+                RIGHTSENSOR.DetectedEntities(entitiesB);
+                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                    sensorDir.X = 0f;
+                } else if (entitiesA.Count > 0) {
+                    sensorDir.X = 1f;
+                } else if (entitiesB.Count > 0) {
+                    sensorDir.X = -1f;
+                }
+                entitiesA.Clear();
+                entitiesB.Clear();
+                UPSENSOR.DetectedEntities(entitiesA);
+                DOWNSENSOR.DetectedEntities(entitiesB);
+                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                    sensorDir.Y = 0f;
+                } else if (entitiesA.Count > 0) {
+                    sensorDir.Y = -1f;
+                } else if (entitiesB.Count > 0) {
+                    sensorDir.Y = 1f;
+                }
+                entitiesA.Clear();
+                entitiesB.Clear();
+                FORWARDSENSOR.DetectedEntities(entitiesA);
+                BACKWARDSENSOR.DetectedEntities(entitiesB);
+                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                    sensorDir.Z = 0f;
+                } else if (entitiesA.Count > 0) {
+                    sensorDir.Z = 1f;
+                } else if (entitiesB.Count > 0) {
+                    sensorDir.Z = -1f;
+                }
+                sensorsCount = 0;
+            }
+            sensorsCount++;
+        }
+
         Vector3 KeepRightDistance(Vector3 dir, Vector3D targPos, IMyShipController controller) {
             Vector3 dirCopy = dir;
             double minDistance = gunsMidRange;
@@ -856,47 +919,6 @@ namespace IngameScript {
             dir.X = Math.Round(dirCopy.X) != 0d ? dirCopy.X : dir.X;
             dir.Y = Math.Round(dirCopy.Y) != 0d ? dirCopy.Y : dir.Y;
             dir.Z = Math.Round(dirCopy.Z) != 0d ? dirCopy.Z : dir.Z;
-            return dir;
-        }
-
-        Vector3 SensorDetection(Vector3 dir) {
-            if (sensorsCount >= sensorsDelay) {//TODO delay...
-                List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
-                List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
-                LEFTSENSOR.DetectedEntities(entitiesA);
-                RIGHTSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    dir.X = 0f;
-                } else if (entitiesA.Count > 0) {
-                    dir.X = 1f;
-                } else if (entitiesB.Count > 0) {
-                    dir.X = -1f;
-                }
-                entitiesA.Clear();
-                entitiesB.Clear();
-                UPSENSOR.DetectedEntities(entitiesA);
-                DOWNSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    dir.Y = 0f;
-                } else if (entitiesA.Count > 0) {
-                    dir.Y = -1f;
-                } else if (entitiesB.Count > 0) {
-                    dir.Y = 1f;
-                }
-                entitiesA.Clear();
-                entitiesB.Clear();
-                FORWARDSENSOR.DetectedEntities(entitiesA);
-                BACKWARDSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    dir.Z = 0f;
-                } else if (entitiesA.Count > 0) {
-                    dir.Z = 1f;
-                } else if (entitiesB.Count > 0) {
-                    dir.Z = -1f;
-                }
-                sensorsCount = 0;
-            }
-            sensorsCount++;
             return dir;
         }
 
@@ -1062,14 +1084,12 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3 KeepAltitude(bool isUnderControl, Vector3 dir, IMyShipController controller, bool idleThrusters, bool keepAltitude, Vector3D gravity) {
+        Vector3 KeepAltitude(bool isUnderControl, Vector3 dir, IMyShipController controller, bool idleThrusters, bool keepAltitude, Vector3D gravity, double altitude) {
             if (!isUnderControl && !Vector3D.IsZero(gravity) && idleThrusters && keepAltitude) {
                 if (keepAltitudeOnce) {
                     hoverPosition = controller.CubeGrid.WorldVolume.Center;
                     keepAltitudeOnce = false;
                 }
-                double altitude;
-                controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
                 if (altitude > minAltitude) {
                     if (keepAltitudeCount >= keepAltitudeDelay) {
                         double distance = Vector3D.Distance(hoverPosition, controller.CubeGrid.WorldVolume.Center);
@@ -1186,7 +1206,7 @@ namespace IngameScript {
                     impactDetectionDelay = 1;
                     if (aligned) {
                         if (!targFound) {
-                            PAINTERPB.TryRun(argLockTarget);
+                            SendBroadcastLockTargetMessage(true);
                         }
                         lockTargetOnce = false;
                         impactDetectionDelay = 5;
@@ -1195,7 +1215,7 @@ namespace IngameScript {
                 dir = CheckCollisions(dir, remote, trgP, trgV);
             } else {
                 if (!lockTargetOnce) {
-                    PAINTERPB.TryRun(argUnlockFromTarget);
+                    SendBroadcastLockTargetMessage(false);
                     lockTargetOnce = true;
                 }
                 if (!Vector3D.IsZero(returnPosition)) {
@@ -1759,7 +1779,6 @@ namespace IngameScript {
             LCDDEADMAN = GridTerminalSystem.GetBlockWithName(deadManPanelName) as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName(idleThrusterPanelName) as IMyTextPanel;
             LCDSUNCHASER = GridTerminalSystem.GetBlockWithName(sunChaserPanelName) as IMyTextPanel;
-            PAINTERPB = GridTerminalSystem.GetBlockWithName(painterName) as IMyProgrammableBlock;
             SENSORS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(SENSORS, block => block.CustomName.Contains(sensorsName));
             foreach (IMySensorBlock sensor in SENSORS) {

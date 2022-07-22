@@ -271,12 +271,16 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 RemoveLostMissiles();
-                GetBroadcastMessages();
+                arg = GetBroadcastMessages(arg);
                 GetMessages();
                 ReadMessages();
                 CanShootGuns();
 
                 double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+
+                if (!String.IsNullOrEmpty(arg)) {
+                    ProcessArgs(arg, (double)globalTimestep);
+                }
 
                 if (targetName != null) {
                     if (fudgeCount > fudgeAttempts) {//if lidars or turrets doesn't detect a enemy for some time reset the script
@@ -354,10 +358,6 @@ namespace IngameScript {
                     if (!missilesLoaded) {
                         missilesLoaded = LoadMissiles();
                     }
-                }
-
-                if (!String.IsNullOrEmpty(arg)) {
-                    ProcessArgs(arg, (double)globalTimestep);
                 }
 
                 if (writeCount == writeDelay) {
@@ -900,8 +900,8 @@ namespace IngameScript {
             return received;
         }
 
-        bool GetBroadcastMessages() {
-            bool received = false;
+        string GetBroadcastMessages(string arg) {
+            string message = arg;
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     var igcMessage = BROADCASTLISTENER.AcceptMessage();
@@ -910,12 +910,19 @@ namespace IngameScript {
                         string variable = data.Item1;
                         if (variable == "readyToFire") {
                             joltReady = data.Item2;
-                            received = true;
+                        }
+                    } else if (igcMessage.Data is MyTuple<string, string>) {
+                        var data = (MyTuple<string, string>)igcMessage.Data;
+                        string variable = data.Item1;
+                        if (variable == argLock) {
+                            message = data.Item2;
+                        } else if (variable == argClear) {
+                            message = data.Item2;
                         }
                     }
                 }
             }
-            return received;
+            return message;
         }
 
         void ReadMessages() {
@@ -1004,7 +1011,7 @@ namespace IngameScript {
             doOnce = false;
             autoMissilesCounter = autoMissilesDelay + 1;
             missilesLoaded = false;
-            fudgeFactor = 5;
+            fudgeFactor = 5d;
             scanFudge = false;
             fudgeCount = 0;
             timeSinceLastLock = 0d;
