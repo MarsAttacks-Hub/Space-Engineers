@@ -22,7 +22,10 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
+        //imminent collision evasion doesn't work
+        //collision avoidance doesn't work
         //do logic for thrusters and !magneticDrive
+        //when landing lock landing gear, when taking of unlock landing gear
         //NAVIGATOR
 
         readonly string controllersName = "[CRX] Controller";
@@ -133,6 +136,7 @@ namespace IngameScript {
         bool toggleThrustersOnce = false;
         bool returnOnce = true;
         bool lockTargetOnce = true;
+        bool unlockOnce = true;
         bool isPilotedOnce = true;
         bool initMagneticDriveOnce = true;
         bool initAutoMagneticDriveOnce = true;
@@ -264,6 +268,12 @@ namespace IngameScript {
             GetBlocks();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener(navigatorTag);
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
+            foreach (IMyCameraBlock cam in LIDARS) { cam.EnableRaycast = true; }
+            foreach (IMyCameraBlock cam in LIDARSBACK) { cam.EnableRaycast = true; }
+            foreach (IMyCameraBlock cam in LIDARSUP) { cam.EnableRaycast = true; }
+            foreach (IMyCameraBlock cam in LIDARSDOWN) { cam.EnableRaycast = true; }
+            foreach (IMyCameraBlock cam in LIDARSLEFT) { cam.EnableRaycast = true; }
+            foreach (IMyCameraBlock cam in LIDARSRIGHT) { cam.EnableRaycast = true; }
             if (LIDARS.Count != 0) { maxScanRange = LIDARS[0].RaycastDistanceLimit; }
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
@@ -344,10 +354,10 @@ namespace IngameScript {
                 case argIdleThrusters:
                     idleThrusters = !idleThrusters;
                     if (idleThrusters) {
-                        foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = false; }
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                         LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255);
                     } else {
-                        foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = true; }
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                         LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0);
                     }
                     break;
@@ -616,7 +626,7 @@ namespace IngameScript {
         void ManageMagneticDrive(Vector3 dir, IMyShipController controller, bool isControlled, bool isUnderControl, bool isAutoPiloted, bool targetFound, bool idleThrusters, bool keepAltitude, Vector3D gravity, Vector3D myVelocity, double mySpeed) {
             if (magneticDrive && isControlled) {
                 if (initMagneticDriveOnce) {
-                    foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = true; }
+                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                     sunChasing = false;
                     initMagneticDriveOnce = false;
                 }
@@ -714,7 +724,7 @@ namespace IngameScript {
             foreach (IMyMotorStator block in ROTORS) { block.TargetVelocityRPM = 0f; }
             foreach (IMyMotorStator block in ROTORSINV) { block.TargetVelocityRPM = 0f; }
             if (idleThrusters) {
-                foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = false; }
+                foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
             }
         }
 
@@ -756,12 +766,12 @@ namespace IngameScript {
                 //debugLog.Append("dir X: " + dir.X + "\ndir Y: " + dir.Y + "\ndir Z: " + dir.Z + "\n\n");
                 direction /= direction.Length();
                 if (!toggleThrustersOnce) {
-                    foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = false; }
+                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                     toggleThrustersOnce = true;
                 }
             } else {
                 if (toggleThrustersOnce) {
-                    foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = true; }
+                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                     toggleThrustersOnce = false;
                 }
             }
@@ -1036,8 +1046,8 @@ namespace IngameScript {
 
         Vector3 RaycastStopPosition(IMyShipController controller, double stopDistance, Vector3 dir, Vector3D myVelocity) {
             Vector3D normalizedVelocity = Vector3D.Normalize(myVelocity);
-            Vector3D position = normalizedVelocity * stopDistance;
-            Vector3D stopPosition = position + (Vector3D.Normalize(position - controller.CubeGrid.WorldVolume.Center) * 250d);
+            stopDistance += 100d;//TODO
+            Vector3D stopPosition = controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
             Vector3D relative = Vector3D.TransformNormal(normalizedVelocity, MatrixD.Transpose(controller.WorldMatrix));
             Base6Directions.Direction direction = Base6Directions.GetClosestDirection(relative);
             IMyCameraBlock lidar = null;
@@ -1141,12 +1151,12 @@ namespace IngameScript {
                 }
                 if (cntrllr != null) {
                     if (mySpeed > deadManMinSpeed) {
-                        foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = true; }
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                         cntrllr.DampenersOverride = true;
                     } else {
                         if (!deadManOnce) {
                             if (idleThrusters) {
-                                foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = false; }
+                                foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                             }
                             deadManOnce = true;
                         }
@@ -1154,7 +1164,7 @@ namespace IngameScript {
                 }
             } else {
                 if (deadManOnce) {
-                    foreach (IMyShipController block in CONTROLLERS) { block.ControlThrusters = true; }
+                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                     deadManOnce = false;
                 }
             }
@@ -1199,6 +1209,7 @@ namespace IngameScript {
                 if (lockTargetOnce) {
                     bool aligned;
                     if (!targFound) {
+                        unlockOnce = false;
                         aligned = AimAtTarget(controller, trgP);
                     } else {
                         aligned = true;
@@ -1217,6 +1228,10 @@ namespace IngameScript {
                 if (!lockTargetOnce) {
                     SendBroadcastLockTargetMessage(false);
                     lockTargetOnce = true;
+                }
+                if (!unlockOnce) {
+                    UnlockGyros();
+                    unlockOnce = true;
                 }
                 if (!Vector3D.IsZero(returnPosition)) {
                     remote.ClearWaypoints();
@@ -1405,7 +1420,7 @@ namespace IngameScript {
             }
         }
 
-        void Land(IMyRemoteControl remote, Vector3D gravity) {
+        void Land(IMyRemoteControl remote, Vector3D gravity) {//TODO
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             if (lidar == null) { return; }
             MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);
@@ -1419,7 +1434,7 @@ namespace IngameScript {
             }
         }
 
-        bool AimAtTarget(IMyShipController controller, Vector3D targetPos) {
+        bool AimAtTarget(IMyShipController controller, Vector3D targetPos) {//TODO
             bool aligned = false;
             Vector3D aimDirection = targetPos - controller.CubeGrid.WorldVolume.Center;
             double yawAngle;

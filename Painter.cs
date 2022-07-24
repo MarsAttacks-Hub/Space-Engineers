@@ -22,6 +22,7 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
         //revisit LoadMissiles(),make it universal
+        //scan target not always scan straight
         //PAINTER
 
         readonly string lidarsName = "[CRX] Camera Lidar";
