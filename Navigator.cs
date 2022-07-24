@@ -27,6 +27,9 @@ namespace IngameScript {
         //do logic for thrusters and !magneticDrive
         //when landing lock landing gear, when taking of unlock landing gear
         //NAVIGATOR
+        DebugAPI Debug;
+        int YellowLengthId;
+        const double YellowLengthDefault = 5;
 
         readonly string controllersName = "[CRX] Controller";
         readonly string remotesName = "[CRX] Controller Remote";
@@ -229,7 +232,8 @@ namespace IngameScript {
         Vector3D landPosition = Vector3D.Zero;
         Vector3D lastForwardVector = Vector3D.Zero;
         Vector3D lastUpVector = Vector3D.Zero;
-        Vector3D targPos = Vector3D.Zero;
+        Vector3D targHitPos = Vector3D.Zero;
+        Vector3D targPosition = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
         Vector3 randomDir = Vector3.Zero;
         Vector3 sensorDir = Vector3.Zero;
@@ -260,6 +264,9 @@ namespace IngameScript {
         };
 
         Program() {
+            Debug = new DebugAPI(this);
+            Debug.DeclareAdjustNumber(out YellowLengthId, YellowLengthDefault, 0.05, DebugAPI.Input.R, "Yellow line length");
+
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
             Setup();
         }
@@ -282,6 +289,8 @@ namespace IngameScript {
 
         public void Main(string arg) {
             try {
+                Debug.RemoveDraw();
+
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 GetBroadcastMessages();
@@ -415,12 +424,13 @@ namespace IngameScript {
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     var igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD>) {
-                        var data = (MyTuple<bool, Vector3D, Vector3D, MatrixD>)igcMessage.Data;
+                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D>) {
+                        var data = (MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D>)igcMessage.Data;
                         targFound = data.Item1;
-                        targPos = data.Item2;
+                        targHitPos = data.Item2;
                         targVelVec = data.Item3;
                         targOrientation = data.Item4;
+                        targPosition = data.Item5;
                         received = true;
                     }
                     if (igcMessage.Data is MyTuple<int, bool, bool, bool, bool>) {
@@ -650,10 +660,10 @@ namespace IngameScript {
                             initRandomMagneticDriveOnce = false;
                         }
                         if (Vector3.IsZero(dir)) {
-                            RandomMagneticDrive();
-                            dir = randomDir;
+                            //RandomMagneticDrive();
+                            //dir = randomDir;
 
-                            dir = KeepRightDistance(dir, targPos, controller);
+                            //dir = KeepRightDistance(dir, targPos, controller);
                         }
                     } else {
                         if (!initRandomMagneticDriveOnce) {
@@ -668,7 +678,7 @@ namespace IngameScript {
                     }
                 }
 
-                dir = EvadeEnemy(dir, controller, targOrientation, targVelVec, targPos, controller.CubeGrid.WorldVolume.Center, myVelocity, gravity);
+                dir = EvadeEnemy(dir, controller, targOrientation, targVelVec, targPosition, controller.CubeGrid.WorldVolume.Center, myVelocity, gravity, targetFound, targHitPos);//TODO
 
                 if (mySpeed > securitySpeed && !isAutoPiloted && (Vector3D.IsZero(gravity) || (!Vector3D.IsZero(gravity) && altitude > minAltitude))) {
                     if (sensorDetectionOnce) {
@@ -932,70 +942,100 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3 EvadeEnemy(Vector3 dir, IMyShipController controller, MatrixD targOrientation, Vector3D targVel, Vector3D targPos, Vector3D myPosition, Vector3D myVelocity, Vector3D gravity) {
-            Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(myPosition);
-            Vector3D enemyForwardVec = targOrientation.GetDirectionVector(enemyForward);
-            targOrientation = MatrixD.CreateFromDir(enemyForwardVec);//targOrientation.SetDirectionVector(Base6Directions.Direction.Forward, enemyForwardVec);
-            double distance = Vector3D.Distance(myPosition, targPos);
-            List<Vector3D> enemyAims = new List<Vector3D>();
-            if (distance <= gunsCloseRange) {
-                Vector3D enemyAim = ComputeEnemyLeading(targPos, targVel, rocketSpeed, targOrientation, myPosition, myVelocity);
-                if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, rocketSpeed, enemyAim, gravity); }
-                enemyAims.Add(enemyAim);
-                enemyAim = ComputeEnemyLeading(targPos, targVel, autocannonGatlingSpeed, targOrientation, myPosition, myVelocity);
-                if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, autocannonGatlingSpeed, enemyAim, gravity); }
-                enemyAims.Add(enemyAim);
-            } else if (distance <= gunsMidRange) {
-                Vector3D enemyAim = ComputeEnemyLeading(targPos, targVel, assaultArtillerySpeed, targOrientation, myPosition, myVelocity);
-                if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, assaultArtillerySpeed, enemyAim, gravity); }
-                enemyAims.Add(enemyAim);
-                enemyAim = ComputeEnemyLeading(targPos, targVel, smallRailgunSpeed, targOrientation, myPosition, myVelocity);
-                if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, smallRailgunSpeed, enemyAim, gravity); }
-                enemyAims.Add(enemyAim);
-            } else if (distance <= gunsMaxRange) {
-                Vector3D enemyAim = ComputeEnemyLeading(targPos, targVel, railgunSpeed, targOrientation, myPosition, myVelocity);
-                if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, railgunSpeed, enemyAim, gravity); }
-                enemyAims.Add(enemyAim);
-                enemyAim = ComputeEnemyLeading(targPos, targVel, assaultArtillerySpeed, targOrientation, myPosition, myVelocity);
-                if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, assaultArtillerySpeed, enemyAim, gravity); }
-                enemyAims.Add(enemyAim);
-            } else {
-                return dir;
-            }
-            foreach (Vector3D aim in enemyAims) {
-                double angle = VectorMath.AngleBetween(targOrientation.Forward, aim);
-                if (angle * rad2deg <= evasionAngleTolerance) {
-                    Vector3D evadeDirection = Vector3D.Cross(aim, controller.WorldMatrix.Down);
-                    Vector3 direction = Vector3D.Normalize(evadeDirection);
-                    if (Math.Round(direction.X) != 0d) { dir.X = (float)direction.X; }
-                    if (Math.Round(direction.Y) != 0d) { dir.Y = (float)direction.Y; }
-                    if (Math.Round(direction.Z) != 0d) { dir.Z = (float)direction.Z; }
+        Vector3 EvadeEnemy(Vector3 dir, IMyShipController controller, MatrixD targOrientation, Vector3D targVel, Vector3D targPos, Vector3D myPosition, Vector3D myVelocity, Vector3D gravity, bool targetFound, Vector3D targHitPos) {//TODO
+            if (targetFound) {
+                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(Vector3D.Normalize(controller.CubeGrid.WorldMatrix.Backward));
+                Base6Directions.Direction perpendicular = Base6Directions.GetPerpendicular(enemyForward);
+                Vector3D enemyForwardVec = targOrientation.GetDirectionVector(enemyForward);
+                Vector3D enemyPerpendicularVec = targOrientation.GetDirectionVector(perpendicular);
+                targOrientation = MatrixD.CreateFromDir(enemyForwardVec, enemyPerpendicularVec);
+                targOrientation.Translation = targPos;
+                double distance = Vector3D.Distance(myPosition, targHitPos);//TODO
+                List<Vector3D> enemyAims = new List<Vector3D>();
+                if (distance <= gunsCloseRange) {
+                    Vector3D enemyAim = ComputeEnemyLeading(targPos, targVel, rocketSpeed, targOrientation, myPosition, myVelocity);
+                    if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, rocketSpeed, enemyAim, gravity); }
+                    enemyAims.Add(enemyAim);
+                    enemyAim = ComputeEnemyLeading(targPos, targVel, autocannonGatlingSpeed, targOrientation, myPosition, myVelocity);
+                    if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, autocannonGatlingSpeed, enemyAim, gravity); }
+                    enemyAims.Add(enemyAim);
+                } else if (distance <= gunsMidRange) {
+                    Vector3D enemyAim = ComputeEnemyLeading(targPos, targVel, assaultArtillerySpeed, targOrientation, myPosition, myVelocity);
+                    if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, assaultArtillerySpeed, enemyAim, gravity); }
+                    enemyAims.Add(enemyAim);
+                    enemyAim = ComputeEnemyLeading(targPos, targVel, smallRailgunSpeed, targOrientation, myPosition, myVelocity);
+                    if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, smallRailgunSpeed, enemyAim, gravity); }
+                    enemyAims.Add(enemyAim);
+                } else if (distance <= gunsMaxRange) {
+                    Vector3D enemyAim = ComputeEnemyLeading(targPos, targVel, railgunSpeed, targOrientation, myPosition, myVelocity);
+                    if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, railgunSpeed, enemyAim, gravity); }
+                    enemyAims.Add(enemyAim);
+                    enemyAim = ComputeEnemyLeading(targPos, targVel, assaultArtillerySpeed, targOrientation, myPosition, myVelocity);
+                    if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, assaultArtillerySpeed, enemyAim, gravity); }
+                    enemyAims.Add(enemyAim);
+                } else {
+                    return dir;
+                }
+                foreach (Vector3D aim in enemyAims) {
+
+                    Vector3D normalizedVec = Vector3D.Normalize(enemyForwardVec);
+                    Vector3D position = targPos + (normalizedVec * 1000d);
+                    Debug.DrawLine(targPos, position, Color.Orange, thickness: 1f, onTop: true);
+
+                    normalizedVec = Vector3D.Normalize(aim);
+                    position = targPos + (normalizedVec * 1000d);
+                    Debug.DrawLine(targPos, position, Color.Magenta, thickness: 1f, onTop: true);
+
+                    double angle = VectorMath.AngleBetween(enemyForwardVec, aim);
+
+                    Debug.PrintHUD($"angle: {angle:0.00}\n");
+
+                    if (angle * rad2deg <= evasionAngleTolerance) {
+
+                        Debug.PrintHUD($"inside enemy aim\n");
+
+                        Vector3D evadeDirection = Vector3D.Cross(aim, controller.WorldMatrix.Down);
+                        Vector3 direction = Vector3D.Normalize(evadeDirection);
+
+                        position = myPosition + (direction * 250f);
+                        Debug.DrawLine(myPosition, position, Color.Green, thickness: 1f, onTop: true);
+
+                        if (Math.Round(direction.X) != 0d) { dir.X = (float)direction.X; }
+                        if (Math.Round(direction.Y) != 0d) { dir.Y = (float)direction.Y; }
+                        if (Math.Round(direction.Z) != 0d) { dir.Z = (float)direction.Z; }
+                    }
                 }
             }
             return dir;
         }
 
         Vector3D ComputeEnemyLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, MatrixD targMatrix, Vector3D myPosition, Vector3D myVelocity) {
-            Vector3D aimDirection = GetEnemyAim(targetPosition, targetVelocity, myPosition, myVelocity, projectileSpeed);
-            aimDirection -= targMatrix.Translation;
+            Vector3D aimPosition = GetEnemyAim(targetPosition, targetVelocity, myPosition, myVelocity, projectileSpeed);
+            //aimPosition -= targMatrix.Translation;
+            //Vector3D aimDirection = Vector3D.Normalize(Vector3D.TransformNormal(aimPosition, targMatrix));
+            Vector3D aimDirection = aimPosition - targetPosition;//TODO
             return aimDirection;
         }
 
         Vector3D GetEnemyAim(Vector3D targPosition, Vector3D targVelocity, Vector3D myPosition, Vector3D myVelocity, float projectileSpeed) {
-            float shootDelay = 0f;
-            Vector3D toMe = myPosition - targPosition;
-            Vector3D diffVelocity = myVelocity - targVelocity;
+            Vector3D muzzlePosition = targPosition;
+            Vector3D toTarget = myPosition - muzzlePosition;
+            Vector3D shooterVelocity = targVelocity;
+            Vector3D diffVelocity = myVelocity - shooterVelocity;
             float a = (float)diffVelocity.LengthSquared() - projectileSpeed * projectileSpeed;
-            float b = 2 * Vector3.Dot(diffVelocity, toMe);
-            float c = (float)toMe.LengthSquared();
+            float b = 2 * Vector3.Dot(diffVelocity, toTarget);
+            float c = (float)toTarget.LengthSquared();
             float p = -b / (2 * a);
             float q = (float)Math.Sqrt((b * b) - 4 * a * c) / (2 * a);
             float t1 = p - q;
             float t2 = p + q;
             float t;
-            if (t1 > t2 && t2 > 0f) { t = t2; } else { t = t1; }
-            t += shootDelay;
-            Vector3D predictedPosition = targPosition + diffVelocity * t;
+            if (t1 > t2 && t2 > 0) {
+                t = t2;
+            } else {
+                t = t1;
+            }
+            Vector3D predictedPosition = myPosition + diffVelocity * t;
             return predictedPosition;
         }
 
@@ -1196,7 +1236,7 @@ namespace IngameScript {
             trgP = Vector3D.Zero;
             trgV = Vector3D.Zero;
             if (targFound) {
-                trgP = targPos;
+                trgP = targHitPos;
                 trgV = targVelVec;
             } else if (!targetInfo.IsEmpty()) {
                 if (targetInfo.HitPosition.HasValue) { trgP = targetInfo.HitPosition.Value; } else { trgP = targetInfo.Position; }
@@ -1253,20 +1293,36 @@ namespace IngameScript {
             MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
             Vector3D targetFuturePosition = targetPos + (targetVelocity * collisionPredictionTime);
             LineD line = new LineD(targetPos, targetFuturePosition);
+
+            Debug.DrawLine(targetPos, targetFuturePosition, Color.Red, thickness: 1f, onTop: true);
+
             double? hitDist = obb.Intersects(ref line);
             if (hitDist.HasValue) {
+
+                Debug.PrintHUD($"COLLISION INCOMING\n");
+
                 if (returnOnce) {
                     if (Vector3D.IsZero(returnPosition)) {
                         returnPosition = remote.CubeGrid.WorldVolume.Center;
                     }
                     returnOnce = false;
                 }
-                Vector3D escapePos = targetPos + (Vector3D.Normalize(targetPos - remote.CubeGrid.WorldVolume.Center) * escapeDistance);
-                Vector3D escapePosition = Vector3D.Cross(escapePos, remote.WorldMatrix.Down);
-                Vector3 dirCopy = Vector3D.Normalize(escapePosition);
+                //Vector3D escapePos = targetPos + (Vector3D.Normalize(targetPos - remote.CubeGrid.WorldVolume.Center) * escapeDistance);
+                Vector3D escapePos = targetPos + targetPos - remote.CubeGrid.WorldVolume.Center * escapeDistance;
+
+                Debug.DrawPoint(escapePos, Color.Purple, 5f, onTop: true);
+
+                Vector3D escapeDirection = escapePos + remote.CubeGrid.WorldVolume.Center;
+                escapeDirection = Vector3D.Cross(escapeDirection, remote.WorldMatrix.Down);//Vector3D escapePosition = Vector3D.Cross(escapePos, remote.WorldMatrix.Down);
+
+                Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
+                Vector3D position = remote.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
+                Debug.DrawLine(remote.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
+
+                Vector3 dirCopy = Vector3D.Normalize(escapeDirection);
                 dir.X = Math.Round(dirCopy.X) != 0d ? dirCopy.X : dir.X;
                 dir.Y = Math.Round(dirCopy.Y) != 0d ? dirCopy.Y : dir.Y;
-                dir.Z = (Math.Round(dirCopy.Z) != 0d ? dirCopy.Z : dir.Z);
+                dir.Z = Math.Round(dirCopy.Z) != 0d ? dirCopy.Z : dir.Z;
                 isColliding = true;
             } else {
                 isColliding = false;
@@ -1918,6 +1974,95 @@ namespace IngameScript {
             }
         }
 
+        public class DebugAPI {
+            public readonly bool ModDetected;
+
+            public void RemoveDraw() => _removeDraw?.Invoke(_pb);
+            Action<IMyProgrammableBlock> _removeDraw;
+
+            public void RemoveAll() => _removeAll?.Invoke(_pb);
+            Action<IMyProgrammableBlock> _removeAll;
+
+            public void Remove(int id) => _remove?.Invoke(_pb, id);
+            Action<IMyProgrammableBlock, int> _remove;
+
+            public int DrawPoint(Vector3D origin, Color color, float radius = 0.2f, float seconds = DefaultSeconds, bool? onTop = null) => _point?.Invoke(_pb, origin, color, radius, seconds, onTop ?? _defaultOnTop) ?? -1;
+            Func<IMyProgrammableBlock, Vector3D, Color, float, float, bool, int> _point;
+
+            public int DrawLine(Vector3D start, Vector3D end, Color color, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _line?.Invoke(_pb, start, end, color, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
+            Func<IMyProgrammableBlock, Vector3D, Vector3D, Color, float, float, bool, int> _line;
+
+            public int DrawAABB(BoundingBoxD bb, Color color, Style style = Style.Wireframe, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _aabb?.Invoke(_pb, bb, color, (int)style, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
+            Func<IMyProgrammableBlock, BoundingBoxD, Color, int, float, float, bool, int> _aabb;
+
+            public int DrawOBB(MyOrientedBoundingBoxD obb, Color color, Style style = Style.Wireframe, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _obb?.Invoke(_pb, obb, color, (int)style, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
+            Func<IMyProgrammableBlock, MyOrientedBoundingBoxD, Color, int, float, float, bool, int> _obb;
+
+            public int DrawSphere(BoundingSphereD sphere, Color color, Style style = Style.Wireframe, float thickness = DefaultThickness, int lineEveryDegrees = 15, float seconds = DefaultSeconds, bool? onTop = null) => _sphere?.Invoke(_pb, sphere, color, (int)style, thickness, lineEveryDegrees, seconds, onTop ?? _defaultOnTop) ?? -1;
+            Func<IMyProgrammableBlock, BoundingSphereD, Color, int, float, int, float, bool, int> _sphere;
+
+            public int DrawMatrix(MatrixD matrix, float length = 1f, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _matrix?.Invoke(_pb, matrix, length, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
+            Func<IMyProgrammableBlock, MatrixD, float, float, float, bool, int> _matrix;
+
+            public int DrawGPS(string name, Vector3D origin, Color? color = null, float seconds = DefaultSeconds) => _gps?.Invoke(_pb, name, origin, color, seconds) ?? -1;
+            Func<IMyProgrammableBlock, string, Vector3D, Color?, float, int> _gps;
+
+            public int PrintHUD(string message, Font font = Font.Debug, float seconds = 2) => _printHUD?.Invoke(_pb, message, font.ToString(), seconds) ?? -1;
+            Func<IMyProgrammableBlock, string, string, float, int> _printHUD;
+
+            public void PrintChat(string message, string sender = null, Color? senderColor = null, Font font = Font.Debug) => _chat?.Invoke(_pb, message, sender, senderColor, font.ToString());
+            Action<IMyProgrammableBlock, string, string, Color?, string> _chat;
+
+            public void DeclareAdjustNumber(out int id, double initial, double step = 0.05, Input modifier = Input.Control, string label = null) => id = _adjustNumber?.Invoke(_pb, initial, step, modifier.ToString(), label) ?? -1;
+            Func<IMyProgrammableBlock, double, double, string, string, int> _adjustNumber;
+
+            public double GetAdjustNumber(int id, double noModDefault = 1) => _getAdjustNumber?.Invoke(_pb, id) ?? noModDefault;
+            Func<IMyProgrammableBlock, int, double> _getAdjustNumber;
+
+            public int GetTick() => _tick?.Invoke() ?? -1;
+            Func<int> _tick;
+
+            public enum Style { Solid, Wireframe, SolidAndWireframe }
+            public enum Input { MouseLeftButton, MouseRightButton, MouseMiddleButton, MouseExtraButton1, MouseExtraButton2, LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt, Tab, Shift, Control, Alt, Space, PageUp, PageDown, End, Home, Insert, Delete, Left, Up, Right, Down, D0, D1, D2, D3, D4, D5, D6, D7, D8, D9, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, NumPad0, NumPad1, NumPad2, NumPad3, NumPad4, NumPad5, NumPad6, NumPad7, NumPad8, NumPad9, Multiply, Add, Separator, Subtract, Decimal, Divide, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12 }
+            public enum Font { Debug, White, Red, Green, Blue, DarkBlue }
+
+            const float DefaultThickness = 0.02f;
+            const float DefaultSeconds = -1;
+
+            IMyProgrammableBlock _pb;
+            bool _defaultOnTop;
+
+            public DebugAPI(MyGridProgram program, bool drawOnTopDefault = false) {
+                if (program == null)
+                    throw new Exception("Pass `this` into the API, not null.");
+
+                _defaultOnTop = drawOnTopDefault;
+                _pb = program.Me;
+
+                var methods = _pb.GetProperty("DebugAPI")?.As<IReadOnlyDictionary<string, Delegate>>()?.GetValue(_pb);
+                if (methods != null) {
+                    Assign(out _removeAll, methods["RemoveAll"]);
+                    Assign(out _removeDraw, methods["RemoveDraw"]);
+                    Assign(out _remove, methods["Remove"]);
+                    Assign(out _point, methods["Point"]);
+                    Assign(out _line, methods["Line"]);
+                    Assign(out _aabb, methods["AABB"]);
+                    Assign(out _obb, methods["OBB"]);
+                    Assign(out _sphere, methods["Sphere"]);
+                    Assign(out _matrix, methods["Matrix"]);
+                    Assign(out _gps, methods["GPS"]);
+                    Assign(out _printHUD, methods["HUDNotification"]);
+                    Assign(out _chat, methods["Chat"]);
+                    Assign(out _adjustNumber, methods["DeclareAdjustNumber"]);
+                    Assign(out _getAdjustNumber, methods["GetAdjustNumber"]);
+                    Assign(out _tick, methods["Tick"]);
+                    RemoveAll();
+                    ModDetected = true;
+                }
+            }
+
+            void Assign<T>(out T field, object method) => field = (T)method;
+        }
 
     }
 }
