@@ -88,6 +88,7 @@ namespace IngameScript {
         readonly float artillerySpeed = 500f;
         readonly float railgunSpeed = 2000f;
         readonly float smallRailgunSpeed = 1000f;
+        readonly double initialScanDistance = 10000d;
         readonly double angleTolerance = 1d;//degrees - threshold where guns start/stop to fire when aligning to the target
         readonly double gunsRange = 2000d;//maximum guns range
         double rocketRange = 500d;
@@ -494,20 +495,7 @@ namespace IngameScript {
         bool AcquireTarget(double timeSinceLastRun) {
             bool targetFound = false;
             if (targetName == null) {//case argLock
-                if (!scanFudge) {
-                    targetFound = ScanTarget(false);
-                    if (!targetFound) {
-                        scanFudge = true;
-                    }
-                } else {
-                    targetFound = ScanFudgeTarget((double)globalTimestep);
-                    if (!targetFound) {
-                        fudgeCount++;
-                    } else {
-                        scanFudge = true;
-                        fudgeCount = 0;
-                    }
-                }
+                targetFound = ScanTarget(false);
             } else {
                 if (scanCenter && hasCenter) {
                     targetFound = ScanDelayedTarget(targetInfo.Position, timeSinceLastRun);
@@ -539,7 +527,9 @@ namespace IngameScript {
         bool ScanTarget(bool sameId) {
             bool targetFound = false;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            MyDetectedEntityInfo entityInfo = lidar.Raycast(lidar.AvailableScanRange, 0, 0);
+            double scanDistance = initialScanDistance;
+            if (lidar.AvailableScanRange < scanDistance) { scanDistance = lidar.AvailableScanRange; }
+            MyDetectedEntityInfo entityInfo = lidar.Raycast(scanDistance);
             if (!entityInfo.IsEmpty()) {
                 if (IsValidLidarTarget(ref entityInfo)) {
                     if (sameId) {
@@ -593,32 +583,6 @@ namespace IngameScript {
             scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition(), timeSinceLastRun);
             double overshootDistance = targetDiameter / 2;
             scanPosition += Vector3D.Normalize(scanPosition - lidar.GetPosition()) * overshootDistance;
-            double dist = Vector3D.Distance(scanPosition, lidar.GetPosition());
-            if (lidar.CanScan(dist)) {
-                MyDetectedEntityInfo entityInfo = lidar.Raycast(scanPosition);
-                if (!entityInfo.IsEmpty()) {
-                    if (entityInfo.EntityId == targetInfo.EntityId) {
-                        targetName = entityInfo.Name;
-                        targetDiameter = Vector3D.Distance(entityInfo.BoundingBox.Min, entityInfo.BoundingBox.Max);
-                        targetInfo = entityInfo;
-                        DetermineTargetPostion();
-                        targetFound = true;
-                    }
-                }
-            }
-            if (!targetFound) {
-                fudgeFactor++;
-            } else {
-                fudgeFactor = 5;
-            }
-            return targetFound;
-        }
-
-        bool ScanFudgeTarget(double timeSinceLastRun) {
-            bool targetFound = false;
-            IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            Vector3D scanPosition = Vector3D.Normalize(lidar.WorldMatrix.Forward) * 5000d;
-            scanPosition += CalculateFudgeVector(scanPosition - lidar.GetPosition(), timeSinceLastRun);
             double dist = Vector3D.Distance(scanPosition, lidar.GetPosition());
             if (lidar.CanScan(dist)) {
                 MyDetectedEntityInfo entityInfo = lidar.Raycast(scanPosition);
@@ -1667,16 +1631,13 @@ namespace IngameScript {
 
         void SetBlocks() {
             foreach (IMyCameraBlock cam in LIDARS) {
-                cam.Enabled = true;
                 cam.EnableRaycast = true;
             }
             foreach (IMyGyro block in GYROS) {
-                block.Enabled = true;
                 block.Yaw = 0f;
                 block.Pitch = 0f;
                 block.Roll = 0f;
                 block.GyroOverride = false;
-                block.GyroPower = 1;
             }
             ANTENNA.Enabled = true;
             ANTENNA.EnableBroadcasting = true;
