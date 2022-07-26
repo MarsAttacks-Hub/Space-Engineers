@@ -26,8 +26,6 @@ namespace IngameScript {
         //when landing lock landing gear, when taking of unlock landing gear
         //NAVIGATOR
         DebugAPI Debug;
-        int YellowLengthId;
-        const double YellowLengthDefault = 5;
 
         readonly string controllersName = "[CRX] Controller";
         readonly string remotesName = "[CRX] Controller Remote";
@@ -174,7 +172,6 @@ namespace IngameScript {
         const float circle = (float)(2 * Math.PI);
         const double rad2deg = 180 / Math.PI;
         const double angleTolerance = 0.1d;//degrees
-        const double evasionAngleTolerance = 2d;//degrees
 
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
         public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
@@ -271,7 +268,6 @@ namespace IngameScript {
 
         Program() {
             Debug = new DebugAPI(this);
-            Debug.DeclareAdjustNumber(out YellowLengthId, YellowLengthDefault, 0.05, DebugAPI.Input.R, "Yellow line length");
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
             Setup();
@@ -1328,14 +1324,11 @@ namespace IngameScript {
         }
 
         void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {//TODO
-            /*BoundingBoxD gridLocalBB;
-            if (isColliding) {
-                gridLocalBB = new BoundingBoxD(remote.CubeGrid.WorldVolume.Center - remote.CubeGrid.WorldVolume.Radius * 2d, remote.CubeGrid.WorldVolume.Center + remote.CubeGrid.WorldVolume.Radius * 2d);
-            } else {
-                gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
-            }*/
-
             BoundingBoxD gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
+            if (isColliding) {
+                //gridLocalBB = new BoundingBoxD(gridLocalBB.Center - gridLocalBB.HalfExtents * 2, gridLocalBB.Center + gridLocalBB.HalfExtents * 2);
+                gridLocalBB = new BoundingBoxD(gridLocalBB.Center - gridLocalBB.Extents * 2, gridLocalBB.Center + gridLocalBB.Extents * 2);
+            }
 
             MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
             Vector3D targetFuturePosition = targetPos + (targetVelocity * collisionPredictionTime);
