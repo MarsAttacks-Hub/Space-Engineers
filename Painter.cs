@@ -273,15 +273,18 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 RemoveLostMissiles();
-                arg = GetBroadcastMessages(arg);
+                Vector3D trgPstn;
+                Vector3D trgVl;
+                string message;
+                GetBroadcastMessages(arg, out trgPstn, out trgVl, out message);
                 GetMessages();
                 ReadMessages();
                 CanShootGuns();
 
                 double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
-                if (!String.IsNullOrEmpty(arg)) {
-                    ProcessArgs(arg, (double)globalTimestep);
+                if (!String.IsNullOrEmpty(message)) {
+                    ProcessArgs(message, timeSinceLastRun, trgPstn, trgVl);
                 }
 
                 if (targetName != null) {
@@ -297,7 +300,7 @@ namespace IngameScript {
                     bool targetFound = TurretsDetection(true);
 
                     if (!targetFound) {
-                        targetFound = AcquireTarget(lastLock);
+                        targetFound = AcquireTarget(lastLock, Vector3D.Zero, Vector3D.Zero);
                     }
 
                     if (targetFound) {//send message to missiles
@@ -377,9 +380,9 @@ namespace IngameScript {
             }
         }
 
-        void ProcessArgs(string arg, double timeSinceLastRun) {
+        void ProcessArgs(string arg, double timeSinceLastRun, Vector3D trgPstn, Vector3D trgVl) {
             switch (arg) {
-                case argLock: AcquireTarget(timeSinceLastRun); break;
+                case argLock: AcquireTarget(timeSinceLastRun, trgPstn, trgVl); break;
                 case commandLaunch:
                     if (missilesLoaded && targetName != null) {
                         foreach (IMyRadioAntenna block in MISSILEANTENNAS) {
@@ -492,10 +495,14 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool AcquireTarget(double timeSinceLastRun) {
+        bool AcquireTarget(double timeSinceLastRun, Vector3D trgPstn, Vector3D trgVl) {
             bool targetFound = false;
             if (targetName == null) {//case argLock
-                targetFound = ScanTarget(false);
+                if (!Vector3D.IsZero(trgPstn)) {
+                    targetFound = ScanTarget(false, trgPstn, trgVl, timeSinceLastRun);
+                } else {
+                    targetFound = ScanTarget(false, Vector3D.Zero, Vector3D.Zero, 0d);
+                }
             } else {
                 if (scanCenter && hasCenter) {
                     targetFound = ScanDelayedTarget(targetInfo.Position, timeSinceLastRun);
@@ -524,12 +531,18 @@ namespace IngameScript {
             return targetFound;
         }
 
-        bool ScanTarget(bool sameId) {
+        bool ScanTarget(bool sameId, Vector3D trgPstn, Vector3D trgVl, double timeSinceLastRun) {
             bool targetFound = false;
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
-            double scanDistance = initialScanDistance;
-            if (lidar.AvailableScanRange < scanDistance) { scanDistance = lidar.AvailableScanRange; }
-            MyDetectedEntityInfo entityInfo = lidar.Raycast(scanDistance);
+            MyDetectedEntityInfo entityInfo;
+            if (!Vector3D.IsZero(trgPstn)) {
+                trgPstn += (Vector3D.Normalize(trgVl) * timeSinceLastRun);//TODO
+                entityInfo = lidar.Raycast(trgPstn);
+            } else {
+                double scanDistance = initialScanDistance;
+                if (lidar.AvailableScanRange < scanDistance) { scanDistance = lidar.AvailableScanRange; }
+                entityInfo = lidar.Raycast(scanDistance);
+            }
             if (!entityInfo.IsEmpty()) {
                 if (IsValidLidarTarget(ref entityInfo)) {
                     if (sameId) {
@@ -865,8 +878,10 @@ namespace IngameScript {
             return received;
         }
 
-        string GetBroadcastMessages(string arg) {
-            string message = arg;
+        void GetBroadcastMessages(string arg, out Vector3D trgPstn, out Vector3D trgVl, out string message) {
+            message = arg;
+            trgPstn = Vector3D.Zero;
+            trgVl = Vector3D.Zero;
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     var igcMessage = BROADCASTLISTENER.AcceptMessage();
@@ -876,18 +891,19 @@ namespace IngameScript {
                         if (variable == "readyToFire") {
                             joltReady = data.Item2;
                         }
-                    } else if (igcMessage.Data is MyTuple<string, string>) {
-                        var data = (MyTuple<string, string>)igcMessage.Data;
+                    } else if (igcMessage.Data is MyTuple<string, string, Vector3D, Vector3D>) {
+                        var data = (MyTuple<string, string, Vector3D, Vector3D>)igcMessage.Data;
                         string variable = data.Item1;
                         if (variable == argLock) {
                             message = data.Item2;
+                            trgPstn = data.Item3;
+                            trgVl = data.Item4;
                         } else if (variable == argClear) {
                             message = data.Item2;
                         }
                     }
                 }
             }
-            return message;
         }
 
         void ReadMessages() {

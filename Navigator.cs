@@ -104,7 +104,7 @@ namespace IngameScript {
         readonly double friendlySafeDistance = 1000d;
         readonly double stopDistance = 50d;
         readonly double minAltitude = 60d;
-        readonly double collisionPredictionTime = 30d;
+        readonly double collisionPredictionTime = 60d;
         readonly float autocannonGatlingSpeed = 400f;
         readonly float railgunSpeed = 2000f;
         readonly float smallRailgunSpeed = 1000f;
@@ -293,18 +293,20 @@ namespace IngameScript {
 
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
-                Debug.PrintHUD($"LastRunTimeMs: {Runtime.LastRunTimeMs:0.00}");
+                //Debug.PrintHUD($"LastRunTimeMs: {Runtime.LastRunTimeMs:0.00}");
 
                 GetBroadcastMessages();
 
+                Debug.PrintHUD($"targFound:{targFound}");
+
                 bool aiming = false;
                 bool isUnderControl = IsPiloted(false);
-                if (!isUnderControl) {
-                    TurretsDetection();
-                    Vector3D trgP, trgV;
-                    ManageTarget(out trgP, out trgV);
-                    aiming = CheckTarget(REMOTE, REMOTE, trgP, trgV);
-                }
+                //if (!isUnderControl) {//TODO
+                TurretsDetection();
+                Vector3D trgP, trgV;
+                ManageTarget(out trgP, out trgV);
+                aiming = CheckTarget(REMOTE, REMOTE, trgP, trgV);
+                //}
 
                 bool isControlled = GetController();
                 SendBroadcastControllerMessage(isControlled);
@@ -323,7 +325,7 @@ namespace IngameScript {
 
                 ManageMagneticDrive(controller, isControlled, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity, myVelocity, mySpeed);
 
-                if (aimTarget) { AimAtTarget(controller, targetPosition); }
+                if (aimTarget) { AimAtTarget(controller, targetPosition, angleTolerance); }
 
                 SunChase(isControlled, gravity, targFound);
 
@@ -453,12 +455,12 @@ namespace IngameScript {
             IGC.SendBroadcastMessage(managerTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
-        void SendBroadcastLockTargetMessage(bool lockTarget) {
+        void SendBroadcastLockTargetMessage(bool lockTarget, Vector3D targetPos, Vector3D targetVel) {
             if (lockTarget) {
-                var tuple = MyTuple.Create("Lock", argLockTarget);
+                var tuple = MyTuple.Create("Lock", argLockTarget, targetPos, targetVel);
                 IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
             } else {
-                var tuple = MyTuple.Create("Clear", argUnlockFromTarget);
+                var tuple = MyTuple.Create("Clear", argUnlockFromTarget, targetPos, targetVel);
                 IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
             }
         }
@@ -471,16 +473,15 @@ namespace IngameScript {
                 foreach (IMyShipController block in CONTROLLERS) {
                     if (block.IsUnderControl && block.IsFunctional && block.CanControlShip && !(block is IMyRemoteControl)) {
                         CONTROLLER = block;
-                        break;
+                        return true;
                     }
                 }
             }
-            bool controlled;
+            bool controlled = false;
             if (CONTROLLER == null) {
-                controlled = false;
                 if (REMOTE.IsAutoPilotEnabled) {
                     CONTROLLER = REMOTE;
-                    controlled = true;
+                    return true;
                 } else {
                     IMyShipController controller = null;
                     foreach (IMyShipController contr in CONTROLLERS) {
@@ -494,29 +495,32 @@ namespace IngameScript {
                     double speed = velocityVec.Length();
                     if (speed > 1) {
                         CONTROLLER = controller;
-                        controlled = true;
+                        return true;
                     }
                     if (!Vector3D.IsZero(controller.GetNaturalGravity())) {
                         CONTROLLER = controller;
-                        controlled = true;
+                        return true;
                     }
                     if (targFound) {
                         CONTROLLER = controller;
-                        controlled = true;
+                        return true;
                     }
                     if (!Vector3.IsZero(collisionDir)) {
                         CONTROLLER = controller;
-                        controlled = true;
+                        return true;
                     }
                 }
             } else {
-                controlled = true;
+                return true;
             }
             return controlled;
         }
 
         void GyroStabilize(IMyShipController controller, bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity, double mySpeed, bool aiming) {
             if (useGyrosToStabilize && !targetFound && !aimingTarget && !isAutoPiloted && !aiming) {
+
+                Debug.PrintHUD($"GyroStabilize");
+
                 if (!Vector3D.IsZero(gravity)) {
                     MatrixD matrix = controller.WorldMatrix;
                     Vector3D leftVec = Vector3D.Cross(matrix.Forward, gravity);
@@ -652,14 +656,14 @@ namespace IngameScript {
                 if (!Vector3D.IsZero(gravity)) {
                     controller.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
                 }
-                if (!Vector3.IsZero(collisionDir)) {
+                if (!Vector3.IsZero(collisionDir) && !targetFound) {
                     if (initEvasionMagneticDriveOnce) {
                         controller.DampenersOverride = false;
                         initEvasionMagneticDriveOnce = false;
                     }
                     dir = Vector3.Sign(collisionDir);
 
-                    Debug.PrintHUD($"collisionDir: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                    //Debug.PrintHUD($"collisionDir: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                 } else {
                     if (!initEvasionMagneticDriveOnce) {
@@ -670,7 +674,7 @@ namespace IngameScript {
                     if (isAutoPiloted) {
                         dir = AutoMagneticDrive(dir);
 
-                        Debug.PrintHUD($"AutoMagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                        //Debug.PrintHUD($"AutoMagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                     } else {
                         if (!initAutoMagneticDriveOnce) {
@@ -685,12 +689,12 @@ namespace IngameScript {
                             RandomMagneticDrive();
                             dir = randomDir;
 
-                            Debug.PrintHUD($"RandomMagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                            //Debug.PrintHUD($"RandomMagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                             Vector3 dirNew = KeepRightDistance(targPosition, controller);
                             dir = MergeDirectionValues(dir, dirNew);//TODO
 
-                            Debug.PrintHUD($"KeepRightDistance: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                            //Debug.PrintHUD($"KeepRightDistance: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                         } else {
                             if (!initRandomMagneticDriveOnce) {
@@ -700,17 +704,17 @@ namespace IngameScript {
                             }
                             dir = MagneticDrive(controller, gravity, myVelocity);
 
-                            Debug.PrintHUD($"MagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                            //Debug.PrintHUD($"MagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                             Vector3 dirNew = KeepAltitude(isUnderControl, controller, idleThrusters, keepAltitude, gravity, altitude);
                             dir = MergeDirectionValues(dir, dirNew);//TODO
 
-                            Debug.PrintHUD($"KeepAltitude: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                            //Debug.PrintHUD($"KeepAltitude: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
                         }
                     }
                 }
 
-                Vector3D dirN = EvadeEnemy(controller, targOrientation, targVelVec, targPosition, controller.CubeGrid.WorldVolume.Center, myVelocity, gravity, targetFound, targHitPos);
+                Vector3D dirN = EvadeEnemy(controller, targOrientation, targVelVec, targPosition, controller.CubeGrid.WorldVolume.Center, myVelocity, gravity, targetFound);//, targHitPos
                 dir = MergeDirectionValues(dir, dirN);//TODO
 
                 if (mySpeed > securitySpeed && !isAutoPiloted && (Vector3D.IsZero(gravity) || (!Vector3D.IsZero(gravity) && altitude > minAltitude))) {
@@ -721,7 +725,7 @@ namespace IngameScript {
                     SensorDetection();
                     dir = MergeDirectionValues(dir, sensorDir);//TODO
 
-                    Debug.PrintHUD($"SensorDetection: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                    //Debug.PrintHUD($"SensorDetection: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                     UpdateAcceleration(controller, Runtime.TimeSinceLastRun.TotalSeconds, myVelocity);
                     if (collisionCheckCount >= collisionCheckDelay) {
@@ -732,7 +736,7 @@ namespace IngameScript {
                     if (!Vector3.IsZero(stopDir)) {
                         dir = MergeDirectionValues(dir, stopDir);//TODO
 
-                        Debug.PrintHUD($"RaycastStopPosition: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                        //Debug.PrintHUD($"RaycastStopPosition: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
                     }
                     collisionCheckCount++;
                 } else {
@@ -963,7 +967,7 @@ namespace IngameScript {
                     maxDistance = gunsCloseRange;
                 }
             }
-            Vector3D direction = Vector3D.Normalize(targPos - controller.CubeGrid.WorldVolume.Center);
+            Vector3D direction = targPos - controller.CubeGrid.WorldVolume.Center;//Vector3D direction = Vector3D.Normalize(targPos - controller.CubeGrid.WorldVolume.Center);
             double distance = direction.Length();
             if (distance > maxDistance) {
                 Vector3D directionTransformed = Vector3D.TransformNormal(direction, MatrixD.Transpose(controller.WorldMatrix));
@@ -977,16 +981,17 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3 EvadeEnemy(IMyShipController controller, MatrixD targOrientation, Vector3D targVel, Vector3D targPos, Vector3D myPosition, Vector3D myVelocity, Vector3D gravity, bool targetFound, Vector3D targHitPos) {
-            Vector3D enemyAim = Vector3D.Zero;
+        Vector3 EvadeEnemy(IMyShipController controller, MatrixD targOrientation, Vector3D targVel, Vector3D targPos, Vector3D myPosition, Vector3D myVelocity, Vector3D gravity, bool targetFound) {//, Vector3D targHitPos
             if (targetFound) {
-                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(Vector3D.Normalize(controller.CubeGrid.WorldMatrix.Backward));
+                //Matrix myMatrix; controller.Orientation.GetMatrix(out myMatrix);
+                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(controller.WorldMatrix.Backward);//Vector3D.Normalize(controller.WorldMatrix.Forward)
                 Base6Directions.Direction perpendicular = Base6Directions.GetPerpendicular(enemyForward);
                 Vector3D enemyForwardVec = targOrientation.GetDirectionVector(enemyForward);
                 Vector3D enemyPerpendicularVec = targOrientation.GetDirectionVector(perpendicular);
                 targOrientation = MatrixD.CreateFromDir(enemyForwardVec, enemyPerpendicularVec);
                 targOrientation.Translation = targPos;
-                double distance = Vector3D.Distance(myPosition, targHitPos);//TODO
+                double distance = Vector3D.Distance(myPosition, targPos);
+                Vector3D enemyAim;
                 if (distance <= gunsCloseRange) {
                     enemyAim = ComputeEnemyLeading(targPos, targVel, autocannonGatlingSpeed, myPosition, myVelocity);
                     if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, autocannonGatlingSpeed, enemyAim, gravity); }
@@ -997,44 +1002,47 @@ namespace IngameScript {
                     enemyAim = ComputeEnemyLeading(targPos, targVel, railgunSpeed, myPosition, myVelocity);
                     if (!Vector3D.IsZero(gravity)) { enemyAim = BulletDrop(distance, railgunSpeed, enemyAim, gravity); }
                 } else {
-                    return enemyAim;
+                    return Vector3.Zero;
                 }
                 //---------------------------------------------------------------------------
-                Vector3D normalizedVec = Vector3D.Normalize(enemyForwardVec);
-                Vector3D position = targPos + (normalizedVec * 1000d);
-                Debug.DrawLine(targPos, position, Color.Orange, thickness: 1f, onTop: true);
+                Vector3D position = targPos + (enemyForwardVec * 2000d);
+                Debug.DrawLine(targPos, position, Color.Orange, thickness: 2f, onTop: true);
 
-                normalizedVec = Vector3D.Normalize(enemyAim);
-                position = targPos + (normalizedVec * 1000d);
-                Debug.DrawLine(targPos, position, Color.Magenta, thickness: 1f, onTop: true);
+                Vector3D normalizedVec = Vector3D.Normalize(enemyAim);
+                position = targPos + (normalizedVec * 2000d);
+                Debug.DrawLine(targPos, position, Color.Magenta, thickness: 2f, onTop: true);
                 //---------------------------------------------------------------------------
 
-                double angle = VectorMath.AngleBetween(enemyForwardVec, enemyAim);
+                double angle = VectorMath.AngleBetween(enemyForwardVec, enemyAim) * rad2deg;
 
-                Debug.PrintHUD($"angle: {angle:0.00}");
+                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
 
-                if (angle * rad2deg <= (4500d / distance)) {//TODO
+                if (angle < (4500d / distance)) {
+                    Vector3D enemyForwardPosition = targPos + (enemyForwardVec * distance);//Vector3D.Normalize(enemyForwardVec) * distance
+                    Vector3D evadeDirection = Vector3.Normalize(controller.CubeGrid.WorldVolume.Center - enemyForwardPosition);//toward my center
+                    evadeDirection = Vector3D.TransformNormal(evadeDirection, MatrixD.Transpose(controller.WorldMatrix));
 
-                    Debug.PrintHUD($"inside enemy aim");
+                    Debug.DrawPoint(enemyForwardPosition, Color.Green, 4f, onTop: true);
+                    Debug.DrawPoint(controller.CubeGrid.WorldVolume.Center, Color.Yellow, 4f, onTop: true);
+                    Debug.DrawLine(controller.CubeGrid.WorldVolume.Center, enemyForwardPosition, Color.Purple, thickness: 1f, onTop: true);
 
-                    Vector3D evadeDirection = Vector3D.Cross(enemyAim, controller.WorldMatrix.Down);
-                    Vector3 direction = Vector3D.Normalize(evadeDirection);
-
-                    position = myPosition + (direction * 250f);
-                    Debug.DrawLine(myPosition, position, Color.Green, thickness: 1f, onTop: true);
+                    return evadeDirection;
                 }
             }
-            return enemyAim;
+            return Vector3.Zero;
         }
 
         Vector3D ComputeEnemyLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, Vector3D myPosition, Vector3D myVelocity) {
             Vector3D aimPosition = GetEnemyAim(targetPosition, targetVelocity, myPosition, myVelocity, projectileSpeed);
-            Vector3D aimDirection = Vector3D.Normalize(aimPosition - targetPosition);//TODO
+
+            Debug.DrawPoint(aimPosition, Color.Red, 4f, onTop: true);
+
+            Vector3D aimDirection = aimPosition - targetPosition;//Vector3D aimDirection = Vector3D.Normalize(aimPosition - targetPosition);
             return aimDirection;
         }
 
         Vector3D GetEnemyAim(Vector3D targPosition, Vector3D targVelocity, Vector3D myPosition, Vector3D myVelocity, float projectileSpeed) {
-            Vector3D toMe = Vector3D.Normalize(myPosition - targPosition);//TODO
+            Vector3D toMe = myPosition - targPosition;//Vector3D toMe = Vector3D.Normalize(myPosition - targPosition);
             Vector3D diffVelocity = myVelocity - targVelocity;
             float a = (float)diffVelocity.LengthSquared() - projectileSpeed * projectileSpeed;
             float b = 2 * Vector3.Dot(diffVelocity, toMe);
@@ -1268,45 +1276,62 @@ namespace IngameScript {
         bool CheckTarget(IMyShipController controller, IMyRemoteControl remote, Vector3D trgP, Vector3D trgV) {
             bool aiming = false;
             if (!Vector3D.IsZero(trgP)) {//TODO check if trgP coming from the turrets
+
+                Vector3D targetPos = trgP + (trgV * (Runtime.TimeSinceLastRun.TotalSeconds));//TODO globalTimeStep Runtime.TimeSinceLastRun.TotalSeconds calculate the delay of IGC
+
                 if (lockTargetOnce) {
 
-                    Debug.PrintHUD($"lockTargetOnce");
+                    //Debug.PrintHUD($"lockTargetOnce");
 
                     bool aligned;
                     if (!targFound) {
-
-                        Debug.PrintHUD($"AimAtTarget, trgP:{trgP.X:0.00}, X:{trgP.X:0.00}, Z:{trgP.Z:0.00}");
-
-                        aiming = true;
                         unlockOnce = false;
-                        aligned = AimAtTarget(controller, trgP);
+                        aiming = true;
+                        aligned = AimAtTarget(controller, targetPos, 20d);//TODO
+
+                        Debug.DrawPoint(targetPos, Color.Red, 5f, onTop: true);
+                        //Debug.PrintHUD($"aligned:{aligned}, targetPos:{targetPos.X:0.00}, X:{targetPos.X:0.00}, Z:{targetPos.Z:0.00}");
                     } else {
-
-                        Debug.PrintHUD($"aligned");
-
                         aligned = true;
+                        if (!unlockOnce) {
+                            UnlockGyros();
+                            unlockOnce = true;
+                        }
+                        //Debug.PrintHUD($"aligned:{aligned}");
                     }
                     if (aligned) {
-                        if (!targFound) {
-
-                            Debug.PrintHUD($"SendBroadcastLockTargetMessage");
-
-                            SendBroadcastLockTargetMessage(true);
-                        }
                         lockTargetOnce = false;
+                        if (!targFound) {
+                            SendBroadcastLockTargetMessage(true, targetPos, trgV);
+
+                            //Debug.PrintHUD($"SendBroadcastLockTargetMessage");
+                        }
+                        //Debug.PrintHUD($"targFound:{targFound}");
                     }
                 } else {
                     if (!targFound) {
-
-                        Debug.PrintHUD($"restart lockTargetOnce");
-
                         lockTargetOnce = true;
+                        unlockOnce = false;
+                        bool aligned = AimAtTarget(controller, targetPos, 20d);//TODO
+
+                        Debug.DrawPoint(targetPos, Color.Red, 5f, onTop: true);
+                        //Debug.PrintHUD($"restart lockTargetOnce");
+                        //Debug.PrintHUD($"aligned:{aligned}, targetPos:{targetPos.X:0.00}, X:{targetPos.X:0.00}, Z:{targetPos.Z:0.00}");
+                    } else {
+                        if (!unlockOnce) {
+                            UnlockGyros();
+                            unlockOnce = true;
+                        }
                     }
                 }
-                CheckCollisions(remote, trgP, trgV);
+
+                if (!targFound) {//TODO
+                    CheckCollisions(remote, trgP, trgV);
+                }
+
             } else {
                 if (!lockTargetOnce) {
-                    SendBroadcastLockTargetMessage(false);
+                    SendBroadcastLockTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
                     lockTargetOnce = true;
                 }
                 if (!unlockOnce) {
@@ -1326,10 +1351,8 @@ namespace IngameScript {
         void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {//TODO
             BoundingBoxD gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
             if (isColliding) {
-                //gridLocalBB = new BoundingBoxD(gridLocalBB.Center - gridLocalBB.HalfExtents * 2, gridLocalBB.Center + gridLocalBB.HalfExtents * 2);
                 gridLocalBB = new BoundingBoxD(gridLocalBB.Center - gridLocalBB.Extents * 2, gridLocalBB.Center + gridLocalBB.Extents * 2);
             }
-
             MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
             Vector3D targetFuturePosition = targetPos + (targetVelocity * collisionPredictionTime);
             LineD line = new LineD(targetPos, targetFuturePosition);
@@ -1345,7 +1368,7 @@ namespace IngameScript {
                     }
                     returnOnce = false;
                 }
-                Vector3D escapeDirection = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos);
+                Vector3D escapeDirection = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos);//TODO
                 escapeDirection = Vector3D.Cross(escapeDirection, remote.WorldMatrix.Down);
 
                 Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
@@ -1521,7 +1544,7 @@ namespace IngameScript {
             }
         }
 
-        bool AimAtTarget(IMyShipController controller, Vector3D targetPos) {
+        bool AimAtTarget(IMyShipController controller, Vector3D targetPos, double tolerance) {
             bool aligned = false;
             Vector3D aimDirection = targetPos - controller.CubeGrid.WorldVolume.Center;
             double yawAngle;
@@ -1533,8 +1556,11 @@ namespace IngameScript {
             double rollSpeed = rollController.Control(rollAngle);
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, controller.WorldMatrix);
             Vector3D forwardVec = controller.WorldMatrix.Forward;
-            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
-            if (angle * rad2deg <= angleTolerance) {
+            double angle = VectorMath.AngleBetween(forwardVec, aimDirection) * rad2deg;
+
+            Debug.PrintHUD($"AimAtTarget, angle:{angle:0.00}, angleTolerance:{tolerance:0.00}");
+
+            if (angle <= tolerance) {
                 aimTarget = false;
                 aligned = true;
                 UnlockGyros();
