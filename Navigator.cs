@@ -22,6 +22,7 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
+        //manage multi target
         //do logic for thrusters and !magneticDrive
         //when landing lock landing gear, when taking of unlock landing gear
         //NAVIGATOR
@@ -135,7 +136,6 @@ namespace IngameScript {
         bool deadManOnce = false;
         bool toggleThrustersOnce = false;
         bool returnOnce = true;
-        bool lockTargetOnce = true;
         bool unlockOnce = true;
         bool isPilotedOnce = true;
         bool initMagneticDriveOnce = true;
@@ -229,7 +229,6 @@ namespace IngameScript {
         Vector3D landPosition = Vector3D.Zero;
         Vector3D lastForwardVector = Vector3D.Zero;
         Vector3D lastUpVector = Vector3D.Zero;
-        Vector3D targHitPos = Vector3D.Zero;
         Vector3D targPosition = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
         Vector3D lastVelocity = Vector3D.Zero;
@@ -297,18 +296,11 @@ namespace IngameScript {
 
                 Debug.PrintHUD($"targFound:{targFound}");
 
-                bool aiming = false;
-                bool isUnderControl = IsPiloted(false);
-                //if (!isUnderControl) {//TODO
-                TurretsDetection();
-                Vector3D trgP, trgV;
-                ManageTarget(out trgP, out trgV);
-                aiming = CheckTarget(REMOTE, REMOTE, trgP, trgV, targFound);
-                //}
-
+                bool aiming = ManageCollisions(targFound, REMOTE);
                 bool isControlled = GetController();
                 SendBroadcastControllerMessage(isControlled);
                 bool isAutoPiloted = IsAutoPiloted();
+                bool isUnderControl = IsPiloted(false);
 
                 IMyShipController controller = CONTROLLER ?? REMOTE;
                 Vector3D gravity = controller.GetNaturalGravity();
@@ -425,7 +417,7 @@ namespace IngameScript {
                     if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D>) {
                         MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D> data = (MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D>)igcMessage.Data;
                         targFound = data.Item1;
-                        targHitPos = data.Item2;
+                        //targHitPos = data.Item2;
                         targVelVec = data.Item3;
                         targOrientation = data.Item4;
                         targPosition = data.Item5;
@@ -971,63 +963,23 @@ namespace IngameScript {
             //return targetFound;
         }
 
-        void ManageTarget(out Vector3D trgP, out Vector3D trgV) {
-            trgP = Vector3D.Zero;
-            trgV = Vector3D.Zero;
-            if (targFound) {
-                trgP = targHitPos;
-                trgV = targVelVec;
-            } else if (!targetInfo.IsEmpty()) {
-                if (targetInfo.HitPosition.HasValue) { trgP = targetInfo.HitPosition.Value; } else { trgP = targetInfo.Position; }
-                trgV = targetInfo.Velocity;
-            }
-        }
-
-        bool CheckTarget(IMyShipController controller, IMyRemoteControl remote, Vector3D trgP, Vector3D trgV, bool targFound) {
+        bool ManageCollisions(bool targFound, IMyRemoteControl remote) {
             bool aiming = false;
-            if (!Vector3D.IsZero(trgP)) {//TODO check if trgP coming from the turrets
-
-                Vector3D targetPos = trgP + (trgV * (Runtime.TimeSinceLastRun.TotalSeconds));
-
-                Debug.DrawPoint(targetPos, Color.Red, 5f, onTop: true);
-
-                if (!targFound) {
+            if (!targFound) {//TODO !isUnderControl
+                TurretsDetection();//TODO put outside? sameId
+                if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+                    aiming = true;
                     unlockOnce = false;
-                    if (lockTargetOnce) {
-                        aiming = true;
-                        bool aligned = AimAtTarget(controller, targetPos, 30d);
-
-                        //Debug.PrintHUD($"aligned:{aligned}, targetPos:{targetPos.X:0.00}, X:{targetPos.X:0.00}, Z:{targetPos.Z:0.00}");
-
-                        if (aligned) {
-                            lockTargetOnce = false;
-
-                            //Debug.PrintHUD($"SendBroadcastLockTargetMessage");
-
-                            SendBroadcastLockTargetMessage(true, targetPos, trgV);
-                        }
-                    } else {
-                        aiming = true;
-                        lockTargetOnce = true;
-                        AimAtTarget(controller, targetPos, 20d);
-                    }
-                } else {
-                    if (!unlockOnce) {
-                        UnlockGyros();
-                        unlockOnce = true;
-                    }
+                    CheckTarget(remote, targetInfo.Position, targetInfo.Velocity);
+                    CheckCollisions(remote, targetInfo.Position, targetInfo.Velocity);
                 }
-
-                CheckCollisions(remote, trgP, trgV, targFound);//TODO
-
             } else {
-                if (!lockTargetOnce) {
-                    SendBroadcastLockTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
-                    lockTargetOnce = true;
-                }
+                targetInfo = default(MyDetectedEntityInfo);//TODO
                 if (!unlockOnce) {
                     UnlockGyros();
                     unlockOnce = true;
+                    collisionDir = Vector3.Zero;
+                    SendBroadcastLockTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
                 }
                 if (!Vector3D.IsZero(returnPosition)) {
                     remote.ClearWaypoints();
@@ -1039,34 +991,36 @@ namespace IngameScript {
             return aiming;
         }
 
-        void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity, bool targFound) {//TODO
-            if (!targFound) {
-                targetVelocity = Vector3D.Normalize(targetVelocity);//TODO should i normalize it?
-                Vector3D toMe = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos);//TODO should i normalize it?
-                double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, targetPos);
-                double angle = VectorMath.AngleBetween(targetVelocity, toMe) * rad2deg;
+        void CheckTarget(IMyRemoteControl remote, Vector3D trgP, Vector3D trgV) {
+            Vector3D targetPos = trgP + (trgV * (Runtime.TimeSinceLastRun.TotalSeconds));
+            bool aligned = AimAtTarget(remote, targetPos, 30d);
+            if (aligned) { SendBroadcastLockTargetMessage(true, targetPos, trgV); }
+        }
 
-                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
+        void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {//TODO
+            targetVelocity = Vector3D.Normalize(targetVelocity);//TODO should i normalize it?
+            Vector3D toMe = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos);//TODO should i normalize it?
+            double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, targetPos);
+            double angle = VectorMath.AngleBetween(targetVelocity, toMe) * rad2deg;
 
-                if (angle < (9000d / distance)) {//TODO
-                    if (returnOnce) {
-                        if (Vector3D.IsZero(returnPosition)) {
-                            returnPosition = remote.CubeGrid.WorldVolume.Center;
-                        }
-                        returnOnce = false;
+            Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
+
+            if (angle < (9000d / distance)) {//TODO
+                if (returnOnce) {
+                    if (Vector3D.IsZero(returnPosition)) {
+                        returnPosition = remote.CubeGrid.WorldVolume.Center;
                     }
-                    Vector3D enemyDirectionPosition = targetPos + (targetVelocity * distance);
-                    Vector3D escapeDirection = Vector3.Normalize(remote.CubeGrid.WorldVolume.Center - enemyDirectionPosition);//toward my center
-                    escapeDirection = Vector3D.TransformNormal(escapeDirection, MatrixD.Transpose(remote.WorldMatrix));
-
-                    Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
-                    Vector3D position = remote.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
-                    Debug.DrawLine(remote.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
-
-                    collisionDir = Vector3D.Normalize(escapeDirection);//TODO should i normalize it?
-                } else {
-                    collisionDir = Vector3.Zero;
+                    returnOnce = false;
                 }
+                Vector3D enemyDirectionPosition = targetPos + (targetVelocity * distance);
+                Vector3D escapeDirection = Vector3.Normalize(remote.CubeGrid.WorldVolume.Center - enemyDirectionPosition);//toward my center
+                escapeDirection = Vector3D.TransformNormal(escapeDirection, MatrixD.Transpose(remote.WorldMatrix));
+
+                Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
+                Vector3D position = remote.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
+                Debug.DrawLine(remote.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
+
+                collisionDir = Vector3D.Normalize(escapeDirection);//TODO should i normalize it?
             } else {
                 collisionDir = Vector3.Zero;
             }
