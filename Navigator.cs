@@ -292,7 +292,7 @@ namespace IngameScript {
 
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
-                //Debug.PrintHUD($"LastRunTimeMs: {Runtime.LastRunTimeMs:0.00}");
+                Debug.PrintHUD($"LastRunTimeMs: {Runtime.LastRunTimeMs:0.00}");
 
                 GetBroadcastMessages();
 
@@ -661,7 +661,6 @@ namespace IngameScript {
                             Vector3D dirNew = KeepRightDistance(targPosition, controller);
                             dirNew = MergeDirectionValues(dirNN, dirNew);//TODO do not overwrite
                             dir = MergeDirectionValues(dir, dirNew);
-
                             //Debug.PrintHUD($"KeepRightDistance: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                         } else {
@@ -670,7 +669,10 @@ namespace IngameScript {
                                 controller.DampenersOverride = true;
                                 initRandomMagneticDriveOnce = true;
                             }
-                            dir = MagneticDrive(controller, gravity, myVelocity, idleThrusters);
+                            Matrix mtrx;
+                            dir = MagneticDrive(controller, out mtrx);
+                            dir = MagneticDampeners(dir, myVelocity, gravity, controller, mtrx);
+                            IdleThrusters(dir, idleThrusters);
 
                             //Debug.PrintHUD($"MagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
@@ -785,24 +787,17 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3D MagneticDrive(IMyShipController controller, Vector3D gravity, Vector3D myVelocity, bool idleThrusters) {
-            Matrix mtrx;
+        Vector3D MagneticDrive(IMyShipController controller, out Matrix mtrx) {
             Vector3D direction = controller.MoveIndicator;
             controller.Orientation.GetMatrix(out mtrx);
             direction = Vector3D.Transform(direction, mtrx);
             if (!Vector3D.IsZero(direction)) {
-                //debugLog.Append("dir X: " + dir.X + "\ndir Y: " + dir.Y + "\ndir Z: " + dir.Z + "\n\n");
-                direction /= direction.Length();
-                if (!toggleThrustersOnce && idleThrusters) {
-                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
-                    toggleThrustersOnce = true;
-                }
-            } else {
-                if (toggleThrustersOnce) {
-                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    toggleThrustersOnce = false;
-                }
+                direction = Vector3D.Normalize(direction);//direction /= direction.Length();
             }
+            return direction;
+        }
+
+        Vector3D MagneticDampeners(Vector3D direction, Vector3D myVelocity, Vector3D gravity, IMyShipController controller, MatrixD mtrx) {
             if (Vector3D.IsZero(gravity) && !controller.DampenersOverride && direction.LengthSquared() == 0f) {
                 return Vector3D.Zero;
             }
@@ -813,6 +808,20 @@ namespace IngameScript {
             if (Math.Abs(vel.Y) < minSpeed) { vel.Y = 0f; }
             if (Math.Abs(vel.Z) < minSpeed) { vel.Z = 0f; }
             return vel;
+        }
+
+        void IdleThrusters(Vector3D direction, bool idleThrusters) {
+            if (!Vector3D.IsZero(direction)) {
+                if (!toggleThrustersOnce && idleThrusters) {
+                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
+                    toggleThrustersOnce = true;
+                }
+            } else {
+                if (toggleThrustersOnce) {
+                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
+                    toggleThrustersOnce = false;
+                }
+            }
         }
 
         void SetPower(Vector3D pow) {
@@ -1023,7 +1032,7 @@ namespace IngameScript {
                     UnlockGyros();
                     unlockOnce = true;
                     collisionDir = Vector3D.Zero;
-                    SendBroadcastLockTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
+                    //SendBroadcastLockTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
                 }
                 if (!Vector3D.IsZero(returnPosition)) {
                     remote.ClearWaypoints();
@@ -1042,7 +1051,7 @@ namespace IngameScript {
         void CheckTarget(IMyRemoteControl remote, Vector3D trgP, Vector3D trgV) {
             Vector3D targetPos = trgP + (trgV * (Runtime.TimeSinceLastRun.TotalSeconds));
             bool aligned = AimAtTarget(remote, targetPos, 30d);
-            if (aligned) { SendBroadcastLockTargetMessage(true, targetPos, trgV); }
+            if (aligned) { SendBroadcastLockTargetMessage(true, targetPos, trgV); }//TODO
         }
 
         Vector3D CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {
