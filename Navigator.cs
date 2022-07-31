@@ -296,7 +296,7 @@ namespace IngameScript {
 
                 GetBroadcastMessages();
 
-                Debug.PrintHUD($"targFound:{targFound}");
+                //Debug.PrintHUD($"targFound:{targFound}");
 
                 TurretsDetection(targFound);
                 bool aiming = ManageCollisions(targFound, REMOTE);
@@ -654,8 +654,8 @@ namespace IngameScript {
 
                             Vector3D dirNN = Vector3D.Zero;
                             foreach (MyDetectedEntityInfo target in targetsInfo) {
-                                Vector3D escapeDir = controller.CubeGrid.WorldVolume.Center - target.Position;//normalize?
-                                escapeDir = Vector3D.Transform(escapeDir, MatrixD.Transpose(controller.WorldMatrix));
+                                Vector3D escapeDir = Vector3D.Normalize(controller.CubeGrid.WorldVolume.Center - target.Position);//normalize?
+                                escapeDir = Vector3D.TransformNormal(escapeDir, MatrixD.Transpose(controller.WorldMatrix));
                                 dirNN = SetResultVector(dirNN, escapeDir);
                             }
                             Vector3D dirNew = KeepRightDistance(targPosition, controller);
@@ -785,7 +785,7 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3D MagneticDrive(IMyShipController controller, Vector3D gravity, Vector3D myVelocity, bool idleThrusters) {//TODO
+        Vector3D MagneticDrive(IMyShipController controller, Vector3D gravity, Vector3D myVelocity, bool idleThrusters) {
             Matrix mtrx;
             Vector3D direction = controller.MoveIndicator;
             controller.Orientation.GetMatrix(out mtrx);
@@ -1052,7 +1052,7 @@ namespace IngameScript {
 
                 double angle = AngleBetween(targetVelocity, Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos)) * rad2deg;//normalize?
 
-                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
+                Debug.PrintHUD($"CheckCollisions, angle:{angle:0.00}, safety:{9000d / distance:0.00}");
 
                 if (angle < (9000d / distance)) {//TODO
                     if (returnOnce) {
@@ -1214,7 +1214,7 @@ namespace IngameScript {
             }
             //----------------------------------
             Vector3D stop = controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
-            Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
+            //Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
             Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
             //----------------------------------
 
@@ -1482,7 +1482,7 @@ namespace IngameScript {
             double rollSpeed = rollController.Control(rollAngle);
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, controller.WorldMatrix);
 
-            Debug.PrintHUD($"AimAtTarget, angle:{AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg:0.00}, angleTolerance:{tolerance:0.00}");
+            //Debug.PrintHUD($"AimAtTarget, angle:{AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg:0.00}, angleTolerance:{tolerance:0.00}");
 
             if (AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg <= tolerance) {
                 aimTarget = false;
