@@ -111,8 +111,8 @@ namespace IngameScript {
 
         Vector3D platformPosition;
         Vector3D targetPosition;
-        Vector3 targetVelocity;
-        Vector3 prevTargetVelocity = new Vector3();
+        Vector3D targetVelocity;
+        Vector3D prevTargetVelocity = new Vector3D();
 
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyShipController> CONTROLLERS = new List<IMyShipController>();
@@ -241,8 +241,8 @@ namespace IngameScript {
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     var msg = BROADCASTLISTENER.AcceptMessage();
-                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3, Vector3D>>>) {
-                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3, Vector3D>>>)msg.Data;
+                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3D, Vector3D>>>) {
+                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3D, Vector3D>>>)msg.Data;
                         timeSinceLastMessage = 0d;
                         platFormId = msg.Source;//platformTag = msg.Tag;
                         for (int i = 0; i < data.Length; i++) {
@@ -274,8 +274,8 @@ namespace IngameScript {
             if (UNICASTLISTENER.HasPendingMessage) {
                 while (UNICASTLISTENER.HasPendingMessage) {
                     var msg = UNICASTLISTENER.AcceptMessage();
-                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3, Vector3D>>>) {
-                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3, Vector3D>>>)msg.Data;
+                    if (msg.Data is ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3D, Vector3D>>>) {
+                        var data = (ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3D, Vector3D>>>)msg.Data;
                         timeSinceLastMessage = 0d;
                         platFormId = msg.Source;//platformTag = msg.Tag;
                         for (int i = 0; i < data.Length; i++) {
@@ -803,7 +803,7 @@ namespace IngameScript {
             Vector3D shooterVelocity = shooter.GetShipVelocities().LinearVelocity;
             Vector3D diffVelocity = targetVelocity - shooterVelocity;
             float a = (float)diffVelocity.LengthSquared() - projectileSpeed * projectileSpeed;
-            float b = 2 * Vector3.Dot(diffVelocity, toTarget);
+            float b = 2f * (float)Vector3D.Dot(diffVelocity, toTarget);
             float c = (float)toTarget.LengthSquared();
             float p = -b / (2 * a);
             float q = (float)Math.Sqrt((b * b) - 4 * a * c) / (2 * a);
@@ -813,7 +813,7 @@ namespace IngameScript {
             if (t1 > t2 && t2 > 0) { t = t2; } else { t = t1; }
             t += shootDelay;
             Vector3D predictedPosition = targetPosition + diffVelocity * t;
-            //Vector3 bulletPath = predictedPosition - muzzlePosition;
+            //Vector3D bulletPath = predictedPosition - muzzlePosition;
             //timeToHit = bulletPath.Length() / projectileSpeed;
             return predictedPosition;
         }
@@ -919,8 +919,8 @@ namespace IngameScript {
         }
 
         void UpdateBroadcastRange(Vector3D platformPosition, Vector3D position) {
-            var distance = Vector3.Distance(platformPosition, position);
-            ANTENNA.Radius = distance + 100;
+            float distance = (float)Vector3D.Distance(platformPosition, position);
+            ANTENNA.Radius = distance + 100f;
         }
 
         void GetAntenna() {
