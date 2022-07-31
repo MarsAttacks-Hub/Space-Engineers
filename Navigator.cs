@@ -66,7 +66,7 @@ namespace IngameScript {
 
         readonly string navigatorTag = "[NAVIGATOR]";
         readonly string managerTag = "[MANAGER]";
-        readonly string painterTag = "[PAINTER]";
+        //readonly string painterTag = "[PAINTER]";
         readonly string sectionTag = "RangeFinderSettings";
         readonly string cockpitRangeFinderKey = "cockpitRangeFinderSurface";
 
@@ -81,13 +81,14 @@ namespace IngameScript {
         const string argSunChaserToggle = "SunChaserToggle";
         const string argSunchaseOn = "SunchaseOn";
         const string argSunchaseOff = "SunchaseOff";
-        const string argUnlockFromTarget = "Clear";
-        const string argLockTarget = "Lock";
+        //const string argUnlockFromTarget = "Clear";
+        //const string argLockTarget = "Lock";
         const string argGyroStabilizeOff = "StabilizeOff";
         const string argGyroStabilizeOn = "StabilizeOn";
 
         readonly bool keepAltitude = true;
         readonly bool useRoll = false;
+        readonly bool isModdedSensor = false;
         readonly double yawAimP = 5d;
         readonly double yawAimI = 0d;
         readonly double yawAimD = 5d;
@@ -116,7 +117,6 @@ namespace IngameScript {
         readonly float syncSpeed = 1 * rpsOverRpm;
         readonly int tickDelay = 50;
         readonly int randomDelay = 10;
-        readonly int sensorsDelay = 5;
         readonly int collisionCheckDelay = 10;
         readonly int keepAltitudeDelay = 50;
         int turretsDetectionDelay = 5;
@@ -159,7 +159,6 @@ namespace IngameScript {
         int turretsDetectionCount = 5;
         int tickCount = 0;
         int randomCount = 50;
-        int sensorsCount = 50;
         int collisionCheckCount = 0;
         int keepAltitudeCount = 0;
         long targId;
@@ -298,8 +297,8 @@ namespace IngameScript {
 
                 //Debug.PrintHUD($"targFound:{targFound}");
 
-                TurretsDetection(targFound);
-                bool aiming = ManageCollisions(targFound, REMOTE);
+                bool enemiesFound = TurretsDetection(targFound);
+                bool aiming = ManageCollisions(targFound, REMOTE, enemiesFound);
                 bool isControlled = GetController();
                 SendBroadcastControllerMessage(isControlled);
                 bool isAutoPiloted = IsAutoPiloted();
@@ -445,7 +444,7 @@ namespace IngameScript {
             IGC.SendBroadcastMessage(managerTag, tuple, TransmissionDistance.ConnectedConstructs);
         }
 
-        void SendBroadcastLockTargetMessage(bool lockTarget, Vector3D targetPos, Vector3D targetVel) {
+        /*void SendBroadcastLockTargetMessage(bool lockTarget, Vector3D targetPos, Vector3D targetVel) {
             if (lockTarget) {
                 MyTuple<string, string, Vector3D, Vector3D> tuple = MyTuple.Create("Lock", argLockTarget, targetPos, targetVel);
                 IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
@@ -453,7 +452,7 @@ namespace IngameScript {
                 MyTuple<string, string, Vector3D, Vector3D> tuple = MyTuple.Create("Clear", argUnlockFromTarget, targetPos, targetVel);
                 IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
             }
-        }
+        }*/
 
         bool GetController() {
             if (CONTROLLER != null && (!CONTROLLER.IsUnderControl || !CONTROLLER.CanControlShip)) {
@@ -689,7 +688,6 @@ namespace IngameScript {
                     Vector3D escapeDir = EvadeEnemy(controller, target.Orientation, target.Velocity, target.Position, controller.CubeGrid.WorldVolume.Center, myVelocity, gravity, targetFound);
                     dirN = SetResultVector(dirN, escapeDir);
                 }
-
                 dir = MergeDirectionValues(dir, dirN);
 
                 if (mySpeed > securitySpeed && !isAutoPiloted && (Vector3D.IsZero(gravity) || (!Vector3D.IsZero(gravity) && altitude > minAltitude))) {
@@ -697,23 +695,27 @@ namespace IngameScript {
                         SetSensorsExtend();
                         sensorDetectionOnce = false;
                     }
-                    SensorDetection();
-                    dir = MergeDirectionValues(dir, sensorDir);
-
-                    //Debug.PrintHUD($"SensorDetection: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
-
                     UpdateAcceleration(controller, Runtime.TimeSinceLastRun.TotalSeconds, myVelocity);
                     if (collisionCheckCount >= collisionCheckDelay) {
                         double stopDistance = CalculateStopDistance(controller, myVelocity);
                         RaycastStopPosition(controller, stopDistance, myVelocity);
+
+                        if (isModdedSensor) { SetSensorsStopDistance((float)stopDistance); }//TODO
+                        SensorDetection();
+
                         collisionCheckCount = 0;
                     }
+                    collisionCheckCount++;
                     if (!Vector3D.IsZero(stopDir)) {
                         dir = MergeDirectionValues(dir, stopDir);
 
-                        //Debug.PrintHUD($"RaycastStopPosition: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                        Debug.PrintHUD($"RaycastStopPosition: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
                     }
-                    collisionCheckCount++;
+                    if (!Vector3D.IsZero(sensorDir)) {
+                        dir = MergeDirectionValues(dir, sensorDir);
+
+                        Debug.PrintHUD($"SensorDetection: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
+                    }
                 } else {
                     if (!sensorDetectionOnce) {
                         foreach (IMySensorBlock sensor in SENSORS) {
@@ -897,44 +899,40 @@ namespace IngameScript {
         }
 
         void SensorDetection() {
-            if (sensorsCount >= sensorsDelay) {
-                sensorDir = new Vector3D();
-                List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
-                List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
-                LEFTSENSOR.DetectedEntities(entitiesA);
-                RIGHTSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    sensorDir.X = 0f;
-                } else if (entitiesA.Count > 0) {
-                    sensorDir.X = 1f;
-                } else if (entitiesB.Count > 0) {
-                    sensorDir.X = -1f;
-                }
-                entitiesA.Clear();
-                entitiesB.Clear();
-                UPSENSOR.DetectedEntities(entitiesA);
-                DOWNSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    sensorDir.Y = 0f;
-                } else if (entitiesA.Count > 0) {
-                    sensorDir.Y = -1f;
-                } else if (entitiesB.Count > 0) {
-                    sensorDir.Y = 1f;
-                }
-                entitiesA.Clear();
-                entitiesB.Clear();
-                FORWARDSENSOR.DetectedEntities(entitiesA);
-                BACKWARDSENSOR.DetectedEntities(entitiesB);
-                if (entitiesA.Count > 0 && entitiesB.Count > 0) {
-                    sensorDir.Z = 0f;
-                } else if (entitiesA.Count > 0) {
-                    sensorDir.Z = 1f;
-                } else if (entitiesB.Count > 0) {
-                    sensorDir.Z = -1f;
-                }
-                sensorsCount = 0;
+            sensorDir = new Vector3D();
+            List<MyDetectedEntityInfo> entitiesA = new List<MyDetectedEntityInfo>();
+            List<MyDetectedEntityInfo> entitiesB = new List<MyDetectedEntityInfo>();
+            LEFTSENSOR.DetectedEntities(entitiesA);
+            RIGHTSENSOR.DetectedEntities(entitiesB);
+            if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                sensorDir.X = 0f;
+            } else if (entitiesA.Count > 0) {
+                sensorDir.X = 1f;
+            } else if (entitiesB.Count > 0) {
+                sensorDir.X = -1f;
             }
-            sensorsCount++;
+            entitiesA.Clear();
+            entitiesB.Clear();
+            UPSENSOR.DetectedEntities(entitiesA);
+            DOWNSENSOR.DetectedEntities(entitiesB);
+            if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                sensorDir.Y = 0f;
+            } else if (entitiesA.Count > 0) {
+                sensorDir.Y = -1f;
+            } else if (entitiesB.Count > 0) {
+                sensorDir.Y = 1f;
+            }
+            entitiesA.Clear();
+            entitiesB.Clear();
+            FORWARDSENSOR.DetectedEntities(entitiesA);
+            BACKWARDSENSOR.DetectedEntities(entitiesB);
+            if (entitiesA.Count > 0 && entitiesB.Count > 0) {
+                sensorDir.Z = 0f;
+            } else if (entitiesA.Count > 0) {
+                sensorDir.Z = 1f;
+            } else if (entitiesB.Count > 0) {
+                sensorDir.Z = -1f;
+            }
         }
 
         Vector3D KeepRightDistance(Vector3D targPos, IMyShipController controller) {
@@ -960,7 +958,7 @@ namespace IngameScript {
             return dir;
         }
 
-        void TurretsDetection(bool targFound) {
+        bool TurretsDetection(bool targFound) {
             bool targetFound = false;
             turretsDetectionDelay = Vector3D.IsZero(collisionDir) ? 5 : 1;
             if (turretsDetectionCount >= turretsDetectionDelay) {
@@ -1016,24 +1014,34 @@ namespace IngameScript {
                 turretsDetectionCount = 0;
             }
             turretsDetectionCount++;
+            return targetFound;
         }
 
-        bool ManageCollisions(bool targFound, IMyRemoteControl remote) {
+        bool ManageCollisions(bool targFound, IMyRemoteControl remote, bool enemiesFound) {
             bool aiming = false;
             if (!targFound) {//!isUnderControl
                 if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                     aiming = true;
                     unlockOnce = false;
-                    CheckTarget(remote, targetInfo.Position, targetInfo.Velocity);
-                    collisionDir = CheckCollisions(remote, targetInfo.Position, targetInfo.Velocity);
+                    Vector3D targetVelocity = targetInfo.Velocity;
+                    //Vector3D targetPos = targetInfo.Position + (targetVelocity * (Runtime.TimeSinceLastRun.TotalSeconds));//TODO
+                    //bool aligned = AimAtTarget(remote, targetPos, 30d);
+                    //if (aligned) { SendBroadcastLockTargetMessage(true, targetPos, targetVelocity); }//TODO
+                    collisionDir = CheckCollisions(remote, targetInfo.Position, targetVelocity);
                 }
             } else {
                 if (!unlockOnce) {
-                    UnlockGyros();
+                    //UnlockGyros();
                     unlockOnce = true;
                     collisionDir = Vector3D.Zero;
                     //SendBroadcastLockTargetMessage(false, Vector3D.Zero, Vector3D.Zero);
                 }
+            }
+            foreach (MyDetectedEntityInfo target in targetsInfo) {
+                Vector3D escapeDir = CheckCollisions(remote, target.Position, target.Velocity);
+                collisionDir = SetResultVector(collisionDir, escapeDir);
+            }
+            if (!enemiesFound) {
                 if (!Vector3D.IsZero(returnPosition)) {
                     remote.ClearWaypoints();
                     remote.AddWaypoint(returnPosition, "returnPosition");
@@ -1041,17 +1049,7 @@ namespace IngameScript {
                     returnOnce = true;
                 }
             }
-            foreach (MyDetectedEntityInfo target in targetsInfo) {
-                Vector3D escapeDir = CheckCollisions(remote, target.Position, target.Velocity);
-                collisionDir = SetResultVector(collisionDir, escapeDir);
-            }
             return aiming;
-        }
-
-        void CheckTarget(IMyRemoteControl remote, Vector3D trgP, Vector3D trgV) {
-            Vector3D targetPos = trgP + (trgV * (Runtime.TimeSinceLastRun.TotalSeconds));
-            bool aligned = AimAtTarget(remote, targetPos, 30d);
-            if (aligned) { SendBroadcastLockTargetMessage(true, targetPos, trgV); }//TODO
         }
 
         Vector3D CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity) {
@@ -1167,8 +1165,10 @@ namespace IngameScript {
         }
 
         void UpdateAcceleration(IMyShipController controller, double timeStep, Vector3D myVelocity) {
+            Vector3D acceleration = (myVelocity - lastVelocity) / timeStep;
             lastVelocity = myVelocity;
-            Vector3D localAcceleration = Vector3D.TransformNormal((myVelocity - lastVelocity) / timeStep, MatrixD.Transpose(controller.WorldMatrix));//acceleration - normalize?
+            MatrixD worldMatrix = controller.WorldMatrix;
+            Vector3D localAcceleration = Vector3D.TransformNormal(acceleration, MatrixD.Transpose(worldMatrix));
             for (int i = 0; i < 3; ++i) {//Now we store off the components if they are larger (in magnitude) than what we have stored
                 double component = localAcceleration.GetDim(i);
                 if (component >= 0d) {
@@ -1185,13 +1185,13 @@ namespace IngameScript {
         }
 
         double CalculateStopDistance(IMyShipController controller, Vector3D myVelocity) {
-            Vector3D localVelocity = Vector3D.TransformNormal(myVelocity, MatrixD.Transpose(controller.WorldMatrix));//normalize?
+            Vector3D localVelocity = Vector3D.TransformNormal(myVelocity, MatrixD.Transpose(controller.WorldMatrix));
             Vector3D stopDistanceLocal = Vector3D.Zero;
             for (int i = 0; i < 3; ++i) {//Now we break the current velocity apart component by component
                 double velocityComponent = localVelocity.GetDim(i);
                 double stopDistComponent = velocityComponent >= 0d
-                    ? velocityComponent * velocityComponent / (2d * minAccel.GetDim(i))
-                    : velocityComponent * velocityComponent / (2d * maxAccel.GetDim(i));
+                    ? (velocityComponent * velocityComponent) / (2d * minAccel.GetDim(i))
+                    : (velocityComponent * velocityComponent) / (2d * maxAccel.GetDim(i));
                 stopDistanceLocal.SetDim(i, stopDistComponent);
             }
             return stopDistanceLocal.Length();//Stop distance is just the magnitude of our result vector now
@@ -1223,13 +1223,17 @@ namespace IngameScript {
             }
             //----------------------------------
             Vector3D stop = controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
-            //Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
-            Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
+            Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
+            //Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
             //----------------------------------
 
-            stopDistance += 200d;//TODO
+            stopDistance += 250d;//TODO
 
-            Debug.DrawPoint(controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Orange, 5f, onTop: true);
+            //----------------------------------
+            Vector3D pos = controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
+            Debug.DrawPoint(pos, Color.Orange, 5f, onTop: true);
+            Debug.DrawLine(controller.CubeGrid.WorldVolume.Center, pos, Color.LimeGreen, thickness: 1f, onTop: true);
+            //----------------------------------
 
             MyDetectedEntityInfo entityInfo = lidar.Raycast(controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance));
             stopDir = Vector3D.Zero;
@@ -1667,12 +1671,31 @@ namespace IngameScript {
         }
 
         void SetSensorsExtend() {
-            if (UPSENSOR != null) { UPSENSOR.LeftExtend = 30f; UPSENSOR.RightExtend = 30f; UPSENSOR.BottomExtend = 28.5f; UPSENSOR.TopExtend = 40f; BACKWARDSENSOR.BackExtend = 0.1f; UPSENSOR.FrontExtend = UPSENSOR.MaxRange; }
-            if (DOWNSENSOR != null) { DOWNSENSOR.LeftExtend = 30f; DOWNSENSOR.RightExtend = 30f; DOWNSENSOR.BottomExtend = 38.5f; DOWNSENSOR.TopExtend = 30f; DOWNSENSOR.BackExtend = 5f; DOWNSENSOR.FrontExtend = DOWNSENSOR.MaxRange; }
-            if (FORWARDSENSOR != null) { FORWARDSENSOR.LeftExtend = 30f; FORWARDSENSOR.RightExtend = 30f; FORWARDSENSOR.BottomExtend = 12.5f; FORWARDSENSOR.TopExtend = 8.5f; FORWARDSENSOR.BackExtend = FORWARDSENSOR.MaxRange; FORWARDSENSOR.FrontExtend = 0.1f; }
-            if (BACKWARDSENSOR != null) { BACKWARDSENSOR.LeftExtend = 30f; BACKWARDSENSOR.RightExtend = 30f; BACKWARDSENSOR.BottomExtend = 15f; BACKWARDSENSOR.TopExtend = 6f; BACKWARDSENSOR.BackExtend = 0.1f; BACKWARDSENSOR.FrontExtend = BACKWARDSENSOR.MaxRange; }
-            if (LEFTSENSOR != null) { LEFTSENSOR.LeftExtend = 33f; LEFTSENSOR.RightExtend = 36f; LEFTSENSOR.BottomExtend = 7.5f; LEFTSENSOR.TopExtend = 13.5f; LEFTSENSOR.BackExtend = 0.1f; LEFTSENSOR.FrontExtend = LEFTSENSOR.MaxRange; }
-            if (RIGHTSENSOR != null) { RIGHTSENSOR.LeftExtend = 36f; RIGHTSENSOR.RightExtend = 33f; RIGHTSENSOR.BottomExtend = 7.5f; RIGHTSENSOR.TopExtend = 13.5f; RIGHTSENSOR.BackExtend = 0.1f; RIGHTSENSOR.FrontExtend = RIGHTSENSOR.MaxRange; }
+            if (UPSENSOR != null) { UPSENSOR.LeftExtend = 30f; UPSENSOR.RightExtend = 30f; UPSENSOR.BottomExtend = 28.5f; UPSENSOR.TopExtend = 40f; BACKWARDSENSOR.BackExtend = 0.1f; UPSENSOR.FrontExtend = 50f; }
+            if (DOWNSENSOR != null) { DOWNSENSOR.LeftExtend = 30f; DOWNSENSOR.RightExtend = 30f; DOWNSENSOR.BottomExtend = 38.5f; DOWNSENSOR.TopExtend = 30f; DOWNSENSOR.BackExtend = 5f; DOWNSENSOR.FrontExtend = 50f; }
+            if (FORWARDSENSOR != null) { FORWARDSENSOR.LeftExtend = 30f; FORWARDSENSOR.RightExtend = 30f; FORWARDSENSOR.BottomExtend = 12.5f; FORWARDSENSOR.TopExtend = 8.5f; FORWARDSENSOR.BackExtend = 50f; FORWARDSENSOR.FrontExtend = 0.1f; }
+            if (BACKWARDSENSOR != null) { BACKWARDSENSOR.LeftExtend = 30f; BACKWARDSENSOR.RightExtend = 30f; BACKWARDSENSOR.BottomExtend = 15f; BACKWARDSENSOR.TopExtend = 6f; BACKWARDSENSOR.BackExtend = 0.1f; BACKWARDSENSOR.FrontExtend = 50f; }
+            if (LEFTSENSOR != null) { LEFTSENSOR.LeftExtend = 33f; LEFTSENSOR.RightExtend = 36f; LEFTSENSOR.BottomExtend = 7.5f; LEFTSENSOR.TopExtend = 13.5f; LEFTSENSOR.BackExtend = 0.1f; LEFTSENSOR.FrontExtend = 50f; }
+            if (RIGHTSENSOR != null) { RIGHTSENSOR.LeftExtend = 36f; RIGHTSENSOR.RightExtend = 33f; RIGHTSENSOR.BottomExtend = 7.5f; RIGHTSENSOR.TopExtend = 13.5f; RIGHTSENSOR.BackExtend = 0.1f; RIGHTSENSOR.FrontExtend = 50f; }
+        }
+
+        void SetSensorsStopDistance(float stopDistance) {
+            stopDistance += 250f;//TODO
+            if (UPSENSOR != null && stopDistance < UPSENSOR.MaxRange) {
+                if (UPSENSOR != null) { UPSENSOR.FrontExtend = stopDistance; }
+                if (DOWNSENSOR != null) { DOWNSENSOR.FrontExtend = stopDistance; }
+                if (FORWARDSENSOR != null) { FORWARDSENSOR.BackExtend = stopDistance; }
+                if (BACKWARDSENSOR != null) { BACKWARDSENSOR.FrontExtend = stopDistance; }
+                if (LEFTSENSOR != null) { LEFTSENSOR.FrontExtend = stopDistance; }
+                if (RIGHTSENSOR != null) { RIGHTSENSOR.FrontExtend = stopDistance; }
+            } else {
+                if (UPSENSOR != null) { UPSENSOR.FrontExtend = UPSENSOR.MaxRange; }
+                if (DOWNSENSOR != null) { DOWNSENSOR.FrontExtend = DOWNSENSOR.MaxRange; }
+                if (FORWARDSENSOR != null) { FORWARDSENSOR.BackExtend = FORWARDSENSOR.MaxRange; }
+                if (BACKWARDSENSOR != null) { BACKWARDSENSOR.FrontExtend = BACKWARDSENSOR.MaxRange; }
+                if (LEFTSENSOR != null) { LEFTSENSOR.FrontExtend = LEFTSENSOR.MaxRange; }
+                if (RIGHTSENSOR != null) { RIGHTSENSOR.FrontExtend = RIGHTSENSOR.MaxRange; }
+            }
         }
 
         IMyCameraBlock GetCameraWithMaxRange(List<IMyCameraBlock> cameraList) {
