@@ -24,9 +24,9 @@ namespace IngameScript {
         //TODO
         //use rotor Displacement instead of merge Enabled
         //when landing lock landing gear, when taking of unlock landing gear
+        //when autopiloting if a enemy comes in range take control back and when gone restore autopilot to reach the position
+        //sensor detection and raycast stop position need more precision
         //NAVIGATOR
-        DebugAPI Debug;
-
         readonly string controllersName = "[CRX] Controller";
         readonly string remotesName = "[CRX] Controller Remote";
         readonly string cockpitsName = "[CRX] Controller Cockpit";
@@ -92,6 +92,9 @@ namespace IngameScript {
         readonly bool keepAltitude = true;
         readonly bool useRoll = false;
         readonly bool isModdedSensor = false;
+        readonly double collisionsDegree = 9000d;
+        readonly double evasionDegree = 4500d;
+        readonly double raycastSafety = 250d;
         readonly double yawAimP = 5d;
         readonly double yawAimI = 0d;
         readonly double yawAimD = 5d;
@@ -109,6 +112,7 @@ namespace IngameScript {
         readonly double friendlySafeDistance = 1000d;
         readonly double stopDistance = 50d;
         readonly double minAltitude = 60d;
+        readonly float sensorsSafety = 250f;
         readonly float autocannonGatlingSpeed = 400f;
         readonly float railgunSpeed = 2000f;
         readonly float smallRailgunSpeed = 1000f;
@@ -277,8 +281,6 @@ namespace IngameScript {
         };
 
         Program() {
-            Debug = new DebugAPI(this);
-
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
             Setup();
         }
@@ -309,16 +311,10 @@ namespace IngameScript {
 
         public void Main(string arg) {
             try {
-                Debug.RemoveDraw();
-
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
-
-                Debug.PrintHUD($"LastRunTimeMs: {Runtime.LastRunTimeMs:0.00}");
 
                 GetBroadcastMessages();
                 UpdateConfigParams();
-
-                //Debug.PrintHUD($"targFound:{targFound}");
 
                 bool enemiesFound = TurretsDetection(targFound);
                 if (collisionDetection) { ManageCollisions(targFound, REMOTE, enemiesFound); }
@@ -384,7 +380,7 @@ namespace IngameScript {
                         MyTuple<Vector3D, double, double> planet;
                         planetsList.TryGetValue(selectedPlanet, out planet);
                         double planetSize = planet.Item2 + planet.Item3 + 1000d;
-                        Vector3D safeJumpPosition = planet.Item1 - (Vector3D.Normalize(planet.Item1 - REMOTE.CubeGrid.WorldVolume.Center) * planetSize);//normalize?
+                        Vector3D safeJumpPosition = planet.Item1 - (Vector3D.Normalize(planet.Item1 - REMOTE.CubeGrid.WorldVolume.Center) * planetSize);
                         REMOTE.ClearWaypoints();
                         REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
                         double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
@@ -534,9 +530,6 @@ namespace IngameScript {
 
         void GyroStabilize(IMyShipController controller, bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity, double mySpeed, bool isTargetEmpty) {
             if (useGyrosToStabilize && !targetFound && !aimingTarget && !isAutoPiloted && isTargetEmpty) {
-
-                //Debug.PrintHUD($"GyroStabilize");
-
                 if (!Vector3D.IsZero(gravity)) {
                     Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(controller.WorldMatrix.Forward, gravity));//left vector
                     double pitchAngle, rollAngle, yawAngle;
@@ -652,9 +645,6 @@ namespace IngameScript {
                         initEvasionMagneticDriveOnce = false;
                     }
                     dir = collisionDir;
-
-                    //Debug.PrintHUD($"collisionDir: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
-
                 } else {
                     if (!initEvasionMagneticDriveOnce) {
                         randomDir = Vector3D.Zero;
@@ -663,9 +653,6 @@ namespace IngameScript {
                     }
                     if (isAutoPiloted) {
                         dir = AutoMagneticDrive(dir);
-
-                        //Debug.PrintHUD($"AutoMagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
-
                     } else {
                         if (!initAutoMagneticDriveOnce) {
                             foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
@@ -678,20 +665,15 @@ namespace IngameScript {
                             }
                             RandomMagneticDrive();
                             dir = randomDir;
-
-                            //Debug.PrintHUD($"RandomMagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
-
                             Vector3D dirNN = Vector3D.Zero;
                             foreach (MyDetectedEntityInfo target in targetsInfo) {
-                                Vector3D escapeDir = Vector3D.Normalize(controller.CubeGrid.WorldVolume.Center - target.Position);//normalize?
+                                Vector3D escapeDir = Vector3D.Normalize(controller.CubeGrid.WorldVolume.Center - target.Position);
                                 escapeDir = Vector3D.TransformNormal(escapeDir, MatrixD.Transpose(controller.WorldMatrix));
                                 dirNN = SetResultVector(dirNN, escapeDir);
                             }
                             Vector3D dirNew = KeepRightDistance(targPosition, controller);
                             dirNew = MergeDirectionValues(dirNN, dirNew);//TODO do not overwrite
                             dir = MergeDirectionValues(dir, dirNew);
-                            //Debug.PrintHUD($"KeepRightDistance: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
-
                         } else {
                             if (!initRandomMagneticDriveOnce) {
                                 randomDir = Vector3D.Zero;
@@ -702,13 +684,8 @@ namespace IngameScript {
                             dir = MagneticDrive(controller, out mtrx);
                             dir = MagneticDampeners(dir, myVelocity, gravity, controller, mtrx);
                             IdleThrusters(dir, idleThrusters);
-
-                            //Debug.PrintHUD($"MagneticDrive: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
-
                             Vector3D dirNew = KeepAltitude(isUnderControl, controller, idleThrusters, keepAltitude, gravity, altitude);
                             dir = MergeDirectionValues(dir, dirNew);
-
-                            //Debug.PrintHUD($"KeepAltitude: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
                         }
                     }
                 }
@@ -732,7 +709,7 @@ namespace IngameScript {
                         double stopDistance = CalculateStopDistance(controller, myVelocity);
                         RaycastStopPosition(controller, stopDistance, myVelocity);
 
-                        if (isModdedSensor) { SetSensorsStopDistance((float)stopDistance); }//TODO
+                        if (isModdedSensor) { SetSensorsStopDistance((float)stopDistance); }
                         SensorDetection();
 
                         collisionCheckCount = 0;
@@ -740,13 +717,9 @@ namespace IngameScript {
                     collisionCheckCount++;
                     if (!Vector3D.IsZero(stopDir)) {
                         dir = MergeDirectionValues(dir, stopDir);
-
-                        Debug.PrintHUD($"RaycastStopPosition: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
                     }
                     if (!Vector3D.IsZero(sensorDir)) {
                         dir = MergeDirectionValues(dir, sensorDir);
-
-                        Debug.PrintHUD($"SensorDetection: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
                     }
                 } else {
                     if (!sensorDetectionOnce) {
@@ -761,8 +734,6 @@ namespace IngameScript {
                         sensorDetectionOnce = true;
                     }
                 }
-
-                Debug.PrintHUD($"SetPower: X:{dir.X:0.00}, X:{dir.X:0.00}, Z:{dir.Z:0.00}");
 
                 SetPower(dir);
 
@@ -977,7 +948,7 @@ namespace IngameScript {
                     maxDistance = gunsCloseRange;
                 }
             }
-            Vector3D direction = targPos - controller.CubeGrid.WorldVolume.Center;//normalize?
+            Vector3D direction = targPos - controller.CubeGrid.WorldVolume.Center;
             double distance = direction.Length();
             direction = Vector3D.Normalize(direction);
             if (distance > maxDistance) {
@@ -1079,12 +1050,8 @@ namespace IngameScript {
             if (!Vector3D.IsZero(targetVelocity)) {
                 targetVelocity = Vector3D.Normalize(targetVelocity);
                 double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, targetPos);
-
-                double angle = AngleBetween(targetVelocity, Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos)) * rad2deg;//normalize?
-
-                Debug.PrintHUD($"CheckCollisions, angle:{angle:0.00}, safety:{9000d / distance:0.00}");
-
-                if (angle < (9000d / distance)) {//TODO
+                double angle = AngleBetween(targetVelocity, Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos)) * rad2deg;
+                if (angle < (collisionsDegree / distance)) {
                     if (returnOnce) {
                         if (Vector3D.IsZero(returnPosition)) {
                             returnPosition = remote.CubeGrid.WorldVolume.Center;
@@ -1094,11 +1061,6 @@ namespace IngameScript {
                     Vector3D enemyDirectionPosition = targetPos + (targetVelocity * distance);
                     Vector3D escapeDirection = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - enemyDirectionPosition);//toward my center normalize?
                     escapeDirection = Vector3D.TransformNormal(escapeDirection, MatrixD.Transpose(remote.WorldMatrix));
-                    //------------------------------------
-                    Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
-                    Vector3D position = remote.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
-                    Debug.DrawLine(remote.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
-                    //------------------------------------
                     return escapeDirection;
                 } else {
                     return Vector3D.Zero;
@@ -1130,27 +1092,10 @@ namespace IngameScript {
                 } else {
                     return Vector3D.Zero;
                 }
-                //---------------------------------------------------------------------------
-                Vector3D position = targPos + (enemyForwardVec * 2000d);
-                Debug.DrawLine(targPos, position, Color.Orange, thickness: 2f, onTop: true);
-
-                Vector3D normalizedVec = Vector3D.Normalize(enemyAim);
-                position = targPos + (normalizedVec * 2000d);
-                Debug.DrawLine(targPos, position, Color.Magenta, thickness: 2f, onTop: true);
-                //---------------------------------------------------------------------------
-
                 double angle = AngleBetween(enemyForwardVec, enemyAim) * rad2deg;
-
-                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
-
-                if (angle < (4500d / distance)) {
+                if (angle < (evasionDegree / distance)) {
                     Vector3D evadeDirection = Vector3D.Normalize(controller.CubeGrid.WorldVolume.Center - (targPos + (enemyForwardVec * distance)));//toward my center - normalize?
                     evadeDirection = Vector3D.TransformNormal(evadeDirection, MatrixD.Transpose(controller.WorldMatrix));
-                    //---------------------------------------------------------------------------
-                    Debug.DrawPoint(targPos + (enemyForwardVec * distance), Color.Green, 4f, onTop: true);
-                    Debug.DrawPoint(controller.CubeGrid.WorldVolume.Center, Color.Yellow, 4f, onTop: true);
-                    Debug.DrawLine(controller.CubeGrid.WorldVolume.Center, targPos + (enemyForwardVec * distance), Color.Purple, thickness: 1f, onTop: true);
-                    //---------------------------------------------------------------------------
                     return evadeDirection;
                 }
             }
@@ -1159,10 +1104,7 @@ namespace IngameScript {
 
         Vector3D ComputeEnemyLeading(Vector3D targetPosition, Vector3D targetVelocity, float projectileSpeed, Vector3D myPosition, Vector3D myVelocity) {
             Vector3D aimPosition = GetEnemyAim(targetPosition, targetVelocity, myPosition, myVelocity, projectileSpeed);
-
-            Debug.DrawPoint(aimPosition, Color.Red, 4f, onTop: true);
-
-            return aimPosition - targetPosition;//normalize direction?
+            return aimPosition - targetPosition;//normalize?
         }
 
         Vector3D GetEnemyAim(Vector3D targPosition, Vector3D targVelocity, Vector3D myPosition, Vector3D myVelocity, float projectileSpeed) {
@@ -1244,20 +1186,7 @@ namespace IngameScript {
                     lidar = GetCameraWithMaxRange(LIDARSRIGHT);
                     break;
             }
-            //----------------------------------
-            Vector3D stop = controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
-            Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
-            //Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
-            //----------------------------------
-
-            stopDistance += 250d;//TODO
-
-            //----------------------------------
-            Vector3D pos = controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
-            Debug.DrawPoint(pos, Color.Orange, 5f, onTop: true);
-            Debug.DrawLine(controller.CubeGrid.WorldVolume.Center, pos, Color.LimeGreen, thickness: 1f, onTop: true);
-            //----------------------------------
-
+            stopDistance += raycastSafety;
             MyDetectedEntityInfo entityInfo = lidar.Raycast(controller.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance));
             stopDir = Vector3D.Zero;
             if (!entityInfo.IsEmpty()) {
@@ -1303,9 +1232,9 @@ namespace IngameScript {
                         altitudeToKeep = altitude;
                     }
                     if (altitude < altitudeToKeep - 30d) {
-                        dir = -Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix));//normalize?
+                        dir = -Vector3D.TransformNormal(Vector3D.Normalize(gravity), MatrixD.Transpose(controller.WorldMatrix));
                     } else if (altitude > altitudeToKeep + 30d) {
-                        dir = Vector3D.TransformNormal(gravity, MatrixD.Transpose(controller.WorldMatrix));//normalize?
+                        dir = Vector3D.TransformNormal(Vector3D.Normalize(gravity), MatrixD.Transpose(controller.WorldMatrix));
                     }
                 }
             } else {
@@ -1318,17 +1247,14 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3D MergeDirectionValues(Vector3D dirToKeep, Vector3D dirNew) {//TODO
-            //if (Math.Abs(dirNew.X) > minSpeed) { dirOld.X = dirNew.X; }
-            //if (Math.Abs(dirNew.Y) > minSpeed) { dirOld.Y = dirNew.Y; }
-            //if (Math.Abs(dirNew.Z) > minSpeed) { dirOld.Z = dirNew.Z; }
+        Vector3D MergeDirectionValues(Vector3D dirToKeep, Vector3D dirNew) {
             dirToKeep.X = dirNew.X != 0d ? dirNew.X : dirToKeep.X;
             dirToKeep.Y = dirNew.Y != 0d ? dirNew.Y : dirToKeep.Y;
             dirToKeep.Z = dirNew.Z != 0d ? dirNew.Z : dirToKeep.Z;
             return dirToKeep;
         }
 
-        Vector3D SetResultVector(Vector3D direction, Vector3D escapeDirection) {//TODO
+        Vector3D SetResultVector(Vector3D direction, Vector3D escapeDirection) {
             if (!Vector3D.IsZero(escapeDirection)) {
                 if (!Vector3D.IsZero(direction)) {
                     direction = (direction + escapeDirection) / 2;
@@ -1443,7 +1369,7 @@ namespace IngameScript {
                     selectedPlanet = planetName;
                     planetsList.TryGetValue(planetName, out planet);
                     double atmosphereRange = planet.Item3 + 1000d;
-                    Vector3D safeJumpPosition = TARGET.HitPosition.Value - (Vector3D.Normalize(TARGET.HitPosition.Value - lidar.GetPosition()) * atmosphereRange);//normalize?
+                    Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * atmosphereRange);
                     remote.ClearWaypoints();
                     remote.AddWaypoint(safeJumpPosition, selectedPlanet);
                     double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition);
@@ -1457,7 +1383,7 @@ namespace IngameScript {
                     targetLog.Append("Ground Dist.: ").Append(Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value).ToString("0.0")).Append("\n");
                     targetLog.Append("Atmo. Height: ").Append(Vector3D.Distance(TARGET.HitPosition.Value, safeJumpPosition).ToString("0.0")).Append("\n");
                 } else if (TARGET.Type == MyDetectedEntityType.Asteroid) {
-                    Vector3D safeJumpPosition = TARGET.HitPosition.Value - (Vector3D.Normalize(TARGET.HitPosition.Value - lidar.GetPosition()) * friendlySafeDistance);//normalize?
+                    Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * friendlySafeDistance);
                     remote.ClearWaypoints();
                     remote.AddWaypoint(safeJumpPosition, "Asteroid");
                     double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition);
@@ -1467,7 +1393,7 @@ namespace IngameScript {
                     targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
                     targetLog.Append("Diameter: ").Append(Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max).ToString("0.0")).Append("\n");
                 } else if (IsNotFriendly(TARGET.Relationship)) {
-                    Vector3D safeJumpPosition = TARGET.HitPosition.Value - (Vector3D.Normalize(TARGET.HitPosition.Value - lidar.GetPosition()) * enemySafeDistance);//normalize?
+                    Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * enemySafeDistance);
                     remote.ClearWaypoints();
                     remote.AddWaypoint(safeJumpPosition, TARGET.Name);
                     targetPosition = safeJumpPosition;
@@ -1477,7 +1403,7 @@ namespace IngameScript {
                     targetLog.Append("Distance: ").Append(Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value).ToString("0.0")).Append("\n");
                     targetLog.Append("Diameter: ").Append(Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max).ToString("0.0")).Append("\n");
                 } else {
-                    Vector3D safeJumpPosition = TARGET.HitPosition.Value - (Vector3D.Normalize(TARGET.HitPosition.Value - lidar.GetPosition()) * friendlySafeDistance);//normalize?
+                    Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * friendlySafeDistance);
                     remote.ClearWaypoints();
                     remote.AddWaypoint(safeJumpPosition, TARGET.Name);
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, safeJumpPosition); }
@@ -1492,13 +1418,13 @@ namespace IngameScript {
             }
         }
 
-        void Land(IMyRemoteControl remote, Vector3D gravity) {//TODO
+        void Land(IMyRemoteControl remote, Vector3D gravity) {
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             if (lidar == null) { return; }
             MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    landPosition = TARGET.HitPosition.Value - gravity * 50d;//normalize gravity?
+                    landPosition = TARGET.HitPosition.Value - Vector3D.Normalize(gravity) * 50d;
                     remote.ClearWaypoints();
                     remote.AddWaypoint(landPosition, "landPosition");
                     remote.SetAutoPilotEnabled(true);
@@ -1508,7 +1434,7 @@ namespace IngameScript {
 
         bool AimAtTarget(IMyShipController controller, Vector3D targetPos, double tolerance) {
             bool aligned = false;
-            Vector3D aimDirection = targetPos - controller.CubeGrid.WorldVolume.Center;//normalize?
+            Vector3D aimDirection = targetPos - controller.CubeGrid.WorldVolume.Center;
             double yawAngle;
             double pitchAngle;
             double rollAngle;
@@ -1517,10 +1443,7 @@ namespace IngameScript {
             double pitchSpeed = pitchController.Control(pitchAngle);
             double rollSpeed = rollController.Control(rollAngle);
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, controller.WorldMatrix);
-
-            //Debug.PrintHUD($"AimAtTarget, angle:{AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg:0.00}, angleTolerance:{tolerance:0.00}");
-
-            if (AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg <= tolerance) {
+            if (AngleBetween(controller.WorldMatrix.Forward, Vector3D.Normalize(aimDirection)) * rad2deg <= tolerance) {
                 aimTarget = false;
                 aligned = true;
                 UnlockGyros();
@@ -1703,7 +1626,7 @@ namespace IngameScript {
         }
 
         void SetSensorsStopDistance(float stopDistance) {
-            stopDistance += 250f;//TODO
+            stopDistance += sensorsSafety;
             if (UPSENSOR != null && stopDistance < UPSENSOR.MaxRange) {
                 if (UPSENSOR != null) { UPSENSOR.FrontExtend = stopDistance; }
                 if (DOWNSENSOR != null) { DOWNSENSOR.FrontExtend = stopDistance; }
@@ -1993,141 +1916,6 @@ namespace IngameScript {
                 _firstRun = true;
             }
         }
-
-        public class DebugAPI {
-            public readonly bool ModDetected;
-
-            public void RemoveDraw() => _removeDraw?.Invoke(_pb);
-            Action<IMyProgrammableBlock> _removeDraw;
-
-            public void RemoveAll() => _removeAll?.Invoke(_pb);
-            Action<IMyProgrammableBlock> _removeAll;
-
-            public void Remove(int id) => _remove?.Invoke(_pb, id);
-            Action<IMyProgrammableBlock, int> _remove;
-
-            public int DrawPoint(Vector3D origin, Color color, float radius = 0.2f, float seconds = DefaultSeconds, bool? onTop = null) => _point?.Invoke(_pb, origin, color, radius, seconds, onTop ?? _defaultOnTop) ?? -1;
-            Func<IMyProgrammableBlock, Vector3D, Color, float, float, bool, int> _point;
-
-            public int DrawLine(Vector3D start, Vector3D end, Color color, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _line?.Invoke(_pb, start, end, color, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
-            Func<IMyProgrammableBlock, Vector3D, Vector3D, Color, float, float, bool, int> _line;
-
-            public int DrawAABB(BoundingBoxD bb, Color color, Style style = Style.Wireframe, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _aabb?.Invoke(_pb, bb, color, (int)style, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
-            Func<IMyProgrammableBlock, BoundingBoxD, Color, int, float, float, bool, int> _aabb;
-
-            public int DrawOBB(MyOrientedBoundingBoxD obb, Color color, Style style = Style.Wireframe, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _obb?.Invoke(_pb, obb, color, (int)style, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
-            Func<IMyProgrammableBlock, MyOrientedBoundingBoxD, Color, int, float, float, bool, int> _obb;
-
-            public int DrawSphere(BoundingSphereD sphere, Color color, Style style = Style.Wireframe, float thickness = DefaultThickness, int lineEveryDegrees = 15, float seconds = DefaultSeconds, bool? onTop = null) => _sphere?.Invoke(_pb, sphere, color, (int)style, thickness, lineEveryDegrees, seconds, onTop ?? _defaultOnTop) ?? -1;
-            Func<IMyProgrammableBlock, BoundingSphereD, Color, int, float, int, float, bool, int> _sphere;
-
-            public int DrawMatrix(MatrixD matrix, float length = 1f, float thickness = DefaultThickness, float seconds = DefaultSeconds, bool? onTop = null) => _matrix?.Invoke(_pb, matrix, length, thickness, seconds, onTop ?? _defaultOnTop) ?? -1;
-            Func<IMyProgrammableBlock, MatrixD, float, float, float, bool, int> _matrix;
-
-            public int DrawGPS(string name, Vector3D origin, Color? color = null, float seconds = DefaultSeconds) => _gps?.Invoke(_pb, name, origin, color, seconds) ?? -1;
-            Func<IMyProgrammableBlock, string, Vector3D, Color?, float, int> _gps;
-
-            public int PrintHUD(string message, Font font = Font.Debug, float seconds = 2) => _printHUD?.Invoke(_pb, message, font.ToString(), seconds) ?? -1;
-            Func<IMyProgrammableBlock, string, string, float, int> _printHUD;
-
-            public void PrintChat(string message, string sender = null, Color? senderColor = null, Font font = Font.Debug) => _chat?.Invoke(_pb, message, sender, senderColor, font.ToString());
-            Action<IMyProgrammableBlock, string, string, Color?, string> _chat;
-
-            public void DeclareAdjustNumber(out int id, double initial, double step = 0.05, Input modifier = Input.Control, string label = null) => id = _adjustNumber?.Invoke(_pb, initial, step, modifier.ToString(), label) ?? -1;
-            Func<IMyProgrammableBlock, double, double, string, string, int> _adjustNumber;
-
-            public double GetAdjustNumber(int id, double noModDefault = 1) => _getAdjustNumber?.Invoke(_pb, id) ?? noModDefault;
-            Func<IMyProgrammableBlock, int, double> _getAdjustNumber;
-
-            public int GetTick() => _tick?.Invoke() ?? -1;
-            Func<int> _tick;
-
-            public enum Style { Solid, Wireframe, SolidAndWireframe }
-            public enum Input { MouseLeftButton, MouseRightButton, MouseMiddleButton, MouseExtraButton1, MouseExtraButton2, LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt, Tab, Shift, Control, Alt, Space, PageUp, PageDown, End, Home, Insert, Delete, Left, Up, Right, Down, D0, D1, D2, D3, D4, D5, D6, D7, D8, D9, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, NumPad0, NumPad1, NumPad2, NumPad3, NumPad4, NumPad5, NumPad6, NumPad7, NumPad8, NumPad9, Multiply, Add, Separator, Subtract, Decimal, Divide, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12 }
-            public enum Font { Debug, White, Red, Green, Blue, DarkBlue }
-
-            const float DefaultThickness = 0.02f;
-            const float DefaultSeconds = -1;
-
-            IMyProgrammableBlock _pb;
-            bool _defaultOnTop;
-
-            public DebugAPI(MyGridProgram program, bool drawOnTopDefault = false) {
-                if (program == null)
-                    throw new Exception("Pass `this` into the API, not null.");
-
-                _defaultOnTop = drawOnTopDefault;
-                _pb = program.Me;
-
-                IReadOnlyDictionary<string, Delegate> methods = _pb.GetProperty("DebugAPI")?.As<IReadOnlyDictionary<string, Delegate>>()?.GetValue(_pb);
-                if (methods != null) {
-                    Assign(out _removeAll, methods["RemoveAll"]);
-                    Assign(out _removeDraw, methods["RemoveDraw"]);
-                    Assign(out _remove, methods["Remove"]);
-                    Assign(out _point, methods["Point"]);
-                    Assign(out _line, methods["Line"]);
-                    Assign(out _aabb, methods["AABB"]);
-                    Assign(out _obb, methods["OBB"]);
-                    Assign(out _sphere, methods["Sphere"]);
-                    Assign(out _matrix, methods["Matrix"]);
-                    Assign(out _gps, methods["GPS"]);
-                    Assign(out _printHUD, methods["HUDNotification"]);
-                    Assign(out _chat, methods["Chat"]);
-                    Assign(out _adjustNumber, methods["DeclareAdjustNumber"]);
-                    Assign(out _getAdjustNumber, methods["GetAdjustNumber"]);
-                    Assign(out _tick, methods["Tick"]);
-                    RemoveAll();
-                    ModDetected = true;
-                }
-            }
-
-            void Assign<T>(out T field, object method) => field = (T)method;
-        }
-
-        /*
-        
-        void CheckCollisions(IMyRemoteControl remote, Vector3D targetPos, Vector3D targetVelocity, bool targFound) {
-            if (!targFound) {
-                BoundingBoxD gridLocalBB = new BoundingBoxD(remote.CubeGrid.Min * remote.CubeGrid.GridSize, remote.CubeGrid.Max * remote.CubeGrid.GridSize);
-                if (isColliding) {
-                    gridLocalBB = new BoundingBoxD(gridLocalBB.Center - gridLocalBB.Extents * 2, gridLocalBB.Center + gridLocalBB.Extents * 2);
-                }
-                MyOrientedBoundingBoxD obb = new MyOrientedBoundingBoxD(gridLocalBB, remote.CubeGrid.WorldMatrix);
-                Vector3D targetFuturePosition = targetPos + (targetVelocity * collisionPredictionTime);
-                LineD line = new LineD(targetPos, targetFuturePosition);
-
-                Debug.DrawOBB(obb, Color.Blue);
-                Debug.DrawLine(targetPos, targetFuturePosition, Color.Red, thickness: 1f, onTop: true);
-
-                double? hitDist = obb.Intersects(ref line);
-                if (hitDist.HasValue) {
-                    if (returnOnce) {
-                        if (Vector3D.IsZero(returnPosition)) {
-                            returnPosition = remote.CubeGrid.WorldVolume.Center;
-                        }
-                        returnOnce = false;
-                    }
-                    double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, targetPos);
-                    Vector3D enemyDirectionPosition = targetPos + (Vector3D.Normalize(targetVelocity) * distance);
-                    Vector3D escapeDirection = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - enemyDirectionPosition);//toward my center
-                    escapeDirection = Vector3D.TransformNormal(escapeDirection, MatrixD.Transpose(remote.WorldMatrix));
-                    
-                    Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
-                    Vector3D position = remote.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
-                    Debug.DrawLine(remote.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
-
-                    collisionDir = Vector3D.Normalize(escapeDirection);// should i normalize it?
-                    isColliding = true;
-                } else {
-                    collisionDir = Vector3D.Zero;
-                    isColliding = false;
-                }
-            } else {
-                collisionDir = Vector3D.Zero;
-                isColliding = false;
-            }
-        }
-        */
 
     }
 }
