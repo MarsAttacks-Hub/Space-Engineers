@@ -132,6 +132,7 @@ namespace IngameScript {
         bool impactsAvoidance = true;
         bool collisionDetection = true;
         bool enemyEvasion = true;
+        bool configChanged = false;
         bool aimTarget = false;
         bool targFound = false;
         bool assaultCanShoot = true;
@@ -299,11 +300,11 @@ namespace IngameScript {
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(0, 255, 255) : new Color(0, 0, 0); }
             if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(0, 255, 255) : new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDEVASION != null) { LCDEVASION.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+            if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+            if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+            if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+            if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+            if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(0, 255, 255) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -315,6 +316,7 @@ namespace IngameScript {
                 Debug.PrintHUD($"LastRunTimeMs: {Runtime.LastRunTimeMs:0.00}");
 
                 GetBroadcastMessages();
+                UpdateConfigParams();
 
                 //Debug.PrintHUD($"targFound:{targFound}");
 
@@ -409,34 +411,42 @@ namespace IngameScript {
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                         if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
                     }
+                    configChanged = true;
                     break;
                 case argMagneticDriveToggle:
                     magneticDrive = !magneticDrive;
                     if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case argDeadManToggle:
                     controlDampeners = !controlDampeners;
                     if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case argAutocombatToggle:
                     autocombat = !autocombat;
-                    if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case argImpactsAvoidanceToggle:
                     impactsAvoidance = !impactsAvoidance;
-                    if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case argCollisionDetectionToggle:
                     collisionDetection = !collisionDetection;
-                    if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case argEnemyEvasionToggle:
                     enemyEvasion = !enemyEvasion;
-                    if (LCDEVASION != null) { LCDEVASION.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case argGyroStabilizeToggle:
                     useGyrosToStabilize = !useGyrosToStabilize;
-                    if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
             }
         }
@@ -1798,14 +1808,33 @@ namespace IngameScript {
         }
 
         void ParseCockpitConfigData(IMyCockpit cockpit) {
-            if (!cockpit.CustomData.Contains(sectionTag)) {
-                cockpit.CustomData += $"[{sectionTag}]\n{cockpitRangeFinderKey}={cockpitRangeFinderSurface}\n";
-            }
             MyIniParseResult result;
             myIni.TryParse(cockpit.CustomData, sectionTag, out result);
             if (!string.IsNullOrEmpty(myIni.Get(sectionTag, cockpitRangeFinderKey).ToString())) {
                 cockpitRangeFinderSurface = myIni.Get(sectionTag, cockpitRangeFinderKey).ToInt32();
                 SURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));
+            }
+        }
+
+        void UpdateConfigParams() {
+            if (configChanged) {
+                if (!magneticDrive) {
+                    autocombat = false;
+                    impactsAvoidance = false;
+                    collisionDetection = false;
+                    enemyEvasion = false;
+                    idleThrusters = false;
+                    controlDampeners = true;
+                }
+                if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                configChanged = false;
             }
         }
 
