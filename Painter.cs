@@ -21,10 +21,8 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
-        //revisit LoadMissiles(),make it universal
-        //scan target not always scan straight
+        //make LoadMissiles() universal
         //PAINTER
-
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
         readonly string lightsName = "[CRX] Rotating Light";
@@ -51,6 +49,9 @@ namespace IngameScript {
         readonly string navigatorTag = "[NAVIGATOR]";
         readonly string decoyName = "[CRX] PB Shooter";
         readonly string cargoName = "[CRX] Cargo";
+        readonly string autoFirePanelName = "[CRX] LCD AutoFire Toggle";
+        readonly string autoMissilesPanelName = "[CRX] LCD Auto Missiles Toggle";
+        readonly string autoSwitchGunsPanelName = "[CRX] LCD Auto Switch Guns Toggle";
         readonly string debugPanelName = "[CRX] Debug";
 
         const string commandLaunch = "Launch";
@@ -214,6 +215,9 @@ namespace IngameScript {
         IMyRadioAntenna ANTENNA;
         IMyProgrammableBlock SHOOTERPB;
         IMyTextPanel DEBUG;
+        IMyTextPanel LCDAUTOSWITCHGUNS;
+        IMyTextPanel LCDAUTOFIRE;
+        IMyTextPanel LCDAUTOMISSILES;
 
         IMyUnicastListener UNILISTENER;
         public IMyBroadcastListener BROADCASTLISTENER;
@@ -266,6 +270,9 @@ namespace IngameScript {
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
             autoMissilesCounter = autoMissilesDelay + 1;
             SetGunsDelay();
+            if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -429,12 +436,6 @@ namespace IngameScript {
                         weaponType = 0;
                     }
                     break;
-                case argAutoFire:
-                    autoFire = !autoFire;
-                    break;
-                case argAutoMissiles:
-                    autoMissiles = !autoMissiles;
-                    break;
                 case argSwitchPayLoad:
                     int blockCount = 0;
                     foreach (IMyProjector proj in TEMPPROJECTORS) {
@@ -454,9 +455,6 @@ namespace IngameScript {
                         }
                     }
                     break;
-                case argToggleAllGuns:
-                    autoSwitchGuns = !autoSwitchGuns;
-                    break;
                 case commandSpiral:
                     if (targetName != null) {
                         foreach (var id in MissileIDs) {
@@ -465,6 +463,18 @@ namespace IngameScript {
                             }
                         }
                     }
+                    break;
+                case argToggleAllGuns:
+                    autoSwitchGuns = !autoSwitchGuns;
+                    if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    break;
+                case argAutoFire:
+                    autoFire = !autoFire;
+                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    break;
+                case argAutoMissiles:
+                    autoMissiles = !autoMissiles;
+                    if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
             }
         }
@@ -738,7 +748,7 @@ namespace IngameScript {
             }
             ApplyGyroOverride(pitchSpeed, yawSpeed, userRoll, GYROS, CONTROLLER.WorldMatrix);
             Vector3D forwardVec = CONTROLLER.WorldMatrix.Forward;
-            double angle = VectorMath.AngleBetween(forwardVec, aimDirection);
+            double angle = AngleBetween(forwardVec, aimDirection);
             if (angle * rad2deg <= angleTolerance) {
                 readyToFire = true;
             } else {
@@ -798,7 +808,7 @@ namespace IngameScript {
             double pitchSpeed = pitchController.Control(pitchAngle);
             double rollSpeed = rollController.Control(rollAngle);
             ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, controller.WorldMatrix);
-            if (VectorMath.AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg <= tolerance) {
+            if (AngleBetween(controller.WorldMatrix.Forward, aimDirection) * rad2deg <= tolerance) {
                 aligned = true;
                 UnlockGyros();
             }
@@ -806,7 +816,7 @@ namespace IngameScript {
         }
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
-            desiredForwardVector = VectorMath.SafeNormalize(desiredForwardVector);
+            desiredForwardVector = SafeNormalize(desiredForwardVector);
             MatrixD transposedWm;
             MatrixD.Transpose(ref worldMatrix, out transposedWm);
             Vector3D.Rotate(ref desiredForwardVector, ref transposedWm, out desiredForwardVector);
@@ -818,7 +828,7 @@ namespace IngameScript {
                 axis = new Vector3D(desiredForwardVector.Y, -desiredForwardVector.X, 0);
                 angle = Math.Acos(MathHelper.Clamp(-desiredForwardVector.Z, -1.0, 1.0));
             } else {
-                leftVector = VectorMath.SafeNormalize(leftVector);
+                leftVector = SafeNormalize(leftVector);
                 Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
                 MatrixD targetMatrix = MatrixD.Zero;//Create matrix
                 targetMatrix.Forward = desiredForwardVector;
@@ -837,7 +847,7 @@ namespace IngameScript {
                 roll = 0;
                 return;
             }
-            axis = VectorMath.SafeNormalize(axis);
+            axis = SafeNormalize(axis);
             yaw = -axis.Y * angle;//Because gyros rotate about -X -Y -Z, we need to negate our angles
             pitch = -axis.X * angle;
             roll = -axis.Z * angle;
@@ -894,9 +904,6 @@ namespace IngameScript {
         }
 
         void GetBroadcastMessages() {
-            //message = arg;
-            //trgPstn = Vector3D.Zero;
-            //trgVl = Vector3D.Zero;
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     var igcMessage = BROADCASTLISTENER.AcceptMessage();
@@ -907,17 +914,6 @@ namespace IngameScript {
                             joltReady = data.Item2;
                         }
                     }
-                    /*else if (igcMessage.Data is MyTuple<string, string, Vector3D, Vector3D>) {
-                        var data = (MyTuple<string, string, Vector3D, Vector3D>)igcMessage.Data;
-                        string variable = data.Item1;
-                        if (variable == argLock) {
-                            message = data.Item2;
-                            trgPstn = data.Item3;
-                            trgVl = data.Item4;
-                        } else if (variable == argClear) {
-                            message = data.Item2;
-                        }
-                    }*/
                 }
             }
         }
@@ -1662,6 +1658,9 @@ namespace IngameScript {
             CONTROLLER = CONTROLLERS[0];
             SHOOTERPB = GridTerminalSystem.GetBlockWithName(decoyName) as IMyProgrammableBlock;
             DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+            LCDAUTOSWITCHGUNS = GridTerminalSystem.GetBlockWithName(autoSwitchGunsPanelName) as IMyTextPanel;
+            LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName(autoFirePanelName) as IMyTextPanel;
+            LCDAUTOMISSILES = GridTerminalSystem.GetBlockWithName(autoMissilesPanelName) as IMyTextPanel;
         }
 
         void SetBlocks() {
@@ -1690,46 +1689,16 @@ namespace IngameScript {
             }
         }
 
-        public static class VectorMath {
-            public static Vector3D SafeNormalize(Vector3D a) {
-                if (Vector3D.IsZero(a)) { return Vector3D.Zero; }
-                if (Vector3D.IsUnit(ref a)) { return a; }
-                return Vector3D.Normalize(a);
-            }
+        public static Vector3D SafeNormalize(Vector3D a) {
+            if (Vector3D.IsZero(a)) { return Vector3D.Zero; }
+            if (Vector3D.IsUnit(ref a)) { return a; }
+            return Vector3D.Normalize(a);
+        }
 
-            public static Vector3D Reflection(Vector3D a, Vector3D b, double rejectionFactor = 1) {//reflect a over b
-                Vector3D project_a = Projection(a, b);
-                Vector3D reject_a = a - project_a;
-                return project_a - reject_a * rejectionFactor;
-            }
-
-            public static Vector3D Rejection(Vector3D a, Vector3D b) {//reject a on b
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return Vector3D.Zero; }
-                return a - a.Dot(b) / b.LengthSquared() * b;
-            }
-
-            public static Vector3D Projection(Vector3D a, Vector3D b) {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return Vector3D.Zero; }
-                return a.Dot(b) / b.LengthSquared() * b;
-            }
-
-            public static double ScalarProjection(Vector3D a, Vector3D b) {
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) { return 0; }
-                if (Vector3D.IsUnit(ref b)) { return a.Dot(b); }
-                return a.Dot(b) / b.Length();
-            }
-
-            public static double AngleBetween(Vector3D a, Vector3D b) {//returns radians
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
-                    return 0;
-                } else { return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1)); }
-            }
-
-            public static double CosBetween(Vector3D a, Vector3D b) {//returns radians
-                if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
-                    return 0;
-                } else { return MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1); }
-            }
+        public static double AngleBetween(Vector3D a, Vector3D b) {//returns radians
+            if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
+                return 0;
+            } else { return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1)); }
         }
 
         void InitPIDControllers() {

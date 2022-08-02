@@ -22,7 +22,6 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //check speed and roll be4 detaching the decoy
         //SHOOTER
-
         readonly string projectorsDecoyName = "Decoy";
         readonly string projectorsBombName = "Bomb";
         readonly string gravGensName = "Decoy";

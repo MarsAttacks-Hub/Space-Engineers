@@ -22,7 +22,6 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
-        //use rotor Displacement instead of merge Enabled
         //when landing lock landing gear, when taking of unlock landing gear
         //when autopiloting if a enemy comes in range take control back and when gone restore autopilot to reach the position
         //sensor detection and raycast stop position need more precision
@@ -299,14 +298,14 @@ namespace IngameScript {
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
             if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0); }
-            if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-            if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+            if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(25, 0, 100) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -402,7 +401,7 @@ namespace IngameScript {
                     idleThrusters = !idleThrusters;
                     if (idleThrusters) {
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
-                        if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 255, 255); }
+                        if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(25, 0, 100); }
                     } else {
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                         if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
@@ -411,37 +410,37 @@ namespace IngameScript {
                     break;
                 case argMagneticDriveToggle:
                     magneticDrive = !magneticDrive;
-                    if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
                 case argDeadManToggle:
                     controlDampeners = !controlDampeners;
-                    if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
                 case argAutocombatToggle:
                     autocombat = !autocombat;
-                    if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
                 case argImpactsAvoidanceToggle:
                     impactsAvoidance = !impactsAvoidance;
-                    if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
                 case argCollisionDetectionToggle:
                     collisionDetection = !collisionDetection;
-                    if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
                 case argEnemyEvasionToggle:
                     enemyEvasion = !enemyEvasion;
-                    if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
                 case argGyroStabilizeToggle:
                     useGyrosToStabilize = !useGyrosToStabilize;
-                    if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                    if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
             }
@@ -1456,7 +1455,7 @@ namespace IngameScript {
                 if (SOLAR.IsFunctional && SOLAR.Enabled && SOLAR.IsWorking) {
                     float power = SOLAR.MaxOutput;
                     if (sunChaseOnce) {
-                        if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 255, 255); }
+                        if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(25, 0, 100); }
                         prevSunPower = power;
                         unlockSunChaseOnce = true;
                         sunChaseOnce = false;
@@ -1749,14 +1748,14 @@ namespace IngameScript {
                     idleThrusters = false;
                     controlDampeners = true;
                 }
-                if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(0, 255, 255) : new Color(0, 0, 0); }
-                if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(0, 255, 255) : new Color(0, 0, 0); }
+                if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 configChanged = false;
             }
         }

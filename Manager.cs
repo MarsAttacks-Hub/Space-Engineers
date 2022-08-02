@@ -20,9 +20,8 @@ using SpaceEngineers.Game.Entities.Blocks;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO check damaged/destroyed blocks
-        //MANAGER
 
+        //MANAGER
         readonly string solarsName = "[CRX] Solar";
         readonly string turbinesName = "[CRX] Wind Turbine";
         readonly string batteriesName = "[CRX] Battery";
@@ -126,11 +125,12 @@ namespace IngameScript {
         public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
         public List<IMyTerminalBlock> BLOCKSWITHINVENTORY = new List<IMyTerminalBlock>();
         public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
-        public List<IMyTextPanel> LCDSSTATUS = new List<IMyTextPanel>();
         public List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> INVENTORYSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
         public List<IMyTerminalBlock> terminalblocks = new List<IMyTerminalBlock>();
+
+        IMyTextPanel LCDSSTATUS;
 
         readonly MyIni myIni = new MyIni();
 
@@ -384,18 +384,15 @@ namespace IngameScript {
 
         void Setup() {
             GetBlocks();
-
             foreach (var block in REACTORS) { block.Enabled = true; }
             foreach (var block in HENGINES) { block.Enabled = true; }
             foreach (var block in BATTERIES) { block.Enabled = true; block.ChargeMode = ChargeMode.Auto; }
-
             GetBatteriesMaxInOut();
             GetHydrogenEnginesMaxOutput();
             GetReactorsMaxOutput();
-
             BROADCASTLISTENER = IGC.RegisterBroadcastListener(managerTag);
-
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
+            if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0); };
         }
 
         public void Main(string argument) {
@@ -510,10 +507,10 @@ namespace IngameScript {
                 case argTogglePB:
                     togglePB = !togglePB;
                     if (togglePB) {
-                        foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 255, 255); };
+                        if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(25, 0, 100); };
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     } else {
-                        foreach (IMyTextPanel block in LCDSSTATUS) { block.BackgroundColor = new Color(0, 0, 0); };
+                        if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(0, 0, 0); };
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
                     break;
@@ -1484,8 +1481,7 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains(shipPrefix));//&& block.IsSameConstructAs(Me)
             INVENTORIES.Clear();
             INVENTORIES.AddRange(BLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-            LCDSSTATUS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(LCDSSTATUS, block => block.CustomName.Contains(lcdStatusName));
+            LCDSSTATUS = GridTerminalSystem.GetBlockWithName(lcdStatusName) as IMyTextPanel;
             POWERSURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains(lcdPowerName));

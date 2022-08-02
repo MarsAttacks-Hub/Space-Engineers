@@ -23,7 +23,6 @@ namespace IngameScript {
         //TODO add other missile guidances
         //make a better drone AI
         //HOMING MISSILE
-
         readonly string antennaName = "A [M]1";
         readonly string missilePrefix = "[M]1";
         readonly string rocketsName = "Rocket";
