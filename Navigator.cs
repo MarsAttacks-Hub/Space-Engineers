@@ -314,7 +314,6 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 GetBroadcastMessages();
-                UpdateConfigParams();
 
                 bool enemiesFound = TurretsDetection(targFound);
                 if (collisionDetection) { ManageCollisions(targFound, REMOTE, enemiesFound); }
@@ -329,6 +328,7 @@ namespace IngameScript {
                 double mySpeed = controller.GetShipSpeed();
 
                 if (!string.IsNullOrEmpty(arg)) { ProcessArgument(arg, gravity); }
+                UpdateConfigParams();
 
                 ManageWaypoints(REMOTE, isUnderControl);
 
@@ -1254,12 +1254,12 @@ namespace IngameScript {
             return dirToKeep;
         }
 
-        Vector3D SetResultVector(Vector3D direction, Vector3D escapeDirection) {
-            if (!Vector3D.IsZero(escapeDirection)) {
+        Vector3D SetResultVector(Vector3D direction, Vector3D otherDirection) {
+            if (!Vector3D.IsZero(otherDirection)) {
                 if (!Vector3D.IsZero(direction)) {
-                    direction = (direction + escapeDirection) / 2;
+                    direction = (direction + otherDirection) / 2;
                 } else {
-                    direction = escapeDirection;
+                    direction = otherDirection;
                 }
             }
             return direction;
