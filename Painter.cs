@@ -22,6 +22,7 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
         //make LoadMissiles() universal
+        //make PID dinamic when not moving set it low
         //PAINTER
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -89,6 +90,7 @@ namespace IngameScript {
         readonly float artillerySpeed = 500f;
         readonly float railgunSpeed = 2000f;
         readonly float smallRailgunSpeed = 1000f;
+        readonly float securitySpeed = 10f;
         readonly double initialScanDistance = 10000d;
         readonly double angleTolerance = 1d;//degrees - threshold where guns start/stop to fire when aligning to the target
         readonly double gunsRange = 2000d;//maximum guns range
@@ -179,6 +181,7 @@ namespace IngameScript {
         bool assaultOnce = false;
         bool autocannonOnce = false;
         bool unlockOnce = false;
+        bool updateOnce = true;
         string targetName = null;
 
         MyDetectedEntityInfo targetInfo;
@@ -271,8 +274,8 @@ namespace IngameScript {
             autoMissilesCounter = autoMissilesDelay + 1;
             SetGunsDelay();
             if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoMissiles ? new Color(25, 0, 100) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -372,6 +375,8 @@ namespace IngameScript {
                     }
                 }
 
+                ManagePIDControllers(CONTROLLER.GetShipSpeed());
+
                 SyncGuns(timeSinceLastRun);
 
                 bool completed = CheckProjectors();
@@ -470,11 +475,11 @@ namespace IngameScript {
                     break;
                 case argAutoFire:
                     autoFire = !autoFire;
-                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
                 case argAutoMissiles:
                     autoMissiles = !autoMissiles;
-                    if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoMissiles ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
             }
         }
@@ -1707,73 +1712,100 @@ namespace IngameScript {
             rollController = new PID(rollAimP, rollAimI, rollAimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
+        void ManagePIDControllers(double mySpeed) {
+            if (mySpeed > securitySpeed) {
+                if (updateOnce) {
+                    UpdatePIDControllers(yawAimP, yawAimI, yawAimD, pitchAimP, pitchAimI, pitchAimD, rollAimP, rollAimI, rollAimD);
+                    updateOnce = false;
+                }
+            } else {
+                if (!updateOnce) {
+                    UpdatePIDControllers(rollAimP, rollAimI, rollAimD, rollAimP, rollAimI, rollAimD, rollAimP, rollAimI, rollAimD);
+                    updateOnce = true;
+                }
+            }
+        }
+
+        void UpdatePIDControllers(double yawAimP, double yawAimI, double yawAimD, double pitchAimP, double pitchAimI, double pitchAimD, double rollAimP, double rollAimI, double rollAimD) {
+            yawController.Update(yawAimP, yawAimI, yawAimD);
+            pitchController.Update(pitchAimP, pitchAimI, pitchAimD);
+            rollController.Update(rollAimP, rollAimI, rollAimD);
+        }
+
         public class PID {
-            public double _kP = 0;
-            public double _kI = 0;
-            public double _kD = 0;
-            public double _integralDecayRatio = 0;
-            public double _lowerBound = 0;
-            public double _upperBound = 0;
-            double _timeStep = 0;
-            double _inverseTimeStep = 0;
-            double _errorSum = 0;
-            double _lastError = 0;
-            bool _firstRun = true;
-            public bool _integralDecay = false;
+            public double kP = 0d;
+            public double kI = 0d;
+            public double kD = 0d;
+            public double integralDecayRatio = 0d;
+            public double lowerBound = 0d;
+            public double upperBound = 0d;
+            double timeStep = 0d;
+            double inverseTimeStep = 0d;
+            double errorSum = 0d;
+            double lastError = 0d;
+            bool firstRun = true;
+            public bool integralDecay = false;
             public double Value { get; private set; }
 
-            public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _lowerBound = lowerBound;
-                _upperBound = upperBound;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
-                _integralDecay = false;
+            public PID(double _kP, double _kI, double _kD, double _lowerBound, double _upperBound, double _timeStep) {
+                kP = _kP;
+                kI = _kI;
+                kD = _kD;
+                lowerBound = _lowerBound;
+                upperBound = _upperBound;
+                timeStep = _timeStep;
+                inverseTimeStep = 1d / timeStep;
+                integralDecay = false;
             }
 
-            public PID(double kP, double kI, double kD, double integralDecayRatio, double timeStep) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
-                _integralDecayRatio = integralDecayRatio;
-                _integralDecay = true;
+            public PID(double _kP, double _kI, double _kD, double _integralDecayRatio, double _timeStep) {
+                kP = _kP;
+                kI = _kI;
+                kD = _kD;
+                timeStep = _timeStep;
+                inverseTimeStep = 1d / timeStep;
+                integralDecayRatio = _integralDecayRatio;
+                integralDecay = true;
             }
 
-            public double Control(double error) {
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
-                if (_firstRun) {
-                    errorDerivative = 0;
-                    _firstRun = false;
+            public void Update(double _kP, double _kI, double _kD) {
+                kP = _kP;
+                kI = _kI;
+                kD = _kD;
+                firstRun = true;
+            }
+
+            public double Control(double _error) {
+                double errorDerivative = (_error - lastError) * inverseTimeStep;//Compute derivative term
+                if (firstRun) {
+                    errorDerivative = 0d;
+                    firstRun = false;
                 }
-                if (!_integralDecay) {//Compute integral term
-                    _errorSum += error * _timeStep;
-                    if (_errorSum > _upperBound) {//Clamp integral term
-                        _errorSum = _upperBound;
-                    } else if (_errorSum < _lowerBound) {
-                        _errorSum = _lowerBound;
+                if (!integralDecay) {//Compute integral term
+                    errorSum += _error * timeStep;
+                    if (errorSum > upperBound) {//Clamp integral term
+                        errorSum = upperBound;
+                    } else if (errorSum < lowerBound) {
+                        errorSum = lowerBound;
                     }
                 } else {
-                    _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
+                    errorSum = errorSum * (1.0 - integralDecayRatio) + _error * timeStep;
                 }
-                _lastError = error;//Store this error as last error
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;//Construct output
+                lastError = _error;//Store this error as last error
+                this.Value = kP * _error + kI * errorSum + kD * errorDerivative;//Construct output
                 return this.Value;
             }
 
-            public double Control(double error, double timeStep) {
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
-                return Control(error);
+            public double Control(double _error, double _timeStep) {
+                timeStep = _timeStep;
+                inverseTimeStep = 1d / timeStep;
+                return Control(_error);
             }
 
             public void Reset() {
-                _errorSum = 0;
-                _lastError = 0;
-                _firstRun = true;
+                errorSum = 0d;
+                lastError = 0d;
+                firstRun = true;
             }
         }
 

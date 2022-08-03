@@ -22,9 +22,10 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
-        //when landing lock landing gear, when taking of unlock landing gear
-        //when autopiloting if a enemy comes in range take control back and when gone restore autopilot to reach the position
-        //sensor detection and raycast stop position need more precision
+        //lock landing gear when landing, unlock when taking off
+        //land doesn't work
+        //thrusters doesn't turn off when idling in gravity
+        //when autofighting the ship goes down in gravity, impact avoidance is useless
         //NAVIGATOR
         readonly string controllersName = "[CRX] Controller";
         readonly string remotesName = "[CRX] Controller Remote";
@@ -91,9 +92,10 @@ namespace IngameScript {
         readonly bool keepAltitude = true;
         readonly bool useRoll = false;
         readonly bool isModdedSensor = false;
+        readonly bool closeRangeCombat = false;
         readonly double collisionsDegree = 9000d;
         readonly double evasionDegree = 4500d;
-        readonly double raycastSafety = 250d;
+        readonly double raycastSafety = 1000d;
         readonly double yawAimP = 5d;
         readonly double yawAimI = 0d;
         readonly double yawAimD = 5d;
@@ -115,17 +117,17 @@ namespace IngameScript {
         readonly float autocannonGatlingSpeed = 400f;
         readonly float railgunSpeed = 2000f;
         readonly float smallRailgunSpeed = 1000f;
-        readonly float maxSpeed = 105f;
+        readonly double maxSpeed = 105d;
         readonly float securitySpeed = 10f;
-        readonly float minSpeed = 2f;
+        readonly double minSpeed = 2d;
         readonly float deadManMinSpeed = 0.1f;
         readonly float targetVel = 29 * rpsOverRpm;
         readonly float syncSpeed = 1 * rpsOverRpm;
         readonly int tickDelay = 50;
         readonly int randomDelay = 10;
-        readonly int collisionCheckDelay = 10;
         readonly int keepAltitudeDelay = 50;
         int turretsDetectionDelay = 5;
+        int collisionCheckDelay = 10;
 
         bool magneticDrive = true;
         bool controlDampeners = true;
@@ -143,11 +145,11 @@ namespace IngameScript {
         bool railgunsCanShoot = true;
         bool smallRailgunsCanShoot = true;
         bool sunChasing = false;
+        bool checkAllTicks = false;
         bool unlockGyrosOnce = true;
         bool deadManOnce = false;
         bool toggleThrustersOnce = false;
         bool returnOnce = true;
-        bool unlockOnce = true;
         bool isPilotedOnce = true;
         bool initMagneticDriveOnce = true;
         bool initAutoMagneticDriveOnce = true;
@@ -157,6 +159,7 @@ namespace IngameScript {
         bool unlockSunChaseOnce = true;
         bool keepAltitudeOnce = true;
         bool sensorDetectionOnce = true;
+        bool updateOnce = true;
         string selectedPlanet = "";
         double maxScanRange = 0d;
         double altitudeToKeep = 0d;
@@ -167,6 +170,7 @@ namespace IngameScript {
         int planetSelector = 0;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
+        int checkAllTicksCount = 0;
         int turretsDetectionCount = 5;
         int tickCount = 0;
         int randomCount = 50;
@@ -314,8 +318,8 @@ namespace IngameScript {
 
                 GetBroadcastMessages();
 
-                bool enemiesFound = TurretsDetection(targFound);
-                if (collisionDetection) { ManageCollisions(targFound, REMOTE, enemiesFound); }
+                TurretsDetection(targFound);
+                if (collisionDetection) { ManageCollisions(targFound, REMOTE); }
                 bool isControlled = GetController();
                 SendBroadcastControllerMessage(isControlled);
                 bool isAutoPiloted = IsAutoPiloted();
@@ -329,7 +333,9 @@ namespace IngameScript {
                 if (!string.IsNullOrEmpty(arg)) { ProcessArgument(arg, gravity); }
                 UpdateConfigParams();
 
-                ManageWaypoints(REMOTE, isUnderControl);
+                ManageWaypoints(REMOTE, isUnderControl, targFound, targetInfo.IsEmpty());
+
+                ManagePIDControllers(mySpeed);
 
                 GyroStabilize(controller, targFound, aimTarget, isAutoPiloted, useRoll, gravity, mySpeed, targetInfo.IsEmpty());
 
@@ -682,7 +688,6 @@ namespace IngameScript {
                             Matrix mtrx;
                             dir = MagneticDrive(controller, out mtrx);
                             dir = MagneticDampeners(dir, myVelocity, gravity, controller, mtrx);
-                            IdleThrusters(dir, idleThrusters);
                             Vector3D dirNew = KeepAltitude(isUnderControl, controller, idleThrusters, keepAltitude, gravity, altitude);
                             dir = MergeDirectionValues(dir, dirNew);
                         }
@@ -703,6 +708,14 @@ namespace IngameScript {
                         SetSensorsExtend();
                         sensorDetectionOnce = false;
                     }
+                    if (checkAllTicks) {
+                        collisionCheckDelay = 1;
+                        checkAllTicksCount++;
+                        if (checkAllTicksCount == 200) {
+                            checkAllTicks = false;
+                            checkAllTicksCount = 0;
+                        }
+                    }
                     UpdateAcceleration(controller, Runtime.TimeSinceLastRun.TotalSeconds, myVelocity);
                     if (collisionCheckCount >= collisionCheckDelay) {
                         double stopDistance = CalculateStopDistance(controller, myVelocity);
@@ -716,6 +729,7 @@ namespace IngameScript {
                     collisionCheckCount++;
                     if (!Vector3D.IsZero(stopDir)) {
                         dir = MergeDirectionValues(dir, stopDir);
+                        checkAllTicks = true;
                     }
                     if (!Vector3D.IsZero(sensorDir)) {
                         dir = MergeDirectionValues(dir, sensorDir);
@@ -732,6 +746,10 @@ namespace IngameScript {
                         }
                         sensorDetectionOnce = true;
                     }
+                }
+
+                if (!isAutoPiloted) {
+                    IdleThrusters(dir, idleThrusters);
                 }
 
                 SetPower(dir);
@@ -826,7 +844,7 @@ namespace IngameScript {
             }
         }
 
-        void SetPower(Vector3D pow) {//TODO use rotor Displacement instead of merge Enabled
+        void SetPower(Vector3D pow) {
             if (pow.X != 0f) {
                 if (pow.X > 0f) {
                     foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = true; }
@@ -943,8 +961,13 @@ namespace IngameScript {
                 minDistance = gunsCloseRange;
                 maxDistance = gunsMidRange;
                 if (!assaultCanShoot && !smallRailgunsCanShoot) {
-                    minDistance = 500d;
-                    maxDistance = gunsCloseRange;
+                    if (closeRangeCombat) {
+                        minDistance = 500d;
+                        maxDistance = gunsCloseRange;
+                    } else {
+                        minDistance = gunsCloseRange;
+                        maxDistance = gunsMidRange;
+                    }
                 }
             }
             Vector3D direction = targPos - controller.CubeGrid.WorldVolume.Center;
@@ -1017,31 +1040,18 @@ namespace IngameScript {
             return targetFound;
         }
 
-        void ManageCollisions(bool targFound, IMyRemoteControl remote, bool enemiesFound) {
+        void ManageCollisions(bool targFound, IMyRemoteControl remote) {
             if (!targFound) {//!isUnderControl
                 if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
-                    unlockOnce = false;
                     Vector3D targetVelocity = targetInfo.Velocity;
                     collisionDir = CheckCollisions(remote, targetInfo.Position, targetVelocity);
                 }
             } else {
-                if (!unlockOnce) {
-                    //UnlockGyros();
-                    unlockOnce = true;
-                    collisionDir = Vector3D.Zero;
-                }
+                collisionDir = Vector3D.Zero;
             }
             foreach (MyDetectedEntityInfo target in targetsInfo) {
                 Vector3D escapeDir = CheckCollisions(remote, target.Position, target.Velocity);
                 collisionDir = SetResultVector(collisionDir, escapeDir);
-            }
-            if (!enemiesFound) {
-                if (!Vector3D.IsZero(returnPosition)) {
-                    remote.ClearWaypoints();
-                    remote.AddWaypoint(returnPosition, "returnPosition");
-                    remote.SetAutoPilotEnabled(true);
-                    returnOnce = true;
-                }
             }
         }
 
@@ -1051,12 +1061,6 @@ namespace IngameScript {
                 double distance = Vector3D.Distance(remote.CubeGrid.WorldVolume.Center, targetPos);
                 double angle = AngleBetween(targetVelocity, Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - targetPos)) * rad2deg;
                 if (angle < (collisionsDegree / distance)) {
-                    if (returnOnce) {
-                        if (Vector3D.IsZero(returnPosition)) {
-                            returnPosition = remote.CubeGrid.WorldVolume.Center;
-                        }
-                        returnOnce = false;
-                    }
                     Vector3D enemyDirectionPosition = targetPos + (targetVelocity * distance);
                     Vector3D escapeDirection = Vector3D.Normalize(remote.CubeGrid.WorldVolume.Center - enemyDirectionPosition);//toward my center normalize?
                     escapeDirection = Vector3D.TransformNormal(escapeDirection, MatrixD.Transpose(remote.WorldMatrix));
@@ -1294,7 +1298,7 @@ namespace IngameScript {
             }
         }
 
-        void ManageWaypoints(IMyRemoteControl remote, bool isUnderControl) {
+        void ManageWaypoints(IMyRemoteControl remote, bool isUnderControl, bool targFound, bool isTargetEmpty) {
             if (!isUnderControl) {
                 isPilotedOnce = true;
             } else {
@@ -1306,40 +1310,56 @@ namespace IngameScript {
                     isPilotedOnce = false;
                 }
             }
-            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
-                if (Vector3D.Distance(targetPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
+            if (targFound || !isTargetEmpty) {
+                if (remote.IsAutoPilotEnabled) {
                     remote.SetAutoPilotEnabled(false);
-                    targetPosition = Vector3D.Zero;
                 }
-            }
-            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition)) {
-                if (Vector3D.Distance(returnPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
+            } else {
+                if (returnOnce && Vector3D.IsZero(returnPosition) && !isUnderControl) {
+                    returnPosition = remote.CubeGrid.WorldVolume.Center;
+                    returnOnce = false;
+                }
+                if (!Vector3D.IsZero(returnPosition)) {
                     remote.ClearWaypoints();
-                    remote.SetAutoPilotEnabled(false);
-                    returnPosition = Vector3D.Zero;
+                    remote.AddWaypoint(returnPosition, "returnPosition");
+                    remote.SetAutoPilotEnabled(true);
                     returnOnce = true;
                 }
-            }
-            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(hoverPosition)) {
-                if (Vector3D.Distance(hoverPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
-                    remote.ClearWaypoints();
-                    remote.SetAutoPilotEnabled(false);
-                    hoverPosition = Vector3D.Zero;
+                if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition)) {
+                    if (Vector3D.Distance(returnPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
+                        remote.ClearWaypoints();
+                        remote.SetAutoPilotEnabled(false);
+                        returnPosition = Vector3D.Zero;
+                        returnOnce = true;
+                    }
                 }
-            }
-            if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(landPosition)) {
-                foreach (IMyCockpit cockpit in COCKPITS) {
-                    if (cockpit.IsUnderControl && !Vector3D.IsZero(cockpit.MoveIndicator)) {
+                if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(hoverPosition)) {
+                    if (Vector3D.Distance(hoverPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
+                        remote.ClearWaypoints();
+                        remote.SetAutoPilotEnabled(false);
+                        hoverPosition = Vector3D.Zero;
+                    }
+                }
+                if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(landPosition)) {
+                    foreach (IMyCockpit cockpit in COCKPITS) {
+                        if (cockpit.IsUnderControl && !Vector3D.IsZero(cockpit.MoveIndicator)) {
+                            remote.ClearWaypoints();
+                            remote.SetAutoPilotEnabled(false);
+                            //landPosition = Vector3D.Zero;
+                            break;
+                        }
+                    }
+                    if (Vector3D.Distance(landPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
                         remote.ClearWaypoints();
                         remote.SetAutoPilotEnabled(false);
                         landPosition = Vector3D.Zero;
-                        break;
                     }
                 }
-                if (Vector3D.Distance(landPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
-                    remote.ClearWaypoints();
-                    remote.SetAutoPilotEnabled(false);
-                    landPosition = Vector3D.Zero;
+                if (remote.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
+                    if (Vector3D.Distance(targetPosition, remote.CubeGrid.WorldVolume.Center) < stopDistance) {
+                        remote.SetAutoPilotEnabled(false);
+                        targetPosition = Vector3D.Zero;
+                    }
                 }
             }
         }
@@ -1420,10 +1440,10 @@ namespace IngameScript {
         void Land(IMyRemoteControl remote, Vector3D gravity) {
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             if (lidar == null) { return; }
-            MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);
+            MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);//TODO
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    landPosition = TARGET.HitPosition.Value - Vector3D.Normalize(gravity) * 50d;
+                    landPosition = TARGET.HitPosition.Value - Vector3D.Normalize(-gravity) * 50d;
                     remote.ClearWaypoints();
                     remote.AddWaypoint(landPosition, "landPosition");
                     remote.SetAutoPilotEnabled(true);
@@ -1846,73 +1866,100 @@ namespace IngameScript {
             rollController = new PID(rollAimP, rollAimI, rollAimD, integralWindupLimit, -integralWindupLimit, globalTimestep);
         }
 
+        void ManagePIDControllers(double mySpeed) {
+            if (mySpeed > securitySpeed) {
+                if (updateOnce) {
+                    UpdatePIDControllers(yawAimP, yawAimI, yawAimD, pitchAimP, pitchAimI, pitchAimD, rollAimP, rollAimI, rollAimD);
+                    updateOnce = false;
+                }
+            } else {
+                if (!updateOnce) {
+                    UpdatePIDControllers(rollAimP, rollAimI, rollAimD, rollAimP, rollAimI, rollAimD, rollAimP, rollAimI, rollAimD);
+                    updateOnce = true;
+                }
+            }
+        }
+
+        void UpdatePIDControllers(double yawAimP, double yawAimI, double yawAimD, double pitchAimP, double pitchAimI, double pitchAimD, double rollAimP, double rollAimI, double rollAimD) {
+            yawController.Update(yawAimP, yawAimI, yawAimD);
+            pitchController.Update(pitchAimP, pitchAimI, pitchAimD);
+            rollController.Update(rollAimP, rollAimI, rollAimD);
+        }
+
         public class PID {
-            public double _kP = 0d;
-            public double _kI = 0d;
-            public double _kD = 0d;
-            public double _integralDecayRatio = 0d;
-            public double _lowerBound = 0d;
-            public double _upperBound = 0d;
-            double _timeStep = 0d;
-            double _inverseTimeStep = 0d;
-            double _errorSum = 0d;
-            double _lastError = 0d;
-            bool _firstRun = true;
-            public bool _integralDecay = false;
+            public double kP = 0d;
+            public double kI = 0d;
+            public double kD = 0d;
+            public double integralDecayRatio = 0d;
+            public double lowerBound = 0d;
+            public double upperBound = 0d;
+            double timeStep = 0d;
+            double inverseTimeStep = 0d;
+            double errorSum = 0d;
+            double lastError = 0d;
+            bool firstRun = true;
+            public bool integralDecay = false;
             public double Value { get; private set; }
 
-            public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _lowerBound = lowerBound;
-                _upperBound = upperBound;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1d / _timeStep;
-                _integralDecay = false;
+            public PID(double _kP, double _kI, double _kD, double _lowerBound, double _upperBound, double _timeStep) {
+                kP = _kP;
+                kI = _kI;
+                kD = _kD;
+                lowerBound = _lowerBound;
+                upperBound = _upperBound;
+                timeStep = _timeStep;
+                inverseTimeStep = 1d / timeStep;
+                integralDecay = false;
             }
 
-            public PID(double kP, double kI, double kD, double integralDecayRatio, double timeStep) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1d / _timeStep;
-                _integralDecayRatio = integralDecayRatio;
-                _integralDecay = true;
+            public PID(double _kP, double _kI, double _kD, double _integralDecayRatio, double _timeStep) {
+                kP = _kP;
+                kI = _kI;
+                kD = _kD;
+                timeStep = _timeStep;
+                inverseTimeStep = 1d / timeStep;
+                integralDecayRatio = _integralDecayRatio;
+                integralDecay = true;
             }
 
-            public double Control(double error) {
-                double errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
-                if (_firstRun) {
+            public void Update(double _kP, double _kI, double _kD) {
+                kP = _kP;
+                kI = _kI;
+                kD = _kD;
+                firstRun = true;
+            }
+
+            public double Control(double _error) {
+                double errorDerivative = (_error - lastError) * inverseTimeStep;//Compute derivative term
+                if (firstRun) {
                     errorDerivative = 0d;
-                    _firstRun = false;
+                    firstRun = false;
                 }
-                if (!_integralDecay) {//Compute integral term
-                    _errorSum += error * _timeStep;
-                    if (_errorSum > _upperBound) {//Clamp integral term
-                        _errorSum = _upperBound;
-                    } else if (_errorSum < _lowerBound) {
-                        _errorSum = _lowerBound;
+                if (!integralDecay) {//Compute integral term
+                    errorSum += _error * timeStep;
+                    if (errorSum > upperBound) {//Clamp integral term
+                        errorSum = upperBound;
+                    } else if (errorSum < lowerBound) {
+                        errorSum = lowerBound;
                     }
                 } else {
-                    _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
+                    errorSum = errorSum * (1.0 - integralDecayRatio) + _error * timeStep;
                 }
-                _lastError = error;//Store this error as last error
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;//Construct output
+                lastError = _error;//Store this error as last error
+                this.Value = kP * _error + kI * errorSum + kD * errorDerivative;//Construct output
                 return this.Value;
             }
 
-            public double Control(double error, double timeStep) {
-                _timeStep = timeStep;
-                _inverseTimeStep = 1d / _timeStep;
-                return Control(error);
+            public double Control(double _error, double _timeStep) {
+                timeStep = _timeStep;
+                inverseTimeStep = 1d / timeStep;
+                return Control(_error);
             }
 
             public void Reset() {
-                _errorSum = 0d;
-                _lastError = 0d;
-                _firstRun = true;
+                errorSum = 0d;
+                lastError = 0d;
+                firstRun = true;
             }
         }
 
