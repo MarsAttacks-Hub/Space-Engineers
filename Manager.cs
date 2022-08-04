@@ -60,6 +60,8 @@ namespace IngameScript {
         readonly double tankThresold = 20;
 
         const string argTogglePB = "TogglePB";
+        const string argPBOn = "PBOn";
+        const string argPBOff = "PBOff";
 
         int cockpitPowerSurface = 2;
         int ticks = 0;
@@ -401,6 +403,7 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(argument)) { ProcessArgument(argument); }
+                if (!togglePB) { return; }
 
                 GetBroadcastMessages();
 
@@ -513,6 +516,16 @@ namespace IngameScript {
                         if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(0, 0, 0); };
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
+                    break;
+                case argPBOn:
+                    togglePB = true;
+                    if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(25, 0, 100); };
+                    Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                    break;
+                case argPBOff:
+                    togglePB = false;
+                    if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(0, 0, 0); };
+                    Runtime.UpdateFrequency = UpdateFrequency.None;
                     break;
             }
         }

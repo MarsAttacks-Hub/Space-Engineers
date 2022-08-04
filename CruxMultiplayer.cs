@@ -22,25 +22,17 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
 
-        const float globalTimestep = 10.0f / 60.0f;
-        const float circle = (float)(2 * Math.PI);
-        const double rad2deg = 180 / Math.PI;
-
-        readonly float rotorVel = 29 * (float)(Math.PI / 30);//rpsOverRpm
-        readonly float syncSpeed = 1 * (float)(Math.PI / 30);
-
-        readonly bool creative = true;
-        readonly bool sequenceWeapons = false;//set true to sequence Gun lists
-        readonly int checkGunsDelay = 10;
-
-        bool magneticDrive = true;
-        bool idleThrusters = false;
+        bool creative = true;//creative mode
+        bool magneticDrive = true;//enable/disable magnetic drive
+        bool autoFire = true;//to fire guns automatically
+        bool idleThrusters = false;//enable/disable thrusters
+        bool togglePB = true;
+        bool sunChasing = false;
         bool hasCenter = true;
         bool scanCenter = false;
         bool scanFudge = false;
         bool fudgeVectorSwitch = false;
         bool aimTarget = false;
-        bool sunChasing = false;
         bool readyToFire = false;
         bool joltReady = true;
         bool gatlingAmmoFound = true;
@@ -73,36 +65,29 @@ namespace IngameScript {
         bool smallRailgunsOnce = false;
         bool assaultOnce = false;
         bool autocannonOnce = false;
-
         int rocketDelay = 1;
         int assaultDelay = 1;
         int artilleryDelay = 1;
         int railgunsDelay = 1;
         int smallRailgunsDelay = 1;
-        int rocketCount = 0;
-        int rocketIndex = 0;
-        int assaultCount = 0;
-        int assaultIndex = 0;
-        int artilleryCount = 0;
-        int artilleryIndex = 0;
-        int railgunsCount = 0;
-        int railgunsIndex = 0;
-        int smallRailgunsCount = 0;
-        int smallRailgunsIndex = 0;
-
         double timeSinceLastLock = 0d;
         double fudgeFactor = 5d;
         double movePitch = .01;
         double moveYaw = .01;
-
         float prevSunPower = 0f;
-
-        bool autoFire = true;//set true to fire guns automatically
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
         int missedScan = 0;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
         int checkGunsCount;
+
+        readonly float rotorVel = 29 * (float)(Math.PI / 30);//rpsOverRpm
+        readonly float syncSpeed = 1 * (float)(Math.PI / 30);
+        readonly int checkGunsDelay = 10;
+
+        const float globalTimestep = 10.0f / 60.0f;
+        const float circle = (float)(2 * Math.PI);
+        const double rad2deg = 180 / Math.PI;
 
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyCameraBlock> LIDARS = new List<IMyCameraBlock>();
@@ -148,6 +133,8 @@ namespace IngameScript {
         IMyTextPanel LCDMAGNETICDRIVE;
         IMyTextPanel LCDIDLETHRUSTERS;
         IMyTextPanel LCDAUTOFIRE;
+        IMyTextPanel LCDCREATIVE;
+        IMyTextPanel LCDTOGGLE;
 
         PID yawController;
         PID pitchController;
@@ -177,10 +164,13 @@ namespace IngameScript {
             InitPIDControllers();
             SetGunsDelay();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[MULTI]");
+            foreach (IMyCameraBlock cam in LIDARS) { cam.EnableRaycast = true; }
             if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            InitMulti();
         }
 
         public void Main(string arg) {
@@ -191,7 +181,7 @@ namespace IngameScript {
 
                 Vector3D gravity = CONTROLLER.GetNaturalGravity();
                 ProcessArgument(arg, gravity);
-                if (arg == "RangeFinder") { return; }
+                if (arg == "RangeFinder") { return; } else if (!togglePB) { return; }
 
                 if (aimTarget) {
                     bool aligned;
@@ -291,7 +281,9 @@ namespace IngameScript {
                 case "RangeFinder":
                     if (Vector3D.IsZero(gravity)) {
                         RangeFinder();
-                    } else { Land(gravity); }
+                    } else {
+                        Land(gravity);
+                    }
                     break;
                 case "AimTarget": if (!Vector3D.IsZero(rangeFinderPosition)) { aimTarget = true; }; break;
                 case "SunChaserToggle":
@@ -314,6 +306,34 @@ namespace IngameScript {
                 case "AutoFire":
                     autoFire = !autoFire;
                     if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    break;
+                case "ToggleCreative":
+                    creative = !creative;
+                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    break;
+                case "TogglePB":
+                    togglePB = !togglePB;
+                    if (togglePB) {
+                        if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(25, 0, 100); };
+                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                        Setup();
+                    } else {
+                        if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(0, 0, 0); };
+                        Runtime.UpdateFrequency = UpdateFrequency.None;
+                        ShutDownMulti();
+                    }
+                    break;
+                case "PBOn":
+                    togglePB = true;
+                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(25, 0, 100); };
+                    Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                    Setup();
+                    break;
+                case "PBOff":
+                    togglePB = false;
+                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(0, 0, 0); };
+                    Runtime.UpdateFrequency = UpdateFrequency.None;
+                    ShutDownMulti();
                     break;
             }
         }
@@ -1047,6 +1067,80 @@ namespace IngameScript {
             return Math.Abs(rotorAngle) > Math.Abs(b) ? b : rotorAngle;
         }
 
+        void InitMulti() {
+            IMyTextSurfaceProvider cockpit = CONTROLLER as IMyTextSurfaceProvider;
+            int surfaceCount = cockpit.SurfaceCount;
+            for (int i = 0; i < surfaceCount; i++) {
+                if (i == 0 || i == 2 || i == 4) {
+                    cockpit.GetSurface(i).WriteText("");
+                }
+            }
+            List<IMyTextPanel> panels = new List<IMyTextPanel>();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power")
+            || block.CustomName.Contains("[CRX] LCD Manager Status") || block.CustomName.Contains("[CRX] LCD Inventory")
+            || block.CustomName.Contains("[CRX] LCD Components") || block.CustomName.Contains("[CRX] LCD Target")
+            || block.CustomName.Contains("[CRX] LCD RangeFinder"));
+            foreach (IMyTextPanel block in panels) {
+                block.WriteText("");
+            }
+            panels.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Auto Missiles Toggle")
+            || block.CustomName.Contains("[CRX] LCD Auto Switch Guns Toggle") || block.CustomName.Contains("[CRX] LCD DeadMan Toggle")
+            || block.CustomName.Contains("[CRX] LCD Autocombat Toggle") || block.CustomName.Contains("[CRX] LCD Impacts Toggle")
+            || block.CustomName.Contains("[CRX] LCD Collisions Toggle") || block.CustomName.Contains("[CRX] LCD Evasion Toggle")
+            || block.CustomName.Contains("[CRX] LCD Stabilizer Toggle"));
+            foreach (IMyTextPanel block in panels) {
+                block.BackgroundColor = new Color(0, 0, 0);
+            }
+            panels.Clear();
+            List<IMySensorBlock> sensors = new List<IMySensorBlock>();
+            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(sensors, block => block.CustomName.Contains("[CRX] Sensor"));
+            foreach (IMySensorBlock sensor in sensors) {
+                sensor.BackExtend = 0.1f;
+                sensor.BottomExtend = 0.1f;
+                sensor.FrontExtend = 0.1f;
+                sensor.LeftExtend = 0.1f;
+                sensor.RightExtend = 0.1f;
+                sensor.TopExtend = 0.1f;
+            }
+            sensors.Clear();
+            IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
+            pb.TryRun("PBOff");
+            pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
+            pb.Enabled = false;
+            pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Navigator") as IMyProgrammableBlock;
+            pb.Enabled = false;
+            List<IMyFunctionalBlock> buttons = new List<IMyFunctionalBlock>();
+            GridTerminalSystem.GetBlocksOfType<IMyFunctionalBlock>(buttons, block => block.CustomName.Contains("[CRX] Button Toggle Auto Missiles")
+                        || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Autocombat")
+                        || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle DeadMan")
+                        || block.CustomName.Contains("[CRX] Button Toggle Enemy Evasion") || block.CustomName.Contains("[CRX] Button Toggle Impacts")
+                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer"));
+            foreach (IMyFunctionalBlock block in buttons) {
+                block.Enabled = false;
+            }
+            buttons.Clear();
+        }
+
+        void ShutDownMulti() {
+            IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
+            pb.TryRun("PBOn");
+            pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
+            pb.Enabled = true;
+            pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Navigator") as IMyProgrammableBlock;
+            pb.Enabled = true;
+            List<IMyFunctionalBlock> buttons = new List<IMyFunctionalBlock>();
+            GridTerminalSystem.GetBlocksOfType<IMyFunctionalBlock>(buttons, block => block.CustomName.Contains("[CRX] Button Toggle Auto Missiles")
+                        || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Autocombat")
+                        || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle DeadMan")
+                        || block.CustomName.Contains("[CRX] Button Toggle Enemy Evasion") || block.CustomName.Contains("[CRX] Button Toggle Impacts")
+                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer"));
+            foreach (IMyFunctionalBlock block in buttons) {
+                block.Enabled = true;
+            }
+            buttons.Clear();
+        }
+
         void GetBlocks() {
             GYROS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyGyro>(GYROS, block => block.CustomName.Contains("[CRX] Gyro"));
@@ -1118,6 +1212,8 @@ namespace IngameScript {
             LCDSUNCHASER = GridTerminalSystem.GetBlockWithName("[CRX] LCD SunChaser Toggle") as IMyTextPanel;
             LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD MagneticDrive Toggle") as IMyTextPanel;
             LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD AutoFire Toggle") as IMyTextPanel;
+            LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Creative Toggle") as IMyTextPanel;
+            LCDTOGGLE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Multi Toggle") as IMyTextPanel;
         }
 
         public class Gun {
@@ -1229,9 +1325,7 @@ namespace IngameScript {
                                 return;
                             }
                             if (!railgunsOnce) { SwitchGun(true, true, true, false, true); }
-                            if (sequenceWeapons) {
-                                SequenceWeapons(RAILGUNS, railgunsDelay, ref railgunsCount, ref railgunsIndex, timeSinceLastRun);
-                            } else { foreach (Gun gun in RAILGUNS) { gun.Shoot(timeSinceLastRun); } }
+                            foreach (Gun gun in RAILGUNS) { gun.Shoot(timeSinceLastRun); }
                         } else {
                             if (readyToFireOnce) {
                                 readyToFireOnce = false;
@@ -1247,9 +1341,7 @@ namespace IngameScript {
                                 return;
                             }
                             if (!artilleryOnce) { SwitchGun(true, true, false, true, true); }
-                            if (sequenceWeapons) {
-                                SequenceWeapons(ARTILLERY, artilleryDelay, ref artilleryCount, ref artilleryIndex, timeSinceLastRun);
-                            } else { foreach (Gun gun in ARTILLERY) { gun.Shoot(timeSinceLastRun); } }
+                            foreach (Gun gun in ARTILLERY) { gun.Shoot(timeSinceLastRun); }
                         } else {
                             if (readyToFireOnce) {
                                 readyToFireOnce = false;
@@ -1265,9 +1357,7 @@ namespace IngameScript {
                                 return;
                             }
                             if (!smallRailgunsOnce) { SwitchGun(true, true, true, true, false); }
-                            if (sequenceWeapons) {
-                                SequenceWeapons(SMALLRAILGUNS, smallRailgunsDelay, ref smallRailgunsCount, ref smallRailgunsIndex, timeSinceLastRun);
-                            } else { foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(timeSinceLastRun); } }
+                            foreach (Gun gun in SMALLRAILGUNS) { gun.Shoot(timeSinceLastRun); }
                         } else {
                             if (readyToFireOnce) {
                                 readyToFireOnce = false;
@@ -1283,9 +1373,7 @@ namespace IngameScript {
                                 return;
                             }
                             if (!assaultOnce) { SwitchGun(true, false, true, true, true); }
-                            if (sequenceWeapons) {
-                                SequenceWeapons(ASSAULT, assaultDelay, ref assaultCount, ref assaultIndex, timeSinceLastRun);
-                            } else { foreach (Gun gun in ASSAULT) { gun.Shoot(timeSinceLastRun); } }
+                            foreach (Gun gun in ASSAULT) { gun.Shoot(timeSinceLastRun); }
                         } else {
                             if (readyToFireOnce) {
                                 readyToFireOnce = false;
@@ -1323,9 +1411,7 @@ namespace IngameScript {
                                 return;
                             }
                             if (!rocketsOnce) { SwitchGun(false, true, true, true, true); }
-                            if (sequenceWeapons) {
-                                SequenceWeapons(ROCKETS, rocketDelay, ref rocketCount, ref rocketIndex, timeSinceLastRun);
-                            } else { foreach (Gun gun in ROCKETS) { gun.Shoot(timeSinceLastRun); } }
+                            foreach (Gun gun in ROCKETS) { gun.Shoot(timeSinceLastRun); }
                         } else {
                             if (readyToFireOnce) {
                                 readyToFireOnce = false;
@@ -1409,20 +1495,6 @@ namespace IngameScript {
             artilleryOnce = false;
             railgunsOnce = false;
             smallRailgunsOnce = false;
-        }
-
-        void SequenceWeapons(List<Gun> guns, int delay, ref int count, ref int index, double timeSinceLastRun) {
-            if (count == delay) {
-                for (int i = 0; i < guns.Count; i++) {
-                    if (i == index) {
-                        guns[i].Shoot(timeSinceLastRun);
-                    } else { guns[i].Update(timeSinceLastRun); }
-                }
-                count = 0;
-            } else { foreach (Gun gun in guns) { gun.Update(timeSinceLastRun); } }
-            index++;
-            if (index >= guns.Count) { index = 0; }
-            count++;
         }
 
         void SetGunsDelay() {
