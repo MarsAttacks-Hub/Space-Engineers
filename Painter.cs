@@ -23,6 +23,8 @@ namespace IngameScript {
         //TODO
         //make LoadMissiles() universal
         //make PID dinamic when not moving set it low
+        //toggle sequenceWeapons
+        //toggle creative
         //PAINTER
         readonly string lidarsName = "[CRX] Camera Lidar";
         readonly string antennasName = "T";
@@ -344,7 +346,7 @@ namespace IngameScript {
                     } else { timeSinceLastLock += timeSinceLastRun; }
 
                     ReadTargetInfo();
-                } else {
+                } else {//TODO //-------------------------------
                     if (doOnce) {//things to run once when a enemy is lost
                         ResetTargeter();
                         return;
@@ -374,6 +376,7 @@ namespace IngameScript {
                         }
                     }
                 }
+                //-------------------------------
 
                 ManagePIDControllers(CONTROLLER.GetShipSpeed());
 
