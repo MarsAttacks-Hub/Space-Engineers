@@ -22,33 +22,6 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
         //check speed and roll be4 detaching the decoy
         //SHOOTER
-        readonly string projectorsDecoyName = "Decoy";
-        readonly string projectorsBombName = "Bomb";
-        readonly string gravGensName = "Decoy";
-        readonly string mergesName = "Drop";
-        readonly string weldersName = "Drop";
-        readonly string warHeadsName = "Decoy";
-        readonly string debugPanelName = "[CRX] Debug";
-        readonly string joltName = "Jolt";
-        readonly string hingeDetachName = "Detach Jolt";
-        readonly string hingeFrontName = "Front Jolt";
-        readonly string pistonsDoubleOuterName = "Double Outer";
-        readonly string pistonsDoubleInnerName = "Double Inner";
-        readonly string pistonsFrontName = "Front Jolt";
-        readonly string ammoName = "Ammo Jolt";
-        readonly string merges1Name = "1 Jolt";
-        readonly string merges2Name = "2 Jolt";
-        readonly string merges3Name = "3 Jolt";
-
-        readonly string painterTag = "[PAINTER]";
-        readonly string multiTag = "[MULTI]";
-
-        const string argToggleDecoy = "ToggleDecoy";
-        const string argSwitch = "Switch";
-        const string argLaunchOne = "LaunchDecoy";
-        const string argFireJolt = "FireJolt";
-        const string argToggleJolt = "ToggleJolt";
-
         int launchDelay = 25;
         int selectedDrop = 0;//0 decoys - 1 bombs
         bool toggleDecoy = true;
@@ -133,7 +106,7 @@ namespace IngameScript {
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                 }
             } catch (Exception e) {
-                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName(debugPanelName) as IMyTextPanel;
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
@@ -147,10 +120,10 @@ namespace IngameScript {
 
         void ProcessArgument(string argument) {
             switch (argument) {
-                case argToggleDecoy:
+                case "ToggleDecoy":
                     toggleDecoy = !toggleDecoy;
                     break;
-                case argSwitch:
+                case "Switch":
                     if (!launchOnce && launchTick == 0) {
                         if (selectedDrop == 1) {
                             selectedDrop = 0;
@@ -165,17 +138,17 @@ namespace IngameScript {
                         }
                     }
                     break;
-                case argLaunchOne:
+                case "LaunchDecoy":
                     if (!launchOnce && launchTick == 0) {
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                         launchOnce = true;
                         launchTick = 0;
                     }
                     break;
-                case argToggleJolt:
+                case "ToggleJolt":
                     toggleJolt = !toggleJolt;
                     break;
-                case argFireJolt:
+                case "FireJolt":
                     if (!firing && fireTick == 0) {
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                         firing = true;
@@ -216,7 +189,7 @@ namespace IngameScript {
                         foreach (IMyGravityGenerator block in GRAVGENS) { block.Enabled = true; }
                     } else if (selectedDrop == 1) {
                         List<IMyWarhead> warHeads = new List<IMyWarhead>();
-                        GridTerminalSystem.GetBlocksOfType<IMyWarhead>(warHeads, block => block.CustomName.Contains(warHeadsName));
+                        GridTerminalSystem.GetBlocksOfType<IMyWarhead>(warHeads, block => block.CustomName.Contains("Decoy"));
                         foreach (IMyWarhead war in warHeads) { war.IsArmed = true; }
                     }
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = false; }
@@ -300,9 +273,9 @@ namespace IngameScript {
 
         void SendBroadcastMessage(bool readyToFire) {
             string variable = "readyToFire";
-            var tuple = MyTuple.Create(variable, readyToFire);
-            IGC.SendBroadcastMessage(painterTag, tuple, TransmissionDistance.ConnectedConstructs);
-            IGC.SendBroadcastMessage(multiTag, tuple, TransmissionDistance.ConnectedConstructs);
+            MyTuple<string, bool> tuple = MyTuple.Create(variable, readyToFire);
+            IGC.SendBroadcastMessage("[PAINTER]", tuple, TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[MULTI]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         bool CheckProjectors(List<IMyProjector> projectors, List<IMyShipWelder> welders) {
@@ -333,54 +306,54 @@ namespace IngameScript {
 
         void GetJoltAmmoBlocks() {
             WARHEADS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyWarhead>(WARHEADS, block => block.CustomName.Contains(ammoName));
+            GridTerminalSystem.GetBlocksOfType<IMyWarhead>(WARHEADS, block => block.CustomName.Contains("Ammo Jolt"));
             BATTERIES.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(BATTERIES, battery => battery.CustomName.Contains(ammoName));
+            GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(BATTERIES, battery => battery.CustomName.Contains("Ammo Jolt"));
             MERGESJOLT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESJOLT, battery => battery.CustomName.Contains(ammoName));
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESJOLT, battery => battery.CustomName.Contains("Ammo Jolt"));
         }
 
         void GetBlocks() {
             PROJECTORSDECOY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORSDECOY, block => block.CustomName.Contains(projectorsDecoyName));
+            GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORSDECOY, block => block.CustomName.Contains("Decoy"));
             PROJECTORSBOMB.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORSBOMB, block => block.CustomName.Contains(projectorsBombName));
+            GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORSBOMB, block => block.CustomName.Contains("Bomb"));
             MERGESDECOY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESDECOY, block => block.CustomName.Contains(mergesName));
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESDECOY, block => block.CustomName.Contains("Drop"));
             GRAVGENS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(GRAVGENS, block => block.CustomName.Contains(gravGensName));
+            GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(GRAVGENS, block => block.CustomName.Contains("Decoy"));
             WELDERSDECOY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipWelder>(WELDERSDECOY, block => block.CustomName.Contains(weldersName));
+            GridTerminalSystem.GetBlocksOfType<IMyShipWelder>(WELDERSDECOY, block => block.CustomName.Contains("Drop"));
             HINGESDETACH.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyMotorBase>(HINGESDETACH, block => block.CustomName.Contains(hingeDetachName));
+            GridTerminalSystem.GetBlocksOfType<IMyMotorBase>(HINGESDETACH, block => block.CustomName.Contains("Detach Jolt"));
             HINGESFRONT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyMotorBase>(HINGESFRONT, block => block.CustomName.Contains(hingeFrontName));
+            GridTerminalSystem.GetBlocksOfType<IMyMotorBase>(HINGESFRONT, block => block.CustomName.Contains("Front Jolt"));
             HINGESJOLT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyMotorBase>(HINGESJOLT, block => block.CustomName.Contains(joltName));
+            GridTerminalSystem.GetBlocksOfType<IMyMotorBase>(HINGESJOLT, block => block.CustomName.Contains("Jolt"));
             PISTONSDOUBLEOUTER.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSDOUBLEOUTER, block => block.CustomName.Contains(pistonsDoubleOuterName));
+            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSDOUBLEOUTER, block => block.CustomName.Contains("Double Outer"));
             PISTONSDOUBLEINNER.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSDOUBLEINNER, block => block.CustomName.Contains(pistonsDoubleInnerName));
+            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSDOUBLEINNER, block => block.CustomName.Contains("Double Inner"));
             PISTONSFRONT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSFRONT, block => block.CustomName.Contains(pistonsFrontName));
+            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSFRONT, block => block.CustomName.Contains("Front Jolt"));
             PISTONSJOLT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSJOLT, block => block.CustomName.Contains(joltName));
+            GridTerminalSystem.GetBlocksOfType<IMyExtendedPistonBase>(PISTONSJOLT, block => block.CustomName.Contains("Jolt"));
             PROJECTORS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORS, block => block.CustomName.Contains(joltName));
+            GridTerminalSystem.GetBlocksOfType<IMyProjector>(PROJECTORS, block => block.CustomName.Contains("Jolt"));
             WELDERSJOLT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipWelder>(WELDERSJOLT, block => block.CustomName.Contains(joltName));
+            GridTerminalSystem.GetBlocksOfType<IMyShipWelder>(WELDERSJOLT, block => block.CustomName.Contains("Jolt"));
             WARHEADS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyWarhead>(WARHEADS, block => block.CustomName.Contains(ammoName));
+            GridTerminalSystem.GetBlocksOfType<IMyWarhead>(WARHEADS, block => block.CustomName.Contains("Ammo Jolt"));
             BATTERIES.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(BATTERIES, block => block.CustomName.Contains(ammoName));
+            GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(BATTERIES, block => block.CustomName.Contains("Ammo Jolt"));
             MERGESJOLT.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESJOLT, block => block.CustomName.Contains(ammoName));
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESJOLT, block => block.CustomName.Contains("Ammo Jolt"));
             MERGES1.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES1, block => block.CustomName.Contains(merges1Name));
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES1, block => block.CustomName.Contains("1 Jolt"));
             MERGES2.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES2, block => block.CustomName.Contains(merges2Name));
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES2, block => block.CustomName.Contains("2 Jolt"));
             MERGES3.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES3, block => block.CustomName.Contains(merges3Name));
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES3, block => block.CustomName.Contains("3 Jolt"));
         }
 
         void Build_1() {

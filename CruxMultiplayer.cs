@@ -22,12 +22,14 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
 
+        //MULTI
         bool creative = true;//creative mode
         bool magneticDrive = true;//enable/disable magnetic drive
         bool autoFire = true;//to fire guns automatically
         bool idleThrusters = false;//enable/disable thrusters
         bool togglePB = true;
         bool sunChasing = false;
+
         bool hasCenter = true;
         bool scanCenter = false;
         bool scanFudge = false;
@@ -83,7 +85,6 @@ namespace IngameScript {
 
         readonly float rotorVel = 29 * (float)(Math.PI / 30);//rpsOverRpm
         readonly float syncSpeed = 1 * (float)(Math.PI / 30);
-        readonly int checkGunsDelay = 10;
 
         const float globalTimestep = 10.0f / 60.0f;
         const float circle = (float)(2 * Math.PI);
@@ -242,7 +243,7 @@ namespace IngameScript {
 
                     CanShootGuns();
 
-                    if (checkGunsCount >= checkGunsDelay) {
+                    if (checkGunsCount >= 10) {
                         CheckGunsAmmo();
                         checkGunsCount = 0;
                     }
@@ -1104,9 +1105,9 @@ namespace IngameScript {
                 sensor.TopExtend = 0.1f;
             }
             sensors.Clear();
-            IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
-            pb.TryRun("PBOff");
-            pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
+            //IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
+            //pb.TryRun("PBOff");
+            IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
             pb.Enabled = false;
             pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Navigator") as IMyProgrammableBlock;
             pb.Enabled = false;
@@ -1115,7 +1116,9 @@ namespace IngameScript {
                         || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Autocombat")
                         || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle DeadMan")
                         || block.CustomName.Contains("[CRX] Button Toggle Enemy Evasion") || block.CustomName.Contains("[CRX] Button Toggle Impacts")
-                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer"));
+                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer")
+                        || block.CustomName.Contains("[CRX] Button Toggle Modded Sensor") || block.CustomName.Contains("[CRX] Button Toggle Keep Altitude")
+                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Close Combat"));
             foreach (IMyFunctionalBlock block in buttons) {
                 block.Enabled = false;
             }
@@ -1123,9 +1126,9 @@ namespace IngameScript {
         }
 
         void ShutDownMulti() {
-            IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
-            pb.TryRun("PBOn");
-            pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
+            //IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
+            //pb.TryRun("PBOn");
+            IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
             pb.Enabled = true;
             pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Navigator") as IMyProgrammableBlock;
             pb.Enabled = true;
@@ -1134,7 +1137,9 @@ namespace IngameScript {
                         || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Autocombat")
                         || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle DeadMan")
                         || block.CustomName.Contains("[CRX] Button Toggle Enemy Evasion") || block.CustomName.Contains("[CRX] Button Toggle Impacts")
-                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer"));
+                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer")
+                        || block.CustomName.Contains("[CRX] Button Toggle Modded Sensor") || block.CustomName.Contains("[CRX] Button Toggle Keep Altitude")
+                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Close Combat"));
             foreach (IMyFunctionalBlock block in buttons) {
                 block.Enabled = true;
             }
