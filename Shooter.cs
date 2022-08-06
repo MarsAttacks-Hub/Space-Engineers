@@ -20,6 +20,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
+        //TODO
         //check speed and roll be4 detaching the decoy
         //SHOOTER
         int launchDelay = 25;

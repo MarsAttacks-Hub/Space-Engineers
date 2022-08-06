@@ -24,11 +24,11 @@ namespace IngameScript {
         //make LoadMissiles() universal
         //PAINTER
         readonly int missilesCount = 2;
-        bool creative = true;//set true if playing creative mode
-        bool sequenceWeapons = false;//set true to sequence Gun lists
-        bool autoFire = true;//set true to fire guns automatically
-        bool autoMissiles = false;//set true to fire missiles automatically
-        bool autoSwitchGuns = true;//set true to switch guns automatically depending on range etc.
+        bool creative = true;//define if is playing creative mode or not
+        bool sequenceWeapons = false;//enable/disable guns sequencing
+        bool autoFire = true;//enable/disable automatic fire
+        bool autoMissiles = false;//enable/disable automatic missiles launch
+        bool autoSwitchGuns = true;//enable/disable automatic guns switch, depending on range etc.
 
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
         int selectedPayLoad = 0;//0 Missiles - 1 Drones

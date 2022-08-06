@@ -25,20 +25,21 @@ namespace IngameScript {
         //lock landing gear when landing, unlock when taking off
         //land doesn't work
         //thrusters doesn't turn off when idling in gravity
-        //when autofighting the ship goes down in gravity, impact avoidance is useless
+        //when autofighting the ship goes down when in gravity, impact avoidance is useless
         //NAVIGATOR
-        readonly bool useRoll = false;
-        bool magneticDrive = true;
-        bool controlDampeners = true;
-        bool idleThrusters = false;
-        bool useGyrosToStabilize = true;
-        bool autocombat = true;
-        bool impactsAvoidance = true;
-        bool collisionDetection = true;
-        bool enemyEvasion = true;
-        bool keepAltitude = true;
-        bool isModdedSensor = false;
-        bool closeRangeCombat = false;
+        readonly bool useRoll = false;//enable/disable roll when gyro stabilizing
+        bool magneticDrive = true;//enable/disable magnetic drive
+        bool controlDampeners = true;//enable/disable safety dampeners (deadman), valid only if magneticDrive is false
+        bool idleThrusters = false;//enable/disable thrusters
+        bool useGyrosToStabilize = true;//enable/disable gyro stabilization on planets and when driving
+        bool autocombat = true;//enable/disable automatic fighting when ship is not controlled, valid only if magneticDrive is true
+        bool impactsAvoidance = true;//enable/disable detection of obstacles while driving, valid only if magneticDrive is true
+        bool collisionDetection = true;//enable/disable detection of incoming ram attacks, valid only if magneticDrive is true
+        bool enemyEvasion = true;//enable/disable evasion from enemy aim, valid only if magneticDrive is true
+        bool keepAltitude = true;//enable/disable keeping altitude on planets, valid only if magneticDrive is true
+        bool isModdedSensor = false;//define if is using modded sensors, valid only if impactsAvoidance is true and magneticDrive is true
+        bool closeRangeCombat = false;//set the fight distance for the automatic fight, valid only if autocombat is true and magneticDrive is true
+        bool sunChasing = false;//enable/disable sun chase on space
 
         bool configChanged = false;
         bool aimTarget = false;
@@ -47,7 +48,6 @@ namespace IngameScript {
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
         bool smallRailgunsCanShoot = true;
-        bool sunChasing = false;
         bool checkAllTicks = false;
         bool unlockGyrosOnce = true;
         bool deadManOnce = false;

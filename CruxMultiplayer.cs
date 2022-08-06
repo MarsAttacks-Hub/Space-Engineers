@@ -23,12 +23,12 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
 
         //MULTI
-        bool creative = true;//creative mode
+        bool creative = true;//define if is playing creative mode or not
         bool magneticDrive = true;//enable/disable magnetic drive
-        bool autoFire = true;//to fire guns automatically
+        bool autoFire = true;//enable/disable automatic fire
         bool idleThrusters = false;//enable/disable thrusters
-        bool togglePB = true;
-        bool sunChasing = false;
+        bool togglePB = true;//enable/disable PB
+        bool sunChasing = false;//enable/disable sun chase on space
 
         bool hasCenter = true;
         bool scanCenter = false;

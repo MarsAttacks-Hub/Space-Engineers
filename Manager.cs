@@ -22,8 +22,8 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
 
         //MANAGER
-        bool automatedManagment = false;
-        bool togglePB = false;
+        bool automatedManagment = false;//enable/disable automatic managment
+        bool togglePB = false;//enable/disable PB
 
         bool isControlled = true;
         bool solarPowerOnce = true;
