@@ -181,8 +181,10 @@ namespace IngameScript {
                 double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
                 Vector3D gravity = CONTROLLER.GetNaturalGravity();
-                ProcessArgument(arg, gravity);
-                if (arg == "RangeFinder") { return; } else if (!togglePB) { return; }
+                if (!string.IsNullOrEmpty(arg)) {
+                    ProcessArgument(arg, gravity);
+                    if (arg == "RangeFinder") { return; } else if (!togglePB) { return; }
+                }
 
                 if (aimTarget) {
                     bool aligned;
@@ -1072,14 +1074,12 @@ namespace IngameScript {
             IMyTextSurfaceProvider cockpit = CONTROLLER as IMyTextSurfaceProvider;
             int surfaceCount = cockpit.SurfaceCount;
             for (int i = 0; i < surfaceCount; i++) {
-                if (i == 0 || i == 2 || i == 4) {
+                if (i == 0 || i == 4) {
                     cockpit.GetSurface(i).WriteText("");
                 }
             }
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power")
-            || block.CustomName.Contains("[CRX] LCD Manager Status") || block.CustomName.Contains("[CRX] LCD Inventory")
-            || block.CustomName.Contains("[CRX] LCD Components") || block.CustomName.Contains("[CRX] LCD Target")
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Target")
             || block.CustomName.Contains("[CRX] LCD RangeFinder"));
             foreach (IMyTextPanel block in panels) {
                 block.WriteText("");
@@ -1105,8 +1105,6 @@ namespace IngameScript {
                 sensor.TopExtend = 0.1f;
             }
             sensors.Clear();
-            //IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
-            //pb.TryRun("PBOff");
             IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
             pb.Enabled = false;
             pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Navigator") as IMyProgrammableBlock;
@@ -1126,8 +1124,6 @@ namespace IngameScript {
         }
 
         void ShutDownMulti() {
-            //IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Manager") as IMyProgrammableBlock;
-            //pb.TryRun("PBOn");
             IMyProgrammableBlock pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Painter") as IMyProgrammableBlock;
             pb.Enabled = true;
             pb = GridTerminalSystem.GetBlockWithName("[CRX] PB Navigator") as IMyProgrammableBlock;

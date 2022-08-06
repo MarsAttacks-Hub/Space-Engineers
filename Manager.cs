@@ -362,8 +362,10 @@ namespace IngameScript {
                 Echo($"ticks:{ticks}");
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
-                if (!string.IsNullOrEmpty(argument)) { ProcessArgument(argument); }
-                if (!togglePB) { return; }
+                if (!string.IsNullOrEmpty(argument)) {
+                    ProcessArgument(argument);
+                    if (!togglePB) { return; }
+                }
 
                 GetBroadcastMessages();
 
@@ -521,6 +523,15 @@ namespace IngameScript {
                 case "ToggleAutomatedManagment":
                     automatedManagment = !automatedManagment;
                     if (LCDAUTO != null) { LCDAUTO.BackgroundColor = automatedManagment ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    break;
+                case "WritePower":
+                    ReadPowerInfos();
+                    WritePowerInfo();
+                    break;
+                case "WriteInventory":
+                    ReadInventoryInfos();
+                    WriteInventoryInfo();
+                    WriteComponentsInfo();
                     break;
             }
         }

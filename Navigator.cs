@@ -227,10 +227,12 @@ namespace IngameScript {
                 GetBroadcastMessages();
 
                 Vector3D gravity = CONTROLLER.GetNaturalGravity();
-                if (!string.IsNullOrEmpty(arg)) { ProcessArgument(arg, gravity); }
-                if (arg == "RangeFinder") { return; }
-                UpdateConfigParams();
-
+                if (!string.IsNullOrEmpty(arg)) { 
+                    ProcessArgument(arg, gravity);
+                    if (arg == "RangeFinder") { return; }
+                    UpdateConfigParams();
+                }
+                
                 TurretsDetection(targFound);
                 if (collisionDetection) { ManageCollisions(targFound); }
 

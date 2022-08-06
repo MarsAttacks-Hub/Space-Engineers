@@ -83,6 +83,7 @@ namespace IngameScript {
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
+                    if (arg == "LaunchDecoy" || arg == "FireJolt") { return; }
                 }
 
                 if (updateSource == UpdateType.Update1) { launchDelay = 250; } else { launchDelay = 25; }
