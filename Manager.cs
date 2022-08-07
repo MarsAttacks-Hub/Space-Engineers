@@ -25,7 +25,7 @@ namespace IngameScript {
         bool automatedManagment = false;//enable/disable automatic managment
         bool togglePB = false;//enable/disable PB
 
-        bool isControlled = true;
+        bool isControlled = false;
         bool solarPowerOnce = true;
         bool greenPowerOnce = true;
         bool hydrogenPowerOnce = true;
@@ -90,7 +90,7 @@ namespace IngameScript {
         public List<IMyTextSurface> COMPONENTSURFACES = new List<IMyTextSurface>();
         public List<IMyTerminalBlock> terminalblocks = new List<IMyTerminalBlock>();
 
-        IMyTextPanel LCDSSTATUS;
+        IMyTextPanel LCDMANAGER;
         IMyTextPanel LCDAUTO;
 
         readonly MyIni myIni = new MyIni();
@@ -112,7 +112,7 @@ namespace IngameScript {
         readonly MyItemType railgunAmmo = MyItemType.MakeAmmo("LargeRailgunAmmo");
         readonly MyItemType smallRailgunAmmo = MyItemType.MakeAmmo("SmallRailgunAmmo");
 
-        MyResourceSourceComponent source;
+        //MyResourceSourceComponent source;
         MyResourceSinkComponent sink;
 
         public StringBuilder oresLog = new StringBuilder("");
@@ -353,8 +353,8 @@ namespace IngameScript {
             GetReactorsMaxOutput();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[MANAGER]");
             foreach (IMyCockpit cockpit in COCKPITS) { ParseCockpitConfigData(cockpit); }
-            if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0); };
-            if (LCDAUTO != null) { LCDAUTO.BackgroundColor = automatedManagment ? new Color(25, 0, 100) : new Color(0, 0, 0); };
+            if (LCDMANAGER != null) { LCDMANAGER.BackgroundColor = togglePB ? new Color(0, 0, 50) : new Color(0, 0, 0); };
+            if (LCDAUTO != null) { LCDAUTO.BackgroundColor = automatedManagment ? new Color(0, 0, 50) : new Color(0, 0, 0); };
         }
 
         public void Main(string argument) {
@@ -384,7 +384,7 @@ namespace IngameScript {
                     } else if (ticks == 5) {
                         CompactInventory(INVENTORIES);
                     } else if (ticks == 7) {
-                        CompactMainCargos();
+                        SortCargos();
                     } else if (ticks == 9) {
                         FillFromCargo(GASINVENTORIES, "Ice");
                     } else if (ticks == 11) {
@@ -456,19 +456,9 @@ namespace IngameScript {
                         WriteComponentsInfo();
                         ticks = 0;
                     }
-                } else {
-                    if (ticks == 10 || ticks == 20 || ticks == 30 || ticks == 40) {
-                        ReadPowerInfos();
-                        WritePowerInfo();
-                    } else if (ticks >= 50) {
-                        ReadInventoryInfos();
-                        WriteInventoryInfo();
-                        WriteComponentsInfo();
-                        ticks = 0;
-                    }
+                    ticks++;
                 }
 
-                ticks++;
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
@@ -487,21 +477,24 @@ namespace IngameScript {
                 case "TogglePB":
                     togglePB = !togglePB;
                     if (togglePB) {
-                        if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(25, 0, 100); };
+                        if (LCDMANAGER != null) { LCDMANAGER.BackgroundColor = new Color(0, 0, 50); };
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     } else {
-                        if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(0, 0, 0); };
+                        if (LCDMANAGER != null) { LCDMANAGER.BackgroundColor = new Color(0, 0, 0); };
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
                     break;
                 case "PBOn":
                     togglePB = true;
-                    if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(25, 0, 100); };
+                    if (LCDMANAGER != null) { LCDMANAGER.BackgroundColor = new Color(0, 0, 50); };
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     break;
                 case "PBOff":
                     togglePB = false;
-                    if (LCDSSTATUS != null) { LCDSSTATUS.BackgroundColor = new Color(0, 0, 0); };
+                    if (LCDMANAGER != null) { LCDMANAGER.BackgroundColor = new Color(0, 0, 0); };
+                    foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
+                    foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                    foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     break;
                 case "AutoRefineries":
@@ -514,15 +507,15 @@ namespace IngameScript {
                 case "CompactInventories":
                     CompactInventory(INVENTORIES);
                     break;
-                case "CompactMainCargos":
-                    CompactMainCargos();
+                case "SortCargos":
+                    SortCargos();
                     break;
                 case "MoveProductionToMain":
                     MoveProductionOutputsToMainInventory();
                     break;
-                case "ToggleAutomatedManagment":
+                case "ToggleAutoManager":
                     automatedManagment = !automatedManagment;
-                    if (LCDAUTO != null) { LCDAUTO.BackgroundColor = automatedManagment ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTO != null) { LCDAUTO.BackgroundColor = automatedManagment ? new Color(0, 0, 50) : new Color(0, 0, 0); }
                     break;
                 case "WritePower":
                     ReadPowerInfos();
@@ -646,7 +639,8 @@ namespace IngameScript {
             solarMaxOutput = 0;
             foreach (IMySolarPanel block in SOLARS) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { solarMaxOutput += source.MaxOutputByType(electricityId); }
+                solarMaxOutput += block.MaxOutput;
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { solarMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
@@ -654,7 +648,8 @@ namespace IngameScript {
             turbineMaxOutput = 0;
             foreach (IMyPowerProducer block in TURBINES) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { turbineMaxOutput += source.MaxOutputByType(electricityId); }
+                turbineMaxOutput += block.MaxOutput;
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { turbineMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
@@ -662,7 +657,8 @@ namespace IngameScript {
             hEngCurrentOutput = 0;
             foreach (IMyPowerProducer block in HENGINES) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { hEngCurrentOutput += source.CurrentOutputByType(electricityId); }
+                hEngCurrentOutput += block.CurrentOutput;
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { hEngCurrentOutput += source.CurrentOutputByType(electricityId); }
             }
         }
 
@@ -670,7 +666,8 @@ namespace IngameScript {
             hEngMaxOutput = 0;
             foreach (IMyPowerProducer block in HENGINES) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { hEngMaxOutput += source.MaxOutputByType(electricityId); }
+                hEngMaxOutput += block.MaxOutput;
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { hEngMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
@@ -678,7 +675,8 @@ namespace IngameScript {
             reactorsCurrentOutput = 0;
             foreach (IMyPowerProducer block in REACTORS) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { reactorsCurrentOutput += source.CurrentOutputByType(electricityId); }
+                reactorsCurrentOutput += block.CurrentOutput;
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { reactorsCurrentOutput += source.CurrentOutputByType(electricityId); }
             }
         }
 
@@ -686,7 +684,8 @@ namespace IngameScript {
             reactorsMaxOutput = 0;
             foreach (IMyPowerProducer block in REACTORS) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { reactorsMaxOutput += source.MaxOutputByType(electricityId); }
+                reactorsMaxOutput += block.MaxOutput;
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { reactorsMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
@@ -696,8 +695,10 @@ namespace IngameScript {
             battsCurrentOutput = 0;
             foreach (IMyBatteryBlock block in BATTERIES) {
                 if (!block.IsWorking) continue;
-                if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) { battsCurrentInput += sink.CurrentInputByType(electricityId); }
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { battsCurrentOutput += source.CurrentOutputByType(electricityId); }
+                battsCurrentInput += block.CurrentInput;
+                battsCurrentOutput += block.CurrentOutput;
+                //if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) { battsCurrentInput += sink.CurrentInputByType(electricityId); }
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { battsCurrentOutput += source.CurrentOutputByType(electricityId); }
                 battsCurrentStoredPower.Add(block.CustomName, block.CurrentStoredPower);
             }
         }
@@ -707,8 +708,9 @@ namespace IngameScript {
             battsMaxOutput = 0;
             foreach (IMyBatteryBlock block in BATTERIES) {
                 if (!block.IsWorking) continue;
+                battsMaxOutput += block.MaxOutput;
                 //if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) { battsMaxInput += sink.MaxRequiredInputByType(electricityId); }
-                if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { battsMaxOutput += source.MaxOutputByType(electricityId); }
+                //if (block.Components.TryGet<MyResourceSourceComponent>(out source)) { battsMaxOutput += source.MaxOutputByType(electricityId); }
             }
         }
 
@@ -1333,7 +1335,7 @@ namespace IngameScript {
             }
         }
 
-        void CompactMainCargos() {
+        void SortCargos() {
             IMyCargoContainer mainCargo = null;
             int cargoIndex = 1000;
             foreach (IMyCargoContainer cargo in CONTAINERS) {
@@ -1497,7 +1499,7 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(BLOCKSWITHINVENTORY, block => block.HasInventory && block.CustomName.Contains("[CRX] "));//&& block.IsSameConstructAs(Me)
             INVENTORIES.Clear();
             INVENTORIES.AddRange(BLOCKSWITHINVENTORY.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-            LCDSSTATUS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Manager Status") as IMyTextPanel;
+            LCDMANAGER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Manager") as IMyTextPanel;
             LCDAUTO = GridTerminalSystem.GetBlockWithName("[CRX] LCD Auto Manager") as IMyTextPanel;
             POWERSURFACES.Clear();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();

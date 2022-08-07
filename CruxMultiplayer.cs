@@ -28,7 +28,7 @@ namespace IngameScript {
         bool autoFire = true;//enable/disable automatic fire
         bool idleThrusters = false;//enable/disable thrusters
         bool togglePB = true;//enable/disable PB
-        bool sunChasing = false;//enable/disable sun chase on space
+        bool sunAlign = false;//enable/disable sun chase on space
 
         bool hasCenter = true;
         bool scanCenter = false;
@@ -49,8 +49,8 @@ namespace IngameScript {
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
         bool smallRailgunsCanShoot = true;
-        bool sunChaseOnce = true;
-        bool unlockSunChaseOnce = true;
+        bool sunAlignOnce = true;
+        bool unlockSunAlignOnce = true;
         bool toggleThrustersOnce = false;
         bool updateOnce = true;
         bool initMagneticDriveOnce = true;
@@ -130,7 +130,7 @@ namespace IngameScript {
         IMyThrust BACKWARDTHRUST;
         IMySolarPanel SOLAR;
         IMyProgrammableBlock SHOOTERPB;
-        IMyTextPanel LCDSUNCHASER;
+        IMyTextPanel LCDSUNALIGN;
         IMyTextPanel LCDMAGNETICDRIVE;
         IMyTextPanel LCDIDLETHRUSTERS;
         IMyTextPanel LCDAUTOFIRE;
@@ -166,12 +166,12 @@ namespace IngameScript {
             SetGunsDelay();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[MULTI]");
             foreach (IMyCameraBlock cam in LIDARS) { cam.EnableRaycast = true; }
-            if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0); }
+            if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            InitMulti();
+            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+            //if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = togglePB ? new Color(100, 0, 25) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -200,16 +200,17 @@ namespace IngameScript {
                 bool isAutopiloted = REMOTE.IsAutoPilotEnabled;
                 bool needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || isAutopiloted
                     || !Vector3D.IsZero(gravity) || myVelocity.Length() > 2d || !isTargetEmpty;
+                SendBroadcastControllerMessage(needControl);
 
-                if (!needControl && sunChasing && Vector3D.IsZero(gravity) && isTargetEmpty) {
+                if (!needControl && sunAlign && Vector3D.IsZero(gravity) && isTargetEmpty) {
                     SunChase();
                     return;
                 } else {
-                    if (!sunChaseOnce) {
+                    if (!sunAlignOnce) {
                         UnlockGyros();
-                        if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0); }
+                        if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
                         prevSunPower = 0f;
-                        sunChaseOnce = true;
+                        sunAlignOnce = true;
                     }
                 }
 
@@ -289,8 +290,8 @@ namespace IngameScript {
                     }
                     break;
                 case "AimTarget": if (!Vector3D.IsZero(rangeFinderPosition)) { aimTarget = true; }; break;
-                case "SunChaserToggle":
-                    sunChasing = !sunChasing;
+                case "ToggleSunAlign":
+                    sunAlign = !sunAlign;
                     break;
                 case "ToggleMagneticDrive":
                     magneticDrive = !magneticDrive;
@@ -306,31 +307,19 @@ namespace IngameScript {
                         if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
                     }
                     break;
-                case "AutoFire":
+                case "ToggleAutoFire":
                     autoFire = !autoFire;
-                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
                 case "ToggleCreative":
                     creative = !creative;
-                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-                    break;
-                case "TogglePB":
-                    togglePB = !togglePB;
-                    if (togglePB) {
-                        if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(25, 0, 100); };
-                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
-                        Setup();
-                    } else {
-                        if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(0, 0, 0); };
-                        Runtime.UpdateFrequency = UpdateFrequency.None;
-                        ShutDownMulti();
-                    }
+                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
                 case "PBOn":
                     togglePB = true;
-                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(25, 0, 100); };
+                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(100, 0, 25); };//TODO
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
-                    Setup();
+                    InitMulti();
                     break;
                 case "PBOff":
                     togglePB = false;
@@ -356,12 +345,17 @@ namespace IngameScript {
             }
         }
 
+        void SendBroadcastControllerMessage(bool isControlled) {
+            MyTuple<string, bool> tuple = MyTuple.Create("isControlled", isControlled);
+            IGC.SendBroadcastMessage("[MANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
+        }
+
         void ManageMagneticDrive(bool needControl, bool isAutoPiloted, bool idleThrusters, Vector3D gravity, Vector3D myVelocity) {
             if (magneticDrive && needControl) {
                 Vector3D dir = Vector3D.Zero;
                 if (initMagneticDriveOnce) {
                     foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    //sunChasing = false;
+                    //sunAlign = false;
                     initMagneticDriveOnce = false;
                 }
 
@@ -972,32 +966,32 @@ namespace IngameScript {
         void SunChase() {
             if (SOLAR.IsFunctional && SOLAR.Enabled && SOLAR.IsWorking) {
                 float power = SOLAR.MaxOutput;
-                if (sunChaseOnce) {
-                    if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(25, 0, 100); }
+                if (sunAlignOnce) {
+                    if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(25, 0, 100); }
                     prevSunPower = power;
-                    unlockSunChaseOnce = true;
-                    sunChaseOnce = false;
+                    unlockSunAlignOnce = true;
+                    sunAlignOnce = false;
                 }
                 double pitch = 0d;
                 double yaw = 0d;
                 if (power < .02) {
-                    if (unlockSunChaseOnce) {
+                    if (unlockSunAlignOnce) {
                         UnlockGyros();
-                        unlockSunChaseOnce = false;
+                        unlockSunAlignOnce = false;
                     }
                     return;
                 }
                 if (power > .98) {
                     if (sunAlignmentStep > 0) {
                         sunAlignmentStep = 0;
-                        if (unlockSunChaseOnce) {
+                        if (unlockSunAlignOnce) {
                             UnlockGyros();
-                            unlockSunChaseOnce = false;
+                            unlockSunAlignOnce = false;
                         }
                     }
                     return;
                 }
-                unlockSunChaseOnce = true;
+                unlockSunAlignOnce = true;
                 switch (sunAlignmentStep) {
                     case 0:
                         selectedSunAlignmentStep = 0;
@@ -1074,7 +1068,7 @@ namespace IngameScript {
             IMyTextSurfaceProvider cockpit = CONTROLLER as IMyTextSurfaceProvider;
             int surfaceCount = cockpit.SurfaceCount;
             for (int i = 0; i < surfaceCount; i++) {
-                if (i == 0 || i == 4) {
+                if (i == 0 || i == 4) {//TODO
                     cockpit.GetSurface(i).WriteText("");
                 }
             }
@@ -1085,15 +1079,17 @@ namespace IngameScript {
                 block.WriteText("");
             }
             panels.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Auto Missiles Toggle")
-            || block.CustomName.Contains("[CRX] LCD Auto Switch Guns Toggle") || block.CustomName.Contains("[CRX] LCD DeadMan Toggle")
-            || block.CustomName.Contains("[CRX] LCD Autocombat Toggle") || block.CustomName.Contains("[CRX] LCD Impacts Toggle")
-            || block.CustomName.Contains("[CRX] LCD Collisions Toggle") || block.CustomName.Contains("[CRX] LCD Evasion Toggle")
-            || block.CustomName.Contains("[CRX] LCD Stabilizer Toggle"));
+            /*GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Auto Missiles Toggle")
+            || block.CustomName.Contains("[CRX] LCD Auto Switch Guns Toggle") || block.CustomName.Contains("[CRX] LCD Sequence Guns Toggle")
+            || block.CustomName.Contains("[CRX] LCD Toggle Safety Dampeners") || block.CustomName.Contains("[CRX] LCD Toggle Stabilizer")
+            || block.CustomName.Contains("[CRX] LCD Toggle Auto Combat") || block.CustomName.Contains("[CRX] LCD Toggle Obstacles")
+            || block.CustomName.Contains("[CRX] LCD Toggle Collisions") || block.CustomName.Contains("[CRX] LCD Toggle Evasion")
+            || block.CustomName.Contains("[CRX] LCD Toggle Keep Altitude") || block.CustomName.Contains("[CRX] LCD Toggle Modded Sensor")
+            || block.CustomName.Contains("[CRX] LCD Toggle Close Combat") );
             foreach (IMyTextPanel block in panels) {
                 block.BackgroundColor = new Color(0, 0, 0);
             }
-            panels.Clear();
+            panels.Clear();*/
             List<IMySensorBlock> sensors = new List<IMySensorBlock>();
             GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(sensors, block => block.CustomName.Contains("[CRX] Sensor"));
             foreach (IMySensorBlock sensor in sensors) {
@@ -1111,12 +1107,12 @@ namespace IngameScript {
             pb.Enabled = false;
             List<IMyFunctionalBlock> buttons = new List<IMyFunctionalBlock>();
             GridTerminalSystem.GetBlocksOfType<IMyFunctionalBlock>(buttons, block => block.CustomName.Contains("[CRX] Button Toggle Auto Missiles")
-                        || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Autocombat")
-                        || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle DeadMan")
-                        || block.CustomName.Contains("[CRX] Button Toggle Enemy Evasion") || block.CustomName.Contains("[CRX] Button Toggle Impacts")
-                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer")
-                        || block.CustomName.Contains("[CRX] Button Toggle Modded Sensor") || block.CustomName.Contains("[CRX] Button Toggle Keep Altitude")
-                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Close Combat"));
+                        || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Sequence Guns")
+                        || block.CustomName.Contains("[CRX] Button Toggle Auto Combat") || block.CustomName.Contains("[CRX] Button Toggle Close Combat")
+                        || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle Safety Dampeners")
+                        || block.CustomName.Contains("[CRX] Button Toggle Evasion") || block.CustomName.Contains("[CRX] Button Toggle Obstacles")
+                        || block.CustomName.Contains("[CRX] Button Toggle Stabilizer") || block.CustomName.Contains("[CRX] Button Toggle Modded Sensor")
+                        || block.CustomName.Contains("[CRX] Button Toggle Keep Altitude"));
             foreach (IMyFunctionalBlock block in buttons) {
                 block.Enabled = false;
             }
@@ -1130,12 +1126,12 @@ namespace IngameScript {
             pb.Enabled = true;
             List<IMyFunctionalBlock> buttons = new List<IMyFunctionalBlock>();
             GridTerminalSystem.GetBlocksOfType<IMyFunctionalBlock>(buttons, block => block.CustomName.Contains("[CRX] Button Toggle Auto Missiles")
-                        || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Autocombat")
-                        || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle DeadMan")
-                        || block.CustomName.Contains("[CRX] Button Toggle Enemy Evasion") || block.CustomName.Contains("[CRX] Button Toggle Impacts")
-                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Stabilizer")
-                        || block.CustomName.Contains("[CRX] Button Toggle Modded Sensor") || block.CustomName.Contains("[CRX] Button Toggle Keep Altitude")
-                        || block.CustomName.Contains("[CRX] Button Toggle Manager") || block.CustomName.Contains("[CRX] Button Toggle Close Combat"));
+                        || block.CustomName.Contains("[CRX] Button Toggle Auto Switch Guns") || block.CustomName.Contains("[CRX] Button Toggle Sequence Guns")
+                        || block.CustomName.Contains("[CRX] Button Toggle Auto Combat") || block.CustomName.Contains("[CRX] Button Toggle Close Combat")
+                        || block.CustomName.Contains("[CRX] Button Toggle Collisions") || block.CustomName.Contains("[CRX] Button Toggle Safety Dampeners")
+                        || block.CustomName.Contains("[CRX] Button Toggle Evasion") || block.CustomName.Contains("[CRX] Button Toggle Obstacles")
+                        || block.CustomName.Contains("[CRX] Button Toggle Stabilizer") || block.CustomName.Contains("[CRX] Button Toggle Modded Sensor")
+                        || block.CustomName.Contains("[CRX] Button Toggle Keep Altitude"));
             foreach (IMyFunctionalBlock block in buttons) {
                 block.Enabled = true;
             }
@@ -1206,15 +1202,15 @@ namespace IngameScript {
             List<IMySolarPanel> SOLARS = new List<IMySolarPanel>();
             GridTerminalSystem.GetBlocksOfType<IMySolarPanel>(SOLARS, block => block.CustomName.Contains("[CRX] Solar"));
             foreach (IMySolarPanel solar in SOLARS) { if (solar.IsFunctional && solar.Enabled && solar.IsWorking) { SOLAR = solar; } }
-            REMOTE = GridTerminalSystem.GetBlockWithName("[CRX] Controller Remote") as IMyRemoteControl;
-            CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit") as IMyShipController;
+            REMOTE = GridTerminalSystem.GetBlockWithName("[CRX] Controller Remote Reference") as IMyRemoteControl;
+            CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit 1") as IMyShipController;
             SHOOTERPB = GridTerminalSystem.GetBlockWithName("[CRX] PB Shooter") as IMyProgrammableBlock;
-            LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD IdleThrusters Toggle") as IMyTextPanel;
-            LCDSUNCHASER = GridTerminalSystem.GetBlockWithName("[CRX] LCD SunChaser Toggle") as IMyTextPanel;
-            LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD MagneticDrive Toggle") as IMyTextPanel;
-            LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD AutoFire Toggle") as IMyTextPanel;
-            LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Creative Toggle") as IMyTextPanel;
-            LCDTOGGLE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Multi Toggle") as IMyTextPanel;
+            LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Thrusters") as IMyTextPanel;
+            LCDSUNALIGN = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Sun Align") as IMyTextPanel;
+            LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Magnetic Drive") as IMyTextPanel;
+            LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Fire") as IMyTextPanel;
+            LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Creative") as IMyTextPanel;
+            LCDTOGGLE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Multi") as IMyTextPanel;
         }
 
         public class Gun {

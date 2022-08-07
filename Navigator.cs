@@ -29,17 +29,17 @@ namespace IngameScript {
         //NAVIGATOR
         readonly bool useRoll = false;//enable/disable roll when gyro stabilizing
         bool magneticDrive = true;//enable/disable magnetic drive
-        bool controlDampeners = true;//enable/disable safety dampeners (deadman), valid only if magneticDrive is false
+        bool safetyDampeners = true;//enable/disable safety dampeners, valid only if magneticDrive is false
         bool idleThrusters = false;//enable/disable thrusters
         bool useGyrosToStabilize = true;//enable/disable gyro stabilization on planets and when driving
-        bool autocombat = true;//enable/disable automatic fighting when ship is not controlled, valid only if magneticDrive is true
-        bool impactsAvoidance = true;//enable/disable detection of obstacles while driving, valid only if magneticDrive is true
+        bool autoCombat = true;//enable/disable automatic fighting when ship is not controlled, valid only if magneticDrive is true
+        bool obstaclesAvoidance = true;//enable/disable detection of obstacles while driving, valid only if magneticDrive is true
         bool collisionDetection = true;//enable/disable detection of incoming ram attacks, valid only if magneticDrive is true
         bool enemyEvasion = true;//enable/disable evasion from enemy aim, valid only if magneticDrive is true
         bool keepAltitude = true;//enable/disable keeping altitude on planets, valid only if magneticDrive is true
-        bool isModdedSensor = false;//define if is using modded sensors, valid only if impactsAvoidance is true and magneticDrive is true
-        bool closeRangeCombat = false;//set the fight distance for the automatic fight, valid only if autocombat is true and magneticDrive is true
-        bool sunChasing = false;//enable/disable sun chase on space
+        bool moddedSensor = false;//define if is using modded sensors, valid only if obstaclesAvoidance is true and magneticDrive is true
+        bool closeRangeCombat = false;//set the fight distance for the automatic fight, valid only if autoCombat is true and magneticDrive is true
+        bool sunAlign = false;//enable/disable sun chase on space
 
         bool configChanged = false;
         bool aimTarget = false;
@@ -50,7 +50,7 @@ namespace IngameScript {
         bool smallRailgunsCanShoot = true;
         bool checkAllTicks = false;
         bool unlockGyrosOnce = true;
-        bool deadManOnce = false;
+        bool safetyDampenersOnce = false;
         bool toggleThrustersOnce = false;
         bool returnOnce = true;
         bool isPilotedOnce = true;
@@ -58,8 +58,8 @@ namespace IngameScript {
         bool initAutoMagneticDriveOnce = true;
         bool initRandomMagneticDriveOnce = true;
         bool initEvasionMagneticDriveOnce = true;
-        bool sunChaseOnce = true;
-        bool unlockSunChaseOnce = true;
+        bool sunAlignOnce = true;
+        bool unlockSunAlignOnce = true;
         bool keepAltitudeOnce = true;
         bool sensorDetectionOnce = true;
         bool updateOnce = true;
@@ -126,12 +126,12 @@ namespace IngameScript {
         IMyThrust RIGHTTHRUST;
         IMyThrust FORWARDTHRUST;
         IMyThrust BACKWARDTHRUST;
-        IMyTextPanel LCDDEADMAN;
+        IMyTextPanel LCDSAFETYDAMPENERS;
         IMyTextPanel LCDIDLETHRUSTERS;
-        IMyTextPanel LCDSUNCHASER;
+        IMyTextPanel LCDSUNALIGN;
         IMyTextPanel LCDMAGNETICDRIVE;
         IMyTextPanel LCDAUTOCOMBAT;
-        IMyTextPanel LCDIMPACTS;
+        IMyTextPanel LCDOBSTACLES;
         IMyTextPanel LCDCOLLISIONS;
         IMyTextPanel LCDEVASION;
         IMyTextPanel LCDSTABILIZER;
@@ -206,17 +206,17 @@ namespace IngameScript {
             if (LIDARS.Count != 0) { maxScanRange = LIDARS[0].RaycastDistanceLimit; }
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
-            if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0); }
+            if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autoCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDOBSTACLES != null) { LCDOBSTACLES.BackgroundColor = obstaclesAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDALTITUDE != null) { LCDALTITUDE.BackgroundColor = keepAltitude ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDMODDEDSENSOR != null) { LCDMODDEDSENSOR.BackgroundColor = isModdedSensor ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDMODDEDSENSOR != null) { LCDMODDEDSENSOR.BackgroundColor = moddedSensor ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDCLOSECOMBAT != null) { LCDCLOSECOMBAT.BackgroundColor = closeRangeCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
         }
 
@@ -227,12 +227,12 @@ namespace IngameScript {
                 GetBroadcastMessages();
 
                 Vector3D gravity = CONTROLLER.GetNaturalGravity();
-                if (!string.IsNullOrEmpty(arg)) { 
+                if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg, gravity);
                     if (arg == "RangeFinder") { return; }
                     UpdateConfigParams();
                 }
-                
+
                 TurretsDetection(targFound);
                 if (collisionDetection) { ManageCollisions(targFound); }
 
@@ -249,15 +249,15 @@ namespace IngameScript {
                     if (!aligned) { return; }
                 }
 
-                if (!needControl && sunChasing && Vector3D.IsZero(gravity) && isTargetEmpty) {
+                if (!needControl && sunAlign && Vector3D.IsZero(gravity) && isTargetEmpty) {
                     SunChase();
                     return;
                 } else {
-                    if (!sunChaseOnce) {
+                    if (!sunAlignOnce) {
                         UnlockGyros();
-                        if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(0, 0, 0); }
+                        if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
                         prevSunPower = 0f;
-                        sunChaseOnce = true;
+                        sunAlignOnce = true;
                     }
                 }
 
@@ -326,8 +326,8 @@ namespace IngameScript {
                         targetLog.Append("Atmo. Height: ").Append(planet.Item3.ToString("0.0")).Append("\n");
                     }
                     break;
-                case "SunChaserToggle":
-                    sunChasing = !sunChasing;
+                case "ToggleSunAlign":
+                    sunAlign = !sunAlign;
                     break;
                 case "ToggleIdleThrusters":
                     idleThrusters = !idleThrusters;
@@ -345,44 +345,44 @@ namespace IngameScript {
                     if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
-                case "DeadMan":
-                    controlDampeners = !controlDampeners;
-                    if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                case "ToggleSafetyDampeners":
+                    safetyDampeners = !safetyDampeners;
+                    if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
-                case "AutocombatToggle":
-                    autocombat = !autocombat;
-                    if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                case "ToggleAutoCombat":
+                    autoCombat = !autoCombat;
+                    if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autoCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
-                case "ImpactsAvoidanceToggle":
-                    impactsAvoidance = !impactsAvoidance;
-                    if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                case "ToggleObstaclesAvoidance":
+                    obstaclesAvoidance = !obstaclesAvoidance;
+                    if (LCDOBSTACLES != null) { LCDOBSTACLES.BackgroundColor = obstaclesAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
-                case "CollisionDetectionToggle":
+                case "ToggleCollisionDetection":
                     collisionDetection = !collisionDetection;
                     if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
-                case "EnemyEvasionToggle":
+                case "ToggleEnemyEvasion":
                     enemyEvasion = !enemyEvasion;
                     if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     configChanged = true;
                     break;
-                case "GyroStabilizeToggle":
+                case "ToggleGyroStabilize":
                     useGyrosToStabilize = !useGyrosToStabilize;
                     if (LCDSTABILIZER != null) { LCDSTABILIZER.BackgroundColor = useGyrosToStabilize ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
-                case "KeepAltitudeToggle":
+                case "ToggleKeepAltitude":
                     keepAltitude = !keepAltitude;
                     if (LCDALTITUDE != null) { LCDALTITUDE.BackgroundColor = keepAltitude ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
-                case "ModdedSensorToggle":
-                    isModdedSensor = !isModdedSensor;
-                    if (LCDMODDEDSENSOR != null) { LCDMODDEDSENSOR.BackgroundColor = isModdedSensor ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                case "ToggleModdedSensor":
+                    moddedSensor = !moddedSensor;
+                    if (LCDMODDEDSENSOR != null) { LCDMODDEDSENSOR.BackgroundColor = moddedSensor ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
-                case "CloseRangeCombatToggle":
+                case "ToggleCloseCombat":
                     closeRangeCombat = !closeRangeCombat;
                     if (LCDCLOSECOMBAT != null) { LCDCLOSECOMBAT.BackgroundColor = closeRangeCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
@@ -525,7 +525,7 @@ namespace IngameScript {
                 Vector3D dir = Vector3D.Zero;
                 if (initMagneticDriveOnce) {
                     foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    sunChasing = false;
+                    sunAlign = false;
                     initMagneticDriveOnce = false;
                 }
                 SyncRotors();
@@ -552,7 +552,7 @@ namespace IngameScript {
                             foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                             initAutoMagneticDriveOnce = true;
                         }
-                        if (autocombat && !isUnderControl && targetFound) {
+                        if (autoCombat && !isUnderControl && targetFound) {
                             if (initRandomMagneticDriveOnce) {
                                 CONTROLLER.DampenersOverride = false;
                                 initRandomMagneticDriveOnce = false;
@@ -592,7 +592,7 @@ namespace IngameScript {
                     dir = MergeDirectionValues(dir, dirN);
                 }
 
-                if (impactsAvoidance && mySpeed > 10f && !isAutoPiloted && (Vector3D.IsZero(gravity) || (!Vector3D.IsZero(gravity) && altitude > 60d))) {
+                if (obstaclesAvoidance && mySpeed > 10f && !isAutoPiloted && (Vector3D.IsZero(gravity) || (!Vector3D.IsZero(gravity) && altitude > 60d))) {
                     if (sensorDetectionOnce) {
                         SetSensorsExtend();
                         sensorDetectionOnce = false;
@@ -610,7 +610,7 @@ namespace IngameScript {
                         double stopDistance = CalculateStopDistance(myVelocity);
                         RaycastStopPosition(stopDistance, myVelocity);
 
-                        if (isModdedSensor) { SetSensorsStopDistance((float)stopDistance); }
+                        if (moddedSensor) { SetSensorsStopDistance((float)stopDistance); }
                         SensorDetection();
 
                         collisionCheckCount = 0;
@@ -649,8 +649,8 @@ namespace IngameScript {
                     initMagneticDriveOnce = true;
                 }
                 if (tickCount == 50) {
-                    if (controlDampeners) {
-                        DeadMan(IsPiloted(true), mySpeed);
+                    if (safetyDampeners) {
+                        SafetyDampeners(IsPiloted(true), mySpeed);
                     }
                     tickCount = 0;
                 }
@@ -1157,7 +1157,7 @@ namespace IngameScript {
             return direction;
         }
 
-        void DeadMan(bool isUnderControl, double mySpeed) {
+        void SafetyDampeners(bool isUnderControl, double mySpeed) {
             if (!isUnderControl) {
                 IMyShipController cntrllr = null;
                 if (CONTROLLER.CanControlShip) {
@@ -1170,18 +1170,18 @@ namespace IngameScript {
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                         cntrllr.DampenersOverride = true;
                     } else {
-                        if (!deadManOnce) {
+                        if (!safetyDampenersOnce) {
                             if (idleThrusters) {
                                 foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                             }
-                            deadManOnce = true;
+                            safetyDampenersOnce = true;
                         }
                     }
                 }
             } else {
-                if (deadManOnce) {
+                if (safetyDampenersOnce) {
                     foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    deadManOnce = false;
+                    safetyDampenersOnce = false;
                 }
             }
         }
@@ -1357,32 +1357,32 @@ namespace IngameScript {
         void SunChase() {
             if (SOLAR.IsFunctional && SOLAR.Enabled && SOLAR.IsWorking) {
                 float power = SOLAR.MaxOutput;
-                if (sunChaseOnce) {
-                    if (LCDSUNCHASER != null) { LCDSUNCHASER.BackgroundColor = new Color(25, 0, 100); }
+                if (sunAlignOnce) {
+                    if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(25, 0, 100); }
                     prevSunPower = power;
-                    unlockSunChaseOnce = true;
-                    sunChaseOnce = false;
+                    unlockSunAlignOnce = true;
+                    sunAlignOnce = false;
                 }
                 double pitch = 0d;
                 double yaw = 0d;
                 if (power < .02) {
-                    if (unlockSunChaseOnce) {
+                    if (unlockSunAlignOnce) {
                         UnlockGyros();
-                        unlockSunChaseOnce = false;
+                        unlockSunAlignOnce = false;
                     }
                     return;
                 }
                 if (power > .98) {
                     if (sunAlignmentStep > 0) {
                         sunAlignmentStep = 0;
-                        if (unlockSunChaseOnce) {
+                        if (unlockSunAlignOnce) {
                             UnlockGyros();
-                            unlockSunChaseOnce = false;
+                            unlockSunAlignOnce = false;
                         }
                     }
                     return;
                 }
-                unlockSunChaseOnce = true;
+                unlockSunAlignOnce = true;
                 switch (sunAlignmentStep) {
                     case 0:
                         selectedSunAlignmentStep = 0;
@@ -1621,18 +1621,18 @@ namespace IngameScript {
         void UpdateConfigParams() {
             if (configChanged) {
                 if (!magneticDrive) {
-                    autocombat = false;
-                    impactsAvoidance = false;
+                    autoCombat = false;
+                    obstaclesAvoidance = false;
                     collisionDetection = false;
                     enemyEvasion = false;
                     idleThrusters = false;
-                    controlDampeners = true;
+                    safetyDampeners = true;
                 }
                 if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-                if (LCDDEADMAN != null) { LCDDEADMAN.BackgroundColor = controlDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-                if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autocombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-                if (LCDIMPACTS != null) { LCDIMPACTS.BackgroundColor = impactsAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autoCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                if (LCDOBSTACLES != null) { LCDOBSTACLES.BackgroundColor = obstaclesAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 if (LCDCOLLISIONS != null) { LCDCOLLISIONS.BackgroundColor = collisionDetection ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 if (LCDEVASION != null) { LCDEVASION.BackgroundColor = enemyEvasion ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 configChanged = false;
@@ -1688,18 +1688,18 @@ namespace IngameScript {
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD RangeFinder"));
             foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
-            LCDDEADMAN = GridTerminalSystem.GetBlockWithName("[CRX] LCD DeadMan Toggle") as IMyTextPanel;
-            LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD IdleThrusters Toggle") as IMyTextPanel;
-            LCDSUNCHASER = GridTerminalSystem.GetBlockWithName("[CRX] LCD SunChaser Toggle") as IMyTextPanel;
-            LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD MagneticDrive Toggle") as IMyTextPanel;
-            LCDAUTOCOMBAT = GridTerminalSystem.GetBlockWithName("[CRX] LCD Autocombat Toggle") as IMyTextPanel;
-            LCDIMPACTS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Impacts Toggle") as IMyTextPanel;
-            LCDCOLLISIONS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Collisions Toggle") as IMyTextPanel;
-            LCDEVASION = GridTerminalSystem.GetBlockWithName("[CRX] LCD Evasion Toggle") as IMyTextPanel;
-            LCDSTABILIZER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Stabilizer Toggle") as IMyTextPanel;
-            LCDALTITUDE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Keep Altitude Toggle") as IMyTextPanel;
-            LCDMODDEDSENSOR = GridTerminalSystem.GetBlockWithName("[CRX] LCD Modded Sensor Toggle") as IMyTextPanel;
-            LCDCLOSECOMBAT = GridTerminalSystem.GetBlockWithName("[CRX] LCD Close Combat Toggle") as IMyTextPanel;
+            LCDSAFETYDAMPENERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Safety Dampeners") as IMyTextPanel;
+            LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Thrusters") as IMyTextPanel;
+            LCDSUNALIGN = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Sun Align") as IMyTextPanel;
+            LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Magnetic Drive") as IMyTextPanel;
+            LCDAUTOCOMBAT = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Combat") as IMyTextPanel;
+            LCDOBSTACLES = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Obstacles") as IMyTextPanel;
+            LCDCOLLISIONS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Collisions") as IMyTextPanel;
+            LCDEVASION = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Evasion") as IMyTextPanel;
+            LCDSTABILIZER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Stabilizer") as IMyTextPanel;
+            LCDALTITUDE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Keep Altitude") as IMyTextPanel;
+            LCDMODDEDSENSOR = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Modded Sensor") as IMyTextPanel;
+            LCDCLOSECOMBAT = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Close Combat") as IMyTextPanel;
             SENSORS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(SENSORS, block => block.CustomName.Contains("[CRX] Sensor"));
             foreach (IMySensorBlock sensor in SENSORS) {
@@ -1708,8 +1708,8 @@ namespace IngameScript {
             SOLARS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMySolarPanel>(SOLARS, block => block.CustomName.Contains("[CRX] Solar"));
             foreach (IMySolarPanel solar in SOLARS) { if (solar.IsFunctional && solar.Enabled && solar.IsWorking) { SOLAR = solar; } }
-            REMOTE = GridTerminalSystem.GetBlockWithName("[CRX] Controller Remote") as IMyRemoteControl;
-            CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit") as IMyShipController;
+            REMOTE = GridTerminalSystem.GetBlockWithName("[CRX] Controller Remote Reference") as IMyRemoteControl;
+            CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit 1") as IMyShipController;
         }
 
         void InitPIDControllers() {

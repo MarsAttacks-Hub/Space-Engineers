@@ -176,11 +176,11 @@ namespace IngameScript {
             ParseCockpitConfigData(CONTROLLER as IMyCockpit);
             autoMissilesCounter = 9 + 1;
             SetGunsDelay();
-            if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoMissiles ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDSEQUENCEGUNS != null) { LCDSEQUENCEGUNS.BackgroundColor = sequenceWeapons ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+            if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoMissiles ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+            if (LCDSEQUENCEGUNS != null) { LCDSEQUENCEGUNS.BackgroundColor = sequenceWeapons ? new Color(20, 10, 0) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -221,7 +221,6 @@ namespace IngameScript {
                     if (LIDARS.Count != 0) { refBlock = LIDARS[0]; } else { refBlock = CONTROLLER; }
                     LockOnTarget(lastLock, targetInfo.HitPosition.Value, targetVelocity, CONTROLLER.GetNaturalGravity(), CONTROLLER.GetShipVelocities().LinearVelocity, refBlock.GetPosition());
 
-                    //send message to missiles
                     SendBroadcastTargetMessage(true, targetInfo.HitPosition.Value, targetVelocity, targetInfo.Orientation, targetInfo.Position, targetInfo.EntityId);
 
                     foreach (KeyValuePair<long, string> id in MissileIDs) {
@@ -329,25 +328,25 @@ namespace IngameScript {
                         }
                     }
                     break;
-                case "ToggleAllGuns":
+                case "ToggleAutoSwitchGuns":
                     autoSwitchGuns = !autoSwitchGuns;
-                    if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
-                case "AutoFire":
+                case "ToggleAutoFire":
                     autoFire = !autoFire;
-                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
-                case "AutoMissiles":
+                case "ToggleAutoMissiles":
                     autoMissiles = !autoMissiles;
-                    if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoMissiles ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDAUTOMISSILES != null) { LCDAUTOMISSILES.BackgroundColor = autoMissiles ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
                 case "ToggleCreative":
                     creative = !creative;
-                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
                 case "ToggleSequenceGuns":
                     sequenceWeapons = !sequenceWeapons;
-                    if (LCDSEQUENCEGUNS != null) { LCDSEQUENCEGUNS.BackgroundColor = sequenceWeapons ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDSEQUENCEGUNS != null) { LCDSEQUENCEGUNS.BackgroundColor = sequenceWeapons ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
             }
         }
@@ -1496,14 +1495,14 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Target"));
             foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             ANTENNA = GridTerminalSystem.GetBlockWithName("T") as IMyRadioAntenna;
-            CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit") as IMyShipController;
+            CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit 1") as IMyShipController;
             SHOOTERPB = GridTerminalSystem.GetBlockWithName("[CRX] PB Shooter") as IMyProgrammableBlock;
             DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
-            LCDAUTOSWITCHGUNS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Auto Switch Guns Toggle") as IMyTextPanel;
-            LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD AutoFire Toggle") as IMyTextPanel;
-            LCDAUTOMISSILES = GridTerminalSystem.GetBlockWithName("[CRX] LCD Auto Missiles Toggle") as IMyTextPanel;
-            LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Creative Toggle") as IMyTextPanel;
-            LCDSEQUENCEGUNS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Sequence Guns Toggle") as IMyTextPanel;
+            LCDAUTOSWITCHGUNS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Switch Guns") as IMyTextPanel;
+            LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Fire") as IMyTextPanel;
+            LCDAUTOMISSILES = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Missiles") as IMyTextPanel;
+            LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Creative") as IMyTextPanel;
+            LCDSEQUENCEGUNS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Sequence Guns") as IMyTextPanel;
         }
 
         void SetBlocks() {
