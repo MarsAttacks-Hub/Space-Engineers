@@ -484,6 +484,7 @@ namespace IngameScript {
                         foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
                         foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                         foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
+                        powerStatus = "Full Steam";
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
                     break;
@@ -498,6 +499,7 @@ namespace IngameScript {
                     foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
                     foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                     foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
+                    powerStatus = "Full Steam";
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     break;
                 case "AutoRefineries":
