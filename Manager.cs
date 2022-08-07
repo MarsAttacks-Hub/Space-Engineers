@@ -22,8 +22,40 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
 
         //MANAGER
+        readonly Dictionary<MyDefinitionId, MyTuple<string, double>> componentsDefBpQuota = new Dictionary<MyDefinitionId, MyTuple<string, double>>() {
+            { MyItemType.MakeAmmo("Missile200mm"),              MyTuple.Create("Missile200mm",                  5d) },
+            { MyItemType.MakeAmmo("NATO_25x184mm"),             MyTuple.Create("NATO_25x184mmMagazine",         5d) },
+            { MyItemType.MakeAmmo("AutocannonClip"),            MyTuple.Create("AutocannonClip",                5d) },
+            { MyItemType.MakeAmmo("LargeCalibreAmmo"),          MyTuple.Create("LargeCalibreAmmo",              5d) },
+            { MyItemType.MakeAmmo("MediumCalibreAmmo"),         MyTuple.Create("MediumCalibreAmmo",             5d) },
+            { MyItemType.MakeAmmo("LargeRailgunAmmo"),          MyTuple.Create("LargeRailgunAmmo",              5d) },
+            { MyItemType.MakeAmmo("SmallRailgunAmmo"),          MyTuple.Create("SmallRailgunAmmo",              5d) },
+            { MyItemType.MakeComponent("BulletproofGlass"),     MyTuple.Create("BulletproofGlass",              5d) },
+            { MyItemType.MakeComponent("Canvas"),               MyTuple.Create("Canvas",                        5d) },
+            { MyItemType.MakeComponent("Computer"),             MyTuple.Create("ComputerComponent",             5d) },
+            { MyItemType.MakeComponent("Construction"),         MyTuple.Create("ConstructionComponent",         5d) },
+            { MyItemType.MakeComponent("Detector"),             MyTuple.Create("DetectorComponent",             5d) },
+            { MyItemType.MakeComponent("Display"),              MyTuple.Create("Display",                       5d) },
+            { MyItemType.MakeComponent("Explosives"),           MyTuple.Create("ExplosivesComponent",           5d) },
+            { MyItemType.MakeComponent("Girder"),               MyTuple.Create("GirderComponent",               5d) },
+            { MyItemType.MakeComponent("GravityGenerator"),     MyTuple.Create("GravityGeneratorComponent",     5d) },
+            { MyItemType.MakeComponent("InteriorPlate"),        MyTuple.Create("InteriorPlate",                 5d) },
+            { MyItemType.MakeComponent("LargeTube"),            MyTuple.Create("LargeTube",                     5d) },
+            { MyItemType.MakeComponent("Medical"),              MyTuple.Create("MedicalComponent",              5d) },
+            { MyItemType.MakeComponent("MetalGrid"),            MyTuple.Create("MetalGrid",                     5d) },
+            { MyItemType.MakeComponent("Motor"),                MyTuple.Create("MotorComponent",                5d) },
+            { MyItemType.MakeComponent("PowerCell"),            MyTuple.Create("PowerCell",                     5d) },
+            { MyItemType.MakeComponent("RadioCommunication"),   MyTuple.Create("RadioCommunicationComponent",   5d) },
+            { MyItemType.MakeComponent("Reactor"),              MyTuple.Create("ReactorComponent",              5d) },
+            { MyItemType.MakeComponent("SmallTube"),            MyTuple.Create("SmallTube",                     5d) },
+            { MyItemType.MakeComponent("SolarCell"),            MyTuple.Create("SolarCell",                     5d) },
+            { MyItemType.MakeComponent("SteelPlate"),           MyTuple.Create("SteelPlate",                    5d) },
+            { MyItemType.MakeComponent("Superconductor"),       MyTuple.Create("Superconductor",                5d) },
+            { MyItemType.MakeComponent("Thrust"),               MyTuple.Create("ThrustComponent",               5d) }
+        };
+
         bool automatedManagment = false;//enable/disable automatic managment
-        bool togglePB = false;//enable/disable PB
+        bool togglePB = true;//enable/disable PB
 
         bool isControlled = false;
         bool solarPowerOnce = true;
@@ -123,38 +155,6 @@ namespace IngameScript {
         public StringBuilder assemblersInputLog = new StringBuilder("");
         public StringBuilder inventoriesPercentLog = new StringBuilder("");
         public StringBuilder powerLog = new StringBuilder("");
-
-        readonly Dictionary<MyDefinitionId, MyTuple<string, double>> componentsDefBpQuota = new Dictionary<MyDefinitionId, MyTuple<string, double>>() {//TODO
-            { MyItemType.MakeAmmo("Missile200mm"),              MyTuple.Create("Missile200mm",                  5d) },
-            { MyItemType.MakeAmmo("NATO_25x184mm"),             MyTuple.Create("NATO_25x184mmMagazine",         5d) },
-            { MyItemType.MakeAmmo("AutocannonClip"),            MyTuple.Create("AutocannonClip",                5d) },
-            { MyItemType.MakeAmmo("LargeCalibreAmmo"),          MyTuple.Create("LargeCalibreAmmo",              5d) },
-            { MyItemType.MakeAmmo("MediumCalibreAmmo"),         MyTuple.Create("MediumCalibreAmmo",             5d) },
-            { MyItemType.MakeAmmo("LargeRailgunAmmo"),          MyTuple.Create("LargeRailgunAmmo",              5d) },
-            { MyItemType.MakeAmmo("SmallRailgunAmmo"),          MyTuple.Create("SmallRailgunAmmo",              5d) },
-            { MyItemType.MakeComponent("BulletproofGlass"),     MyTuple.Create("BulletproofGlass",              5d) },
-            { MyItemType.MakeComponent("Canvas"),               MyTuple.Create("Canvas",                        5d) },
-            { MyItemType.MakeComponent("Computer"),             MyTuple.Create("ComputerComponent",             5d) },
-            { MyItemType.MakeComponent("Construction"),         MyTuple.Create("ConstructionComponent",         5d) },
-            { MyItemType.MakeComponent("Detector"),             MyTuple.Create("DetectorComponent",             5d) },
-            { MyItemType.MakeComponent("Display"),              MyTuple.Create("Display",                       5d) },
-            { MyItemType.MakeComponent("Explosives"),           MyTuple.Create("ExplosivesComponent",           5d) },
-            { MyItemType.MakeComponent("Girder"),               MyTuple.Create("GirderComponent",               5d) },
-            { MyItemType.MakeComponent("GravityGenerator"),     MyTuple.Create("GravityGeneratorComponent",     5d) },
-            { MyItemType.MakeComponent("InteriorPlate"),        MyTuple.Create("InteriorPlate",                 5d) },
-            { MyItemType.MakeComponent("LargeTube"),            MyTuple.Create("LargeTube",                     5d) },
-            { MyItemType.MakeComponent("Medical"),              MyTuple.Create("MedicalComponent",              5d) },
-            { MyItemType.MakeComponent("MetalGrid"),            MyTuple.Create("MetalGrid",                     5d) },
-            { MyItemType.MakeComponent("Motor"),                MyTuple.Create("MotorComponent",                5d) },
-            { MyItemType.MakeComponent("PowerCell"),            MyTuple.Create("PowerCell",                     5d) },
-            { MyItemType.MakeComponent("RadioCommunication"),   MyTuple.Create("RadioCommunicationComponent",   5d) },
-            { MyItemType.MakeComponent("Reactor"),              MyTuple.Create("ReactorComponent",              5d) },
-            { MyItemType.MakeComponent("SmallTube"),            MyTuple.Create("SmallTube",                     5d) },
-            { MyItemType.MakeComponent("SolarCell"),            MyTuple.Create("SolarCell",                     5d) },
-            { MyItemType.MakeComponent("SteelPlate"),           MyTuple.Create("SteelPlate",                    5d) },
-            { MyItemType.MakeComponent("Superconductor"),       MyTuple.Create("Superconductor",                5d) },
-            { MyItemType.MakeComponent("Thrust"),               MyTuple.Create("ThrustComponent",               5d) }
-        };
 
         public Dictionary<MyDefinitionId, double> oreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
             {MyItemType.MakeOre("Cobalt"),0d},
@@ -481,6 +481,9 @@ namespace IngameScript {
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     } else {
                         if (LCDMANAGER != null) { LCDMANAGER.BackgroundColor = new Color(0, 0, 0); };
+                        foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
+                        foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                        foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
                     break;
@@ -518,6 +521,7 @@ namespace IngameScript {
                     if (LCDAUTO != null) { LCDAUTO.BackgroundColor = automatedManagment ? new Color(0, 0, 50) : new Color(0, 0, 0); }
                     break;
                 case "WritePower":
+                    CalcPower();
                     ReadPowerInfos();
                     WritePowerInfo();
                     break;

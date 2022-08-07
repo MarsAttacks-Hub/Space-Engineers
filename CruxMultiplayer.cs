@@ -171,7 +171,7 @@ namespace IngameScript {
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
             if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
-            //if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = togglePB ? new Color(100, 0, 25) : new Color(0, 0, 0); }
+            //if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = togglePB ? new Color(20, 0, 0) : new Color(0, 0, 0); }
         }
 
         public void Main(string arg) {
@@ -317,7 +317,7 @@ namespace IngameScript {
                     break;
                 case "PBOn":
                     togglePB = true;
-                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(100, 0, 25); };//TODO
+                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(20, 0, 0); };
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     InitMulti();
                     break;
