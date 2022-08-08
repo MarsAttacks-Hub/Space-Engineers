@@ -419,7 +419,7 @@ namespace IngameScript {
 
         void SendBroadcastControllerMessage(bool isControlled) {
             MyTuple<string, bool> tuple = MyTuple.Create("isControlled", isControlled);
-            IGC.SendBroadcastMessage("[MANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[POWERMANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         void GyroStabilize(bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity, double mySpeed, bool isTargetEmpty) {

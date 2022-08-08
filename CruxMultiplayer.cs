@@ -347,7 +347,7 @@ namespace IngameScript {
 
         void SendBroadcastControllerMessage(bool isControlled) {
             MyTuple<string, bool> tuple = MyTuple.Create("isControlled", isControlled);
-            IGC.SendBroadcastMessage("[MANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[POWERMANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         void ManageMagneticDrive(bool needControl, bool isAutoPiloted, bool idleThrusters, Vector3D gravity, Vector3D myVelocity) {
