@@ -40,6 +40,7 @@ namespace IngameScript {
         bool moddedSensor = false;//define if is using modded sensors, valid only if obstaclesAvoidance is true and magneticDrive is true
         bool closeRangeCombat = false;//set the fight distance for the automatic fight, valid only if autoCombat is true and magneticDrive is true
         bool sunAlign = false;//enable/disable sun chase on space
+        bool logger = true;//enable/disable logging
 
         bool configChanged = false;
         bool aimTarget = false;
@@ -53,7 +54,6 @@ namespace IngameScript {
         bool safetyDampenersOnce = false;
         bool toggleThrustersOnce = false;
         bool returnOnce = true;
-        bool isPilotedOnce = true;
         bool initMagneticDriveOnce = true;
         bool initAutoMagneticDriveOnce = true;
         bool initRandomMagneticDriveOnce = true;
@@ -64,10 +64,12 @@ namespace IngameScript {
         bool sensorDetectionOnce = true;
         bool updateOnce = true;
         string selectedPlanet = "";
-        double maxScanRange = 0d;
+        string rangeFinderName = "";
         double altitudeToKeep = 0d;
         double movePitch = .01;
         double moveYaw = .01;
+        double rangeFinderDiameter = 0d;
+        double rangeFinderDistance = 0d;
         float prevSunPower = 0f;
         int planetSelector = 0;
         int sunAlignmentStep = 0;
@@ -80,6 +82,7 @@ namespace IngameScript {
         int randomCount = 50;
         int collisionCheckCount = 0;
         int keepAltitudeCount = 0;
+        int sendMessageCount = 0;
         long targId;
 
         readonly float targetVel = 29 * (float)(Math.PI / 30);//rpsOverRpm
@@ -99,7 +102,6 @@ namespace IngameScript {
         public List<IMyCameraBlock> LIDARSRIGHT = new List<IMyCameraBlock>();
         public List<IMyLargeTurretBase> TURRETS = new List<IMyLargeTurretBase>();
         public List<IMySoundBlock> ALARMS = new List<IMySoundBlock>();
-        public List<IMyTextSurface> SURFACES = new List<IMyTextSurface>();
         public List<IMyMotorStator> ROTORS = new List<IMyMotorStator>();
         public List<IMyMotorStator> ROTORSINV = new List<IMyMotorStator>();
         public List<IMyShipMergeBlock> MERGESPLUSX = new List<IMyShipMergeBlock>();
@@ -150,7 +152,7 @@ namespace IngameScript {
         MyDetectedEntityInfo targetInfo;
         public List<MyDetectedEntityInfo> targetsInfo = new List<MyDetectedEntityInfo>();
         MatrixD targOrientation = new MatrixD();
-        Vector3D targetPosition = Vector3D.Zero;
+        Vector3D rangeFinderPosition = Vector3D.Zero;
         Vector3D returnPosition = Vector3D.Zero;
         Vector3D hoverPosition = Vector3D.Zero;
         Vector3D landPosition = Vector3D.Zero;
@@ -166,16 +168,11 @@ namespace IngameScript {
         Vector3D collisionDir = Vector3D.Zero;
         Vector3D stopDir = Vector3D.Zero;
 
-        public StringBuilder jumpersLog = new StringBuilder("");
-        public StringBuilder lidarsLog = new StringBuilder("");
-        public StringBuilder targetLog = new StringBuilder("");
-
         PID yawController;
         PID pitchController;
         PID rollController;
 
         readonly Random random = new Random();
-        readonly MyIni myIni = new MyIni();
 
         readonly Dictionary<String, MyTuple<Vector3D, double, double>> planetsList = new Dictionary<String, MyTuple<Vector3D, double, double>>() {//string PlanetName, Vector3D PlanetPosition, double PlanetRadius, double AtmosphereRadius
             { "Earth",  MyTuple.Create(new Vector3D(0d,          0d,          0d),         61250d,     41843.4d) },
@@ -196,14 +193,12 @@ namespace IngameScript {
         void Setup() {
             GetBlocks();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[NAVIGATOR]");
-            ParseCockpitConfigData(CONTROLLER as IMyCockpit);
             foreach (IMyCameraBlock cam in LIDARS) { cam.EnableRaycast = true; }
             foreach (IMyCameraBlock cam in LIDARSBACK) { cam.EnableRaycast = true; }
             foreach (IMyCameraBlock cam in LIDARSUP) { cam.EnableRaycast = true; }
             foreach (IMyCameraBlock cam in LIDARSDOWN) { cam.EnableRaycast = true; }
             foreach (IMyCameraBlock cam in LIDARSLEFT) { cam.EnableRaycast = true; }
             foreach (IMyCameraBlock cam in LIDARSRIGHT) { cam.EnableRaycast = true; }
-            if (LIDARS.Count != 0) { maxScanRange = LIDARS[0].RaycastDistanceLimit; }
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
             if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
@@ -245,7 +240,7 @@ namespace IngameScript {
 
                 if (aimTarget) {
                     bool aligned;
-                    AimAtTarget(targetPosition, 0.1d, out aligned);
+                    AimAtTarget(rangeFinderPosition, 0.1d, out aligned);
                     if (!aligned) { return; }
                 }
 
@@ -271,11 +266,13 @@ namespace IngameScript {
 
                 ManageMagneticDrive(needControl, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity, myVelocity, mySpeed);
 
-                ReadLidarInfos();
-                ReadJumpersInfos();
-
-                WriteInfo();
-
+                if (logger) {
+                    if (sendMessageCount >= 10) {
+                        SendBroadcastLogMessage();
+                        sendMessageCount = 0;
+                    }
+                    sendMessageCount++;
+                }
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
@@ -285,7 +282,8 @@ namespace IngameScript {
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
-                Setup();
+                //Setup();
+                Runtime.UpdateFrequency = UpdateFrequency.None;
             }
         }
 
@@ -297,6 +295,7 @@ namespace IngameScript {
                     } else {
                         Land(gravity);
                     }
+                    sendMessageCount = 10;
                     break;
                 case "ChangePlanet":
                     planetSelector++;
@@ -305,7 +304,7 @@ namespace IngameScript {
                     }
                     selectedPlanet = planetsList.ElementAt(planetSelector).Key;
                     break;
-                case "AimTarget": if (!Vector3D.IsZero(targetPosition)) { aimTarget = true; }; break;
+                case "AimTarget": if (!Vector3D.IsZero(rangeFinderPosition)) { aimTarget = true; }; break;
                 case "SetPlanet":
                     if (!aimTarget) {
                         MyTuple<Vector3D, double, double> planet;
@@ -315,15 +314,12 @@ namespace IngameScript {
                         REMOTE.ClearWaypoints();
                         REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
                         double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                        targetPosition = safeJumpPosition;
+                        rangeFinderPosition = safeJumpPosition;
                         if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)distance; }
-                        targetLog.Clear();
-                        string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
-                        targetLog.Append(safeJumpGps).Append("\n");
-                        targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
-                        targetLog.Append("Radius: ").Append(planet.Item2.ToString("0.0")).Append(", ");
-                        targetLog.Append("Diameter: ").Append((planet.Item2 * 2d).ToString("0.0")).Append("\n");
-                        targetLog.Append("Atmo. Height: ").Append(planet.Item3.ToString("0.0")).Append("\n");
+                        rangeFinderName = selectedPlanet;
+                        rangeFinderDiameter = planet.Item2 * 2d;
+                        rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, planet.Item1);
+                        sendMessageCount = 10;
                     }
                     break;
                 case "ToggleSunAlign":
@@ -386,6 +382,15 @@ namespace IngameScript {
                     closeRangeCombat = !closeRangeCombat;
                     if (LCDCLOSECOMBAT != null) { LCDCLOSECOMBAT.BackgroundColor = closeRangeCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
+                case "ToggleLogger":
+                    logger = !logger;
+                    break;
+                case "LoggerOn":
+                    logger = true;
+                    break;
+                case "LoggerOff":
+                    logger = false;
+                    break;
             }
         }
 
@@ -420,6 +425,43 @@ namespace IngameScript {
         void SendBroadcastControllerMessage(bool isControlled) {
             MyTuple<string, bool> tuple = MyTuple.Create("isControlled", isControlled);
             IGC.SendBroadcastMessage("[POWERMANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
+        }
+
+
+        void SendBroadcastLogMessage() {
+            string timeRemaining = "";
+            int maxJump = 0;
+            int currentJump = 0;
+            double totJumpPercent = 0d;
+            double currentStoredPower = 0d;
+            double maxStoredPower = 0d;
+            if (JUMPERS.Count != 0) {
+                maxJump = (int)JUMPERS[0].MaxJumpDistanceMeters;
+                currentJump = (int)(JUMPERS[0].MaxJumpDistanceMeters / 100f * JUMPERS[0].JumpDistanceMeters);
+                foreach (IMyJumpDrive block in JUMPERS) {
+                    MyJumpDriveStatus status = block.Status;
+                    if (status == MyJumpDriveStatus.Charging) {
+                        timeRemaining = block.DetailedInfo.ToString().Split('\n')[5];
+                    }
+                    currentStoredPower += block.CurrentStoredPower;
+                    maxStoredPower += block.MaxStoredPower;
+                }
+                if (maxStoredPower > 0d) {
+                    totJumpPercent = currentStoredPower / maxStoredPower * 100d;
+                }
+            }
+
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<
+                    MyTuple<string, int, int, double, double, double>,
+                    MyTuple<Vector3D, string, double, double>
+                    >>();
+
+            var tuple = MyTuple.Create(
+                MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
+                MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter)
+                );
+            immArray.Add(tuple);
+            IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
         }
 
         void GyroStabilize(bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity, double mySpeed, bool isTargetEmpty) {
@@ -1187,17 +1229,6 @@ namespace IngameScript {
         }
 
         void ManageWaypoints(bool isUnderControl, bool targFound, bool isTargetEmpty) {
-            if (!isUnderControl) {
-                isPilotedOnce = true;
-            } else {
-                if (isPilotedOnce) {
-                    REMOTE.ClearWaypoints();
-                    returnPosition = Vector3D.Zero;
-                    hoverPosition = Vector3D.Zero;
-                    landPosition = Vector3D.Zero;
-                    isPilotedOnce = false;
-                }
-            }
             if (targFound || !isTargetEmpty) {
                 if (REMOTE.IsAutoPilotEnabled) {
                     REMOTE.SetAutoPilotEnabled(false);
@@ -1229,28 +1260,25 @@ namespace IngameScript {
                     }
                 }
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(landPosition)) {
-                    if (CONTROLLER.IsUnderControl && !Vector3D.IsZero(CONTROLLER.MoveIndicator)) {
-                        REMOTE.ClearWaypoints();
-                        REMOTE.SetAutoPilotEnabled(false);
-                        //landPosition = Vector3D.Zero;
-                    }
                     if (Vector3D.Distance(landPosition, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
                         REMOTE.ClearWaypoints();
                         REMOTE.SetAutoPilotEnabled(false);
                         landPosition = Vector3D.Zero;
                     }
                 }
-                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(targetPosition)) {
-                    if (Vector3D.Distance(targetPosition, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
+                if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(rangeFinderPosition)) {
+                    if (Vector3D.Distance(rangeFinderPosition, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
                         REMOTE.SetAutoPilotEnabled(false);
-                        targetPosition = Vector3D.Zero;
+                        rangeFinderPosition = Vector3D.Zero;
+                        rangeFinderName = "";
+                        rangeFinderDistance = 0d;
+                        rangeFinderDiameter = 0d;
                     }
                 }
             }
         }
 
         void RangeFinder() {
-            targetLog.Clear();
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             if (lidar == null) { return; }
             MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);//TODO
@@ -1277,48 +1305,43 @@ namespace IngameScript {
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, selectedPlanet);
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                    targetPosition = safeJumpPosition;
+                    rangeFinderPosition = safeJumpPosition;
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)distance; }
                     string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
-                    targetLog.Append(safeJumpGps).Append("\n");
-                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
-                    targetLog.Append("Radius: ").Append(Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value).ToString("0.0")).Append(", ");
-                    targetLog.Append("Diameter: ").Append(Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max).ToString("0.0")).Append("\n");
-                    targetLog.Append("Ground Dist.: ").Append(Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value).ToString("0.0")).Append("\n");
-                    targetLog.Append("Atmo. Height: ").Append(Vector3D.Distance(TARGET.HitPosition.Value, safeJumpPosition).ToString("0.0")).Append("\n");
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 } else if (TARGET.Type == MyDetectedEntityType.Asteroid) {
                     Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * 1000d);
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, "Asteroid");
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
-                    targetPosition = safeJumpPosition;
+                    rangeFinderPosition = safeJumpPosition;
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)distance; }
-                    targetLog.Append($"GPS:Asteroid:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}\n");
-                    targetLog.Append("Distance: ").Append(distance.ToString("0.0")).Append("\n");
-                    targetLog.Append("Diameter: ").Append(Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max).ToString("0.0")).Append("\n");
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 } else if (IsNotFriendly(TARGET.Relationship)) {
                     Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * 3000d);
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
-                    targetPosition = safeJumpPosition;
+                    rangeFinderPosition = safeJumpPosition;
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition); }
-                    targetLog.Append($"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}\n");
-                    targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
-                    targetLog.Append("Distance: ").Append(Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value).ToString("0.0")).Append("\n");
-                    targetLog.Append("Diameter: ").Append(Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max).ToString("0.0")).Append("\n");
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 } else {
                     Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * 1000d);
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition); }
-                    targetPosition = safeJumpPosition;
-                    targetLog.Append($"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}\n");
-                    targetLog.Append("Name: ").Append(TARGET.Name).Append("\n");
-                    targetLog.Append("Distance: ").Append(Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value).ToString("0.0")).Append("\n");
-                    targetLog.Append("Diameter: ").Append(Vector3D.Distance(TARGET.BoundingBox.Min, TARGET.BoundingBox.Max).ToString("0.0")).Append("\n");
+                    rangeFinderPosition = safeJumpPosition;
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 }
             } else {
-                targetLog.Append("Nothing Detected!\n");
+                rangeFinderName = "Nothing Detected!";
             }
         }
 
@@ -1563,61 +1586,6 @@ namespace IngameScript {
             return Vector3D.Normalize(a);
         }
 
-        void ReadLidarInfos() {
-            lidarsLog.Clear();
-            lidarsLog.Append("Max Range: ").Append(maxScanRange.ToString("0.0")).Append("\n");
-            IMyCameraBlock cam = GetCameraWithMaxRange(LIDARS);
-            if (cam != null) { lidarsLog.Append("Avail. Range: ").Append(cam.AvailableScanRange.ToString("0.0")).Append("\n"); }
-        }
-
-        void ReadJumpersInfos() {
-            jumpersLog.Clear();
-            if (JUMPERS.Count != 0) {
-                jumpersLog.Append("Max Jump: ").Append(JUMPERS[0].MaxJumpDistanceMeters.ToString("0.0")).Append("\n");
-                jumpersLog.Append("Curr. Jump: ").Append((JUMPERS[0].MaxJumpDistanceMeters / 100f * JUMPERS[0].JumpDistanceMeters).ToString("0.0")).Append(" (").Append(JUMPERS[0].JumpDistanceMeters.ToString("0.00")).Append("%)\n");
-                double currentStoredPower = 0d;
-                double maxStoredPower = 0d;
-                StringBuilder timeRemainingBlldr = new StringBuilder();
-                foreach (IMyJumpDrive block in JUMPERS) {
-                    MyJumpDriveStatus status = block.Status;
-                    if (status == MyJumpDriveStatus.Charging) {
-                        timeRemainingBlldr.Append(status.ToString()).Append(": ").Append(block.DetailedInfo.ToString().Split('\n')[5]).Append("s, ");//TODO timeRemaining
-                    } else {
-                        timeRemainingBlldr.Append(status.ToString()).Append(", ");
-                    }
-                    currentStoredPower += block.CurrentStoredPower;
-                    maxStoredPower += block.MaxStoredPower;
-                }
-                jumpersLog.Append("Status: ").Append(timeRemainingBlldr.ToString());
-                if (currentStoredPower > 0d) {
-                    double totJumpPercent = currentStoredPower / maxStoredPower * 100d;
-                    jumpersLog.Append("Stored Power: ").Append(totJumpPercent.ToString("0.00")).Append("%\n");
-                } else {
-                    jumpersLog.Append("Stored Power: ").Append("0%\n");
-                }
-            }
-        }
-
-        void WriteInfo() {
-            foreach (IMyTextSurface surface in SURFACES) {
-                StringBuilder text = new StringBuilder();
-                text.Append(lidarsLog.ToString());
-                text.Append(jumpersLog.ToString());
-                text.Append("Selected Planet: " + selectedPlanet + "\n");
-                text.Append(targetLog.ToString());
-                surface.WriteText(text);
-            }
-        }
-
-        void ParseCockpitConfigData(IMyCockpit cockpit) {
-            MyIniParseResult result;
-            myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
-            if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
-                int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
-                SURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
-            }
-        }
-
         void UpdateConfigParams() {
             if (configChanged) {
                 if (!magneticDrive) {
@@ -1684,10 +1652,6 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSY, block => block.CustomName.Contains("Merge_MD-Z"));//TODO
             MERGESMINUSZ.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains("Merge_MD-Y"));//TODO
-            SURFACES.Clear();
-            List<IMyTextPanel> panels = new List<IMyTextPanel>();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD RangeFinder"));
-            foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             LCDSAFETYDAMPENERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Safety Dampeners") as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Thrusters") as IMyTextPanel;
             LCDSUNALIGN = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Sun Align") as IMyTextPanel;

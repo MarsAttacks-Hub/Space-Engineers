@@ -29,6 +29,7 @@ namespace IngameScript {
         bool autoFire = true;//enable/disable automatic fire
         bool autoMissiles = false;//enable/disable automatic missiles launch
         bool autoSwitchGuns = true;//enable/disable automatic guns switch, depending on range etc.
+        bool logger = true;//enable/disable logging
 
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
         int selectedPayLoad = 0;//0 Missiles - 1 Drones
@@ -40,7 +41,6 @@ namespace IngameScript {
         int selectedMissile = 1;
         int autoMissilesCounter = 0;
         int checkGunsCount = 0;
-        int writeCount = 0;
         int missedScan = 0;
         int rocketCount = 0;
         int rocketIndex = 0;
@@ -52,6 +52,7 @@ namespace IngameScript {
         int railgunsIndex = 0;
         int smallRailgunsCount = 0;
         int smallRailgunsIndex = 0;
+        int sendMessageCount = 0;
         double fudgeFactor = 5d;
         double timeSinceLastLock = 0d;
         bool hasCenter = true;
@@ -96,7 +97,6 @@ namespace IngameScript {
         public List<IMyCameraBlock> LIDARS = new List<IMyCameraBlock>();
         public List<IMyLightingBlock> LIGHTS = new List<IMyLightingBlock>();
         public List<IMyLargeTurretBase> TURRETS = new List<IMyLargeTurretBase>();
-        public List<IMyTextSurface> SURFACES = new List<IMyTextSurface>();
         public List<IMySoundBlock> ALARMS = new List<IMySoundBlock>();
         public List<IMyGyro> GYROS = new List<IMyGyro>();
         public List<IMyShipWelder> WELDERS = new List<IMyShipWelder>();
@@ -141,11 +141,7 @@ namespace IngameScript {
         public List<double> LostMissileIDs = new List<double>();
         Dictionary<long, MyTuple<double, double, string>> missilesInfo = new Dictionary<long, MyTuple<double, double, string>>();
 
-        public StringBuilder targetLog = new StringBuilder("");
-        public StringBuilder missileLog = new StringBuilder("");
         public StringBuilder debugLog = new StringBuilder("");
-
-        readonly MyIni myIni = new MyIni();
 
         PID yawController;
         PID pitchController;
@@ -173,7 +169,6 @@ namespace IngameScript {
                 foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = true; }
                 foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = false; }
             }
-            ParseCockpitConfigData(CONTROLLER as IMyCockpit);
             autoMissilesCounter = 9 + 1;
             SetGunsDelay();
             if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(20, 10, 0) : new Color(0, 0, 0); }
@@ -190,7 +185,7 @@ namespace IngameScript {
                 RemoveLostMissiles();
                 GetBroadcastMessages();
                 GetMessages();
-                ReadMessages();
+                //ReadMessages();//TODO
 
                 double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
@@ -253,7 +248,7 @@ namespace IngameScript {
                         missedScan++;
                     }
 
-                    ReadTargetInfo();
+                    //ReadTargetInfo();//TODO
                 }
 
                 ManagePIDControllers(isTargetEmpty);
@@ -269,18 +264,21 @@ namespace IngameScript {
                     }
                 }
 
-                if (writeCount == 5) {
-                    WriteInfo();
-                    writeCount = 0;
+                if (logger) {
+                    if (sendMessageCount >= 10) {
+                        SendBroadcastLogMessage();
+                        sendMessageCount = 0;
+                    }
+                    sendMessageCount++;
                 }
-                writeCount++;
             } catch (Exception e) {
                 DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                 debugLog = new StringBuilder("");
                 //DEBUG.ReadText(debugLog, true);
                 debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                 DEBUG.WriteText(debugLog);
-                Setup();
+                //Setup();
+                Runtime.UpdateFrequency = UpdateFrequency.None;
             }
         }
 
@@ -348,15 +346,15 @@ namespace IngameScript {
                     sequenceWeapons = !sequenceWeapons;
                     if (LCDSEQUENCEGUNS != null) { LCDSEQUENCEGUNS.BackgroundColor = sequenceWeapons ? new Color(20, 10, 0) : new Color(0, 0, 0); }
                     break;
-            }
-        }
-
-        void ParseCockpitConfigData(IMyCockpit cockpit) {//"[MissilesSettings]\ncockpitTargetSurface=0\n"
-            MyIniParseResult result;
-            myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
-            if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
-                int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
-                SURFACES.Add(cockpit.GetSurface(cockpitTargetSurface));
+                case "ToggleLogger":
+                    logger = !logger;
+                    break;
+                case "LoggerOn":
+                    logger = true;
+                    break;
+                case "LoggerOff":
+                    logger = false;
+                    break;
             }
         }
 
@@ -725,7 +723,7 @@ namespace IngameScript {
                     if (igcMessage.Data is ImmutableArray<MyTuple<string, Vector3D, double, double>>) {
                         ImmutableArray<MyTuple<string, Vector3D, double, double>> data = (ImmutableArray<MyTuple<string, Vector3D, double, double>>)igcMessage.Data;
                         received = true;
-                        MyTuple<double, double, string> tup = MyTuple.Create(data[0].Item4, data[0].Item3, data[0].Item1);
+                        MyTuple<double, double, string> tup = MyTuple.Create(data[0].Item4, data[0].Item3, data[0].Item1);//distanceFromTarget, speed, info
                         if (!tempMissilesInfo.ContainsKey(missileId)) {
                             tempMissilesInfo.Add(missileId, tup);
                         }
@@ -766,20 +764,6 @@ namespace IngameScript {
             }
         }
 
-        void ReadMessages() {
-            missileLog.Clear();
-            if (MissileIDs.Count() > 0) {
-                missileLog.Append("Active Missiles: ").Append(MissileIDs.Count().ToString()).Append("\n");
-            }
-            foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
-                missileLog.Append("Status: ").Append(inf.Value.Item3).Append(", Missile ID: ").Append(inf.Key.ToString()).Append("\n");
-                if (inf.Value.Item3.Contains("Update") || inf.Value.Item3.Contains("Spiral")) {
-                    missileLog.Append("Dist. From Target: ").Append(inf.Value.Item1.ToString("0.0")).Append(", ");
-                }
-                missileLog.Append("Speed: ").Append(inf.Value.Item2.ToString("0.0")).Append("\n");
-            }
-        }
-
         void SendMissileBroadcastMessage(string cmd, Vector3D targetPos, Vector3D targetVel) {
             long fakeId = 0;
             ImmutableArray<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3D, Vector3D>>>.Builder immArray = ImmutableArray.CreateBuilder<MyTuple<MyTuple<long, string, Vector3D, MatrixD, bool>, MyTuple<Vector3D, Vector3D>>>();
@@ -807,6 +791,49 @@ namespace IngameScript {
         void SendBroadcastGunsMessage(int weaponType, bool assaultCanShoot, bool artilleryCanShoot, bool railgunsCanShoot, bool smallRailgunsCanShoot) {
             MyTuple<int, bool, bool, bool, bool> tuple = MyTuple.Create(weaponType, assaultCanShoot, artilleryCanShoot, railgunsCanShoot, smallRailgunsCanShoot);
             IGC.SendBroadcastMessage("[NAVIGATOR]", tuple, TransmissionDistance.ConnectedConstructs);
+        }
+
+        void SendBroadcastLogMessage() {
+            if (targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+                StringBuilder missileLog = new StringBuilder("");
+                foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
+                    missileLog.Append("toTarget=" + inf.Value.Item1 + ",speed=" + inf.Value.Item2 + "," + inf.Value.Item3 + "\n");//(info)"command=" + command + ",status=" + status + ",type=" + type;
+                }
+
+                var immArray = ImmutableArray.CreateBuilder<MyTuple<
+                    MyTuple<string, Vector3D, Vector3D, Vector3D>,
+                    string
+                >>();
+
+                Vector3D targetVelocity = targetInfo.Velocity;
+                var tuple = MyTuple.Create(
+                    MyTuple.Create(targetInfo.Name, targetInfo.HitPosition.Value, targetInfo.Position, targetVelocity),
+                    missileLog.ToString()
+                );
+
+                immArray.Add(tuple);
+                IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            } else {
+                if (missilesInfo.Count > 0) {
+                    StringBuilder missileLog = new StringBuilder("");
+                    foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
+                        missileLog.Append("toTarget=" + inf.Value.Item1 + ",speed=" + inf.Value.Item2 + "," + inf.Value.Item3 + "\n");
+                    }
+
+                    var immArray = ImmutableArray.CreateBuilder<MyTuple<
+                        MyTuple<string, Vector3D, Vector3D, Vector3D>,
+                        string
+                    >>();
+
+                    var tuple = MyTuple.Create(
+                        MyTuple.Create("", Vector3D.Zero, Vector3D.Zero, Vector3D.Zero),
+                        missileLog.ToString()
+                    );
+
+                    immArray.Add(tuple);
+                    IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+                }
+            }
         }
 
         void RemoveLostMissiles() {
@@ -842,7 +869,6 @@ namespace IngameScript {
             UnlockGyros();
             TurnAlarmOff();
             ResetGuns();
-            ClearLogs();
             targetInfo = default(MyDetectedEntityInfo);
             selectedMissile = 1;
             activateOnce = false;
@@ -1399,52 +1425,6 @@ namespace IngameScript {
             return transferred;
         }
 
-        void WriteInfo() {
-            foreach (IMyTextSurface surface in SURFACES) {
-                StringBuilder text = new StringBuilder("");
-                string gun;
-                switch (weaponType) {//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
-                    case 0: gun = "None"; break;
-                    case 1: gun = "Rockets"; break;
-                    case 2: gun = "Gatlings"; break;
-                    case 3: gun = "Autocannon"; break;
-                    case 4: gun = "Assault"; break;
-                    case 5: gun = "Artillery"; break;
-                    case 6: gun = "Railguns"; break;
-                    case 7: gun = "Small Railguns"; break;
-                    default: gun = "None"; break;
-                }
-                text.Append("Guns: " + gun + ", ");
-                text.Append("autoFire: " + autoFire + ", autoSwitchGuns: " + autoSwitchGuns + "\n");
-                text.Append("PayLoad: " + (selectedPayLoad == 0 ? "Missiles" : "Drones") + ", autoMissiles: " + autoMissiles + "\n");
-                text.Append(targetLog.ToString());
-                text.Append(missileLog.ToString());
-                surface.WriteText(text);
-            }
-        }
-
-        void ReadTargetInfo() {
-            targetLog.Clear();
-            targetLog.Append("Launching: ").Append("A [M]").Append(selectedMissile.ToString());
-            if (!missilesLoaded) {
-                targetLog.Append(" Not Loaded\n");
-            } else { targetLog.Append(" Loaded\n"); }
-            targetLog.Append("Target Name: ").Append(targetInfo.Name).Append(", ");
-            string targX = targetInfo.Position.X.ToString("0.00");
-            string targY = targetInfo.Position.Y.ToString("0.00");
-            string targZ = targetInfo.Position.Z.ToString("0.00");
-            targetLog.Append($"X:{targX} Y:{targY} Z:{targZ}").Append("\n");
-            targetLog.Append("Target Speed: ").Append(targetInfo.Velocity.Length().ToString("0.0")).Append(", ");
-            double targetDistance = Vector3D.Distance(targetInfo.Position, CONTROLLER.CubeGrid.WorldVolume.Center);
-            targetLog.Append("Distance: ").Append(targetDistance.ToString("0.0")).Append("\n");
-        }
-
-        void ClearLogs() {
-            targetLog.Clear();
-            missileLog.Clear();
-            foreach (IMyTextSurface surface in SURFACES) { surface.WriteText(""); }
-        }
-
         void GetBlocks() {
             LIDARS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyCameraBlock>(LIDARS, b => b.CustomName.Contains("[CRX] Camera Lidar"));
@@ -1490,10 +1470,6 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(CARGOS, b => b.CustomName.Contains("[CRX] Cargo"));
             CARGOINVENTORIES.Clear();
             CARGOINVENTORIES.AddRange(CARGOS.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
-            SURFACES.Clear();
-            List<IMyTextPanel> panels = new List<IMyTextPanel>();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Target"));
-            foreach (IMyTextPanel panel in panels) { SURFACES.Add(panel as IMyTextSurface); }
             ANTENNA = GridTerminalSystem.GetBlockWithName("T") as IMyRadioAntenna;
             CONTROLLER = GridTerminalSystem.GetBlockWithName("[CRX] Controller Cockpit 1") as IMyShipController;
             SHOOTERPB = GridTerminalSystem.GetBlockWithName("[CRX] PB Shooter") as IMyProgrammableBlock;

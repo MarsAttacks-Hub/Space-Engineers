@@ -197,7 +197,8 @@ namespace IngameScript {
                 StringBuilder debugLog = new StringBuilder("");
                 debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                 SendErrorMessage(debugLog.ToString());
-                Setup();
+                //Setup();
+                Runtime.UpdateFrequency = UpdateFrequency.None;
             }
         }
 
@@ -268,7 +269,7 @@ namespace IngameScript {
             } else if (missileType == 2) {
                 type = "Drone";
             }
-            string info = command + "," + status + "," + type;
+            string info = "command=" + command + ",status=" + status + ",type=" + type;
             ImmutableArray<MyTuple<string, Vector3D, double, double>>.Builder immArray = ImmutableArray.CreateBuilder<MyTuple<string, Vector3D, double, double>>();
             MyTuple<string, Vector3D, double, double> tuple = MyTuple.Create(info, position, speed, distanceFromTarget);
             immArray.Add(tuple);

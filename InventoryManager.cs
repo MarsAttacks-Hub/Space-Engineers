@@ -56,6 +56,7 @@ namespace IngameScript {
         };
 
         bool togglePB = true;//enable/disable PB
+        bool logger = true;//enable/disable logging
 
         double cargoPercentage = 0;
         int ticks = 0;
@@ -292,7 +293,9 @@ namespace IngameScript {
                 } else if (ticks == 7) {
                     ReadInventoryInfos();
                 } else if (ticks >= 9) {
-                    SendBroadcastMessage();
+                    if (logger) {
+                        SendBroadcastMessage();
+                    }
                     ticks = -1;
                 }
                 ticks++;
@@ -317,7 +320,8 @@ namespace IngameScript {
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
-                Setup();
+                //Setup();
+                Runtime.UpdateFrequency = UpdateFrequency.None;
             }
         }
 
@@ -363,6 +367,15 @@ namespace IngameScript {
                 case "WriteLog":
                     ReadInventoryInfos();
                     SendBroadcastMessage();
+                    break;
+                case "ToggleLogger":
+                    logger = !logger;
+                    break;
+                case "LoggerOn":
+                    logger = true;
+                    break;
+                case "LoggerOff":
+                    logger = false;
                     break;
             }
         }

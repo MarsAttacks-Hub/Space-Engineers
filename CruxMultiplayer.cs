@@ -29,6 +29,7 @@ namespace IngameScript {
         bool idleThrusters = false;//enable/disable thrusters
         bool togglePB = true;//enable/disable PB
         bool sunAlign = false;//enable/disable sun chase on space
+        bool logger = true;//enable/disable logging
 
         bool hasCenter = true;
         bool scanCenter = false;
@@ -76,12 +77,16 @@ namespace IngameScript {
         double fudgeFactor = 5d;
         double movePitch = .01;
         double moveYaw = .01;
+        double rangeFinderDiameter = 0d;
+        double rangeFinderDistance = 0d;
         float prevSunPower = 0f;
         int weaponType = 2;//0 None - 1 Rockets - 2 Gatlings - 3 Autocannon - 4 Assault - 5 Artillery - 6 Railguns - 7 Small Railguns
         int missedScan = 0;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
         int checkGunsCount;
+        int sendMessageCount = 0;
+        string rangeFinderName = "";
 
         readonly float rotorVel = 29 * (float)(Math.PI / 30);//rpsOverRpm
         readonly float syncSpeed = 1 * (float)(Math.PI / 30);
@@ -265,6 +270,14 @@ namespace IngameScript {
 
                 SyncGuns(timeSinceLastRun);
 
+                if (logger) {
+                    if (sendMessageCount >= 10) {
+                        SendBroadcastLogRangeFinderMessage();
+                        SendBroadcastLogTargetMessage();
+                        sendMessageCount = 0;
+                    }
+                    sendMessageCount++;
+                }
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
@@ -274,7 +287,8 @@ namespace IngameScript {
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
-                Setup();
+                //Setup();
+                Runtime.UpdateFrequency = UpdateFrequency.None;
             }
         }
 
@@ -288,6 +302,7 @@ namespace IngameScript {
                     } else {
                         Land(gravity);
                     }
+                    sendMessageCount = 10;
                     break;
                 case "AimTarget": if (!Vector3D.IsZero(rangeFinderPosition)) { aimTarget = true; }; break;
                 case "ToggleSunAlign":
@@ -327,6 +342,15 @@ namespace IngameScript {
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     ShutDownMulti();
                     break;
+                case "ToggleLogger":
+                    logger = !logger;
+                    break;
+                case "LoggerOn":
+                    logger = true;
+                    break;
+                case "LoggerOff":
+                    logger = false;
+                    break;
             }
         }
 
@@ -348,6 +372,60 @@ namespace IngameScript {
         void SendBroadcastControllerMessage(bool isControlled) {
             MyTuple<string, bool> tuple = MyTuple.Create("isControlled", isControlled);
             IGC.SendBroadcastMessage("[POWERMANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
+        }
+
+        void SendBroadcastLogTargetMessage() {
+            if (targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+                var immArray = ImmutableArray.CreateBuilder<MyTuple<
+                    MyTuple<string, Vector3D, Vector3D, Vector3D>,
+                    string
+                >>();
+
+                Vector3D targetVelocity = targetInfo.Velocity;
+                var tuple = MyTuple.Create(
+                    MyTuple.Create(targetInfo.Name, targetInfo.HitPosition.Value, targetInfo.Position, targetVelocity),
+                    ""
+                );
+
+                immArray.Add(tuple);
+                IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            }
+        }
+
+        void SendBroadcastLogRangeFinderMessage() {
+            string timeRemaining = "";
+            int maxJump = 0;
+            int currentJump = 0;
+            double totJumpPercent = 0d;
+            double currentStoredPower = 0d;
+            double maxStoredPower = 0d;
+            if (JUMPERS.Count != 0) {
+                maxJump = (int)JUMPERS[0].MaxJumpDistanceMeters;
+                currentJump = (int)(JUMPERS[0].MaxJumpDistanceMeters / 100f * JUMPERS[0].JumpDistanceMeters);
+                foreach (IMyJumpDrive block in JUMPERS) {
+                    MyJumpDriveStatus status = block.Status;
+                    if (status == MyJumpDriveStatus.Charging) {
+                        timeRemaining = block.DetailedInfo.ToString().Split('\n')[5];
+                    }
+                    currentStoredPower += block.CurrentStoredPower;
+                    maxStoredPower += block.MaxStoredPower;
+                }
+                if (maxStoredPower > 0d) {
+                    totJumpPercent = currentStoredPower / maxStoredPower * 100d;
+                }
+            }
+
+            var immArray = ImmutableArray.CreateBuilder<MyTuple<
+                    MyTuple<string, int, int, double, double, double>,
+                    MyTuple<Vector3D, string, double, double>
+                    >>();
+
+            var tuple = MyTuple.Create(
+                MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
+                MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter)
+                );
+            immArray.Add(tuple);
+            IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
         }
 
         void ManageMagneticDrive(bool needControl, bool isAutoPiloted, bool idleThrusters, Vector3D gravity, Vector3D myVelocity) {
@@ -925,7 +1003,9 @@ namespace IngameScript {
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     rangeFinderPosition = safeJumpPosition;
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)distance; }
-                    string safeJumpGps = $"GPS:Safe Jump Pos:{Math.Round(safeJumpPosition.X)}:{Math.Round(safeJumpPosition.Y)}:{Math.Round(safeJumpPosition.Z)}";
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 } else if (TARGET.Type == MyDetectedEntityType.Asteroid) {
                     Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * 1000d);
                     REMOTE.ClearWaypoints();
@@ -933,18 +1013,27 @@ namespace IngameScript {
                     double distance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition);
                     rangeFinderPosition = safeJumpPosition;
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)distance; }
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 } else if (IsNotFriendly(TARGET.Relationship)) {
                     Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * 3000d);
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
                     rangeFinderPosition = safeJumpPosition;
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition); }
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 } else {
                     Vector3D safeJumpPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(lidar.GetPosition() - TARGET.HitPosition.Value) * 1000d);
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(safeJumpPosition, TARGET.Name);
                     if (JUMPERS.Count != 0) { JUMPERS[0].JumpDistanceMeters = (float)Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, safeJumpPosition); }
                     rangeFinderPosition = safeJumpPosition;
+                    rangeFinderName = TARGET.Name;
+                    rangeFinderDiameter = Vector3D.Distance(TARGET.Position, TARGET.HitPosition.Value) * 2d;
+                    rangeFinderDistance = Vector3D.Distance(REMOTE.CubeGrid.WorldVolume.Center, TARGET.HitPosition.Value);
                 }
             }
         }
@@ -1036,6 +1125,9 @@ namespace IngameScript {
                     if (Vector3D.Distance(rangeFinderPosition, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
                         REMOTE.SetAutoPilotEnabled(false);
                         rangeFinderPosition = Vector3D.Zero;
+                        rangeFinderName = "";
+                        rangeFinderDistance = 0d;
+                        rangeFinderDiameter = 0d;
                     }
                 }
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(landPosition)) {

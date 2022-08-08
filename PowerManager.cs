@@ -23,6 +23,7 @@ namespace IngameScript {
 
         //POWER MANAGER
         bool togglePB = true;//enable/disable PB
+        bool logger = true;//enable/disable logging
 
         bool solarPowerOnce = true;
         bool greenPowerOnce = true;
@@ -110,12 +111,13 @@ namespace IngameScript {
                 CalcPower();
                 PowerFlow();
 
-                if (sendCount == 10) {
-                    SendBroadcastMessage();
-                    sendCount = 0;
+                if (logger) {
+                    if (sendCount == 10) {
+                        SendBroadcastMessage();
+                        sendCount = 0;
+                    }
+                    sendCount++;
                 }
-                sendCount++;
-
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
@@ -159,6 +161,15 @@ namespace IngameScript {
                     foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
                     powerStatus = "Full Steam";
                     Runtime.UpdateFrequency = UpdateFrequency.None;
+                    break;
+                case "ToggleLogger":
+                    logger = !logger;
+                    break;
+                case "LoggerOn":
+                    logger = true;
+                    break;
+                case "LoggerOff":
+                    logger = false;
                     break;
             }
         }
