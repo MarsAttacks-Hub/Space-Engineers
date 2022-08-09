@@ -171,6 +171,10 @@ namespace IngameScript {
                 case "LoggerOff":
                     logger = false;
                     break;
+                case "WriteLog":
+                    CalcPower();
+                    SendBroadcastMessage();
+                    break;
             }
         }
 
