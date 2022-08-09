@@ -185,7 +185,6 @@ namespace IngameScript {
                 RemoveLostMissiles();
                 GetBroadcastMessages();
                 GetMessages();
-                //ReadMessages();//TODO
 
                 double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
@@ -247,8 +246,6 @@ namespace IngameScript {
                         timeSinceLastLock += timeSinceLastRun;
                         missedScan++;
                     }
-
-                    //ReadTargetInfo();//TODO
                 }
 
                 ManagePIDControllers(isTargetEmpty);
@@ -797,7 +794,7 @@ namespace IngameScript {
             if (targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                 StringBuilder missileLog = new StringBuilder("");
                 foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
-                    missileLog.Append("toTarget=" + inf.Value.Item1 + ",speed=" + inf.Value.Item2 + "," + inf.Value.Item3 + "\n");//(info)"command=" + command + ",status=" + status + ",type=" + type;
+                    missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");//(info)"command=" + command + ",status=" + status + ",type=" + type;
                 }
 
                 var immArray = ImmutableArray.CreateBuilder<MyTuple<
@@ -817,7 +814,7 @@ namespace IngameScript {
                 if (missilesInfo.Count > 0) {
                     StringBuilder missileLog = new StringBuilder("");
                     foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
-                        missileLog.Append("toTarget=" + inf.Value.Item1 + ",speed=" + inf.Value.Item2 + "," + inf.Value.Item3 + "\n");
+                        missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");
                     }
 
                     var immArray = ImmutableArray.CreateBuilder<MyTuple<

@@ -1157,10 +1157,10 @@ namespace IngameScript {
         }
 
         void InitMulti() {
-            IMyTextSurfaceProvider cockpit = CONTROLLER as IMyTextSurfaceProvider;
+            /*IMyTextSurfaceProvider cockpit = CONTROLLER as IMyTextSurfaceProvider;
             int surfaceCount = cockpit.SurfaceCount;
             for (int i = 0; i < surfaceCount; i++) {
-                if (i == 0 || i == 4) {//TODO
+                if (i == 0 || i == 4 || i == 2) {
                     cockpit.GetSurface(i).WriteText("");
                 }
             }
@@ -1171,7 +1171,7 @@ namespace IngameScript {
                 block.WriteText("");
             }
             panels.Clear();
-            /*GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Auto Missiles Toggle")
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Auto Missiles Toggle")
             || block.CustomName.Contains("[CRX] LCD Auto Switch Guns Toggle") || block.CustomName.Contains("[CRX] LCD Sequence Guns Toggle")
             || block.CustomName.Contains("[CRX] LCD Toggle Safety Dampeners") || block.CustomName.Contains("[CRX] LCD Toggle Stabilizer")
             || block.CustomName.Contains("[CRX] LCD Toggle Auto Combat") || block.CustomName.Contains("[CRX] LCD Toggle Obstacles")
