@@ -82,6 +82,8 @@ namespace IngameScript {
         public List<IMyTextSurface> INVENTORYOREINGOTSSURFACES = new List<IMyTextSurface>();
         public List<IMyTextSurface> INVENTORYCOMPONENTSAMMOSURFACES = new List<IMyTextSurface>();
 
+        IMyTextPanel LCDTOGGLELOGGER;
+
         readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
 
@@ -93,14 +95,23 @@ namespace IngameScript {
         void Setup() {
             GetBlocks();
             ParseCockpitConfigData(COCKPITS);
+            if (LCDTOGGLELOGGER != null) { LCDTOGGLELOGGER.BackgroundColor = logger ? new Color(25, 0, 50) : new Color(0, 0, 0); };
         }
 
         public void Main(string arg) {
             try {
+                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
-                    if (!logger) { Runtime.UpdateFrequency = UpdateFrequency.None; return; } else { Runtime.UpdateFrequency = UpdateFrequency.Update10; }
+                    if (!logger) {
+                        LCDTOGGLELOGGER.BackgroundColor = new Color(0, 0, 0);
+                        Runtime.UpdateFrequency = UpdateFrequency.None;
+                        return;
+                    } else {
+                        LCDTOGGLELOGGER.BackgroundColor = new Color(25, 0, 50);
+                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                    }
                 }
 
                 GetBroadcastMessages();
@@ -512,6 +523,8 @@ namespace IngameScript {
             panels.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Components Ammo"));
             foreach (IMyTextPanel panel in panels) { INVENTORYCOMPONENTSAMMOSURFACES.Add(panel as IMyTextSurface); }
+            panels.Clear();
+            LCDTOGGLELOGGER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Logger") as IMyTextPanel;
         }
 
         //WriteText(lcd, new Vector2(Right.X + Right.Width, Right.Y), "Write on the Right side", "Default", 1f, Color.Red, TextAlignment.RIGHT);
