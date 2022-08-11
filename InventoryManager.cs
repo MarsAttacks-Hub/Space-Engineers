@@ -80,8 +80,6 @@ namespace IngameScript {
         public List<IMyInventory> REACTORSINVENTORIES = new List<IMyInventory>();
         public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
 
-        IMyTextPanel LCDINVENTORYMANAGER;
-
         public Dictionary<MyDefinitionId, double> oreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
             {MyItemType.MakeOre("Cobalt"),0d},
             {MyItemType.MakeOre("Gold"),0d},
@@ -271,7 +269,7 @@ namespace IngameScript {
 
         void Setup() {
             GetBlocks();
-            if (LCDINVENTORYMANAGER != null) { LCDINVENTORYMANAGER.BackgroundColor = togglePB ? new Color(0, 0, 50) : new Color(0, 0, 0); };
+            Me.GetSurface(0).BackgroundColor = togglePB ? new Color(0, 0, 50) : new Color(0, 0, 0);
         }
 
         public void Main(string argument) {
@@ -331,21 +329,21 @@ namespace IngameScript {
                 case "TogglePB":
                     togglePB = !togglePB;
                     if (togglePB) {
-                        if (LCDINVENTORYMANAGER != null) { LCDINVENTORYMANAGER.BackgroundColor = new Color(0, 0, 50); };
+                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 50);
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     } else {
-                        if (LCDINVENTORYMANAGER != null) { LCDINVENTORYMANAGER.BackgroundColor = new Color(0, 0, 0); };
+                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                     }
                     break;
                 case "PBOn":
                     togglePB = true;
-                    if (LCDINVENTORYMANAGER != null) { LCDINVENTORYMANAGER.BackgroundColor = new Color(0, 0, 50); };
+                    Me.GetSurface(0).BackgroundColor = new Color(0, 0, 50);
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     break;
                 case "PBOff":
                     togglePB = false;
-                    if (LCDINVENTORYMANAGER != null) { LCDINVENTORYMANAGER.BackgroundColor = new Color(0, 0, 0); };
+                    Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     break;
                 case "AutoRefineries":
@@ -778,7 +776,6 @@ namespace IngameScript {
             INVENTORIES.Clear();
             INVENTORIES.AddRange(blocksWithInventory.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             blocksWithInventory.Clear();
-            LCDINVENTORYMANAGER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Inventory Manager") as IMyTextPanel;
         }
 
         void ResetOreDict() {

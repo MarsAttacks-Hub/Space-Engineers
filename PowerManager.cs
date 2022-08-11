@@ -34,7 +34,6 @@ namespace IngameScript {
         string powerStatus;
         float terminalCurrentInput;
         float terminalMaxRequiredInput;
-        float terminalMaxInput;
 
         float battsCurrentInput;
         float battsCurrentOutput;
@@ -53,7 +52,7 @@ namespace IngameScript {
         double tankCapacityPercent;
         int sendCount = 0;
 
-        public List<IMyTerminalBlock> TERMINALS = new List<IMyTerminalBlock>();
+        public List<Electric> ELECTRICS = new List<Electric>();
         public List<IMyBatteryBlock> BATTERIES = new List<IMyBatteryBlock>();
         public List<IMyReactor> REACTORS = new List<IMyReactor>();
         public List<IMySolarPanel> SOLARS = new List<IMySolarPanel>();
@@ -61,15 +60,7 @@ namespace IngameScript {
         public List<IMyPowerProducer> HENGINES = new List<IMyPowerProducer>();
         public List<IMyGasTank> HTANKS = new List<IMyGasTank>();
 
-        IMyTextPanel LCDPOWERMANAGER;
-
         IMyBroadcastListener BROADCASTLISTENER;
-
-        readonly MyDefinitionId electricityId = new MyDefinitionId(typeof(VRage.Game.ObjectBuilders.Definitions.MyObjectBuilder_GasProperties), "Electricity");
-        //readonly MyDefinitionId hydrogenId = new MyDefinitionId(typeof(VRage.Game.ObjectBuilders.Definitions.MyObjectBuilder_GasProperties), "Hydrogen");
-
-        MyResourceSinkComponent sink;
-        //MyResourceSourceComponent source;
 
         public StringBuilder oresLog = new StringBuilder("");
         public StringBuilder ingotsLog = new StringBuilder("");
@@ -94,7 +85,7 @@ namespace IngameScript {
             GetHydrogenEnginesMaxOutput();
             GetReactorsMaxOutput();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[POWERMANAGER]");
-            if (LCDPOWERMANAGER != null) { LCDPOWERMANAGER.BackgroundColor = togglePB ? new Color(0, 0, 50) : new Color(0, 0, 0); };
+            Me.GetSurface(0).BackgroundColor = togglePB ? new Color(0, 0, 50) : new Color(0, 0, 0);
         }
 
         public void Main(string argument) {
@@ -137,10 +128,10 @@ namespace IngameScript {
                 case "TogglePB":
                     togglePB = !togglePB;
                     if (togglePB) {
-                        if (LCDPOWERMANAGER != null) { LCDPOWERMANAGER.BackgroundColor = new Color(0, 0, 50); };
+                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 50);
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     } else {
-                        if (LCDPOWERMANAGER != null) { LCDPOWERMANAGER.BackgroundColor = new Color(0, 0, 0); };
+                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
                         foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
                         foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                         foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
@@ -150,12 +141,12 @@ namespace IngameScript {
                     break;
                 case "PBOn":
                     togglePB = true;
-                    if (LCDPOWERMANAGER != null) { LCDPOWERMANAGER.BackgroundColor = new Color(0, 0, 50); };
+                    Me.GetSurface(0).BackgroundColor = new Color(0, 0, 50);
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     break;
                 case "PBOff":
                     togglePB = false;
-                    if (LCDPOWERMANAGER != null) { LCDPOWERMANAGER.BackgroundColor = new Color(0, 0, 0); };
+                    Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
                     foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
                     foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                     foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
@@ -241,19 +232,9 @@ namespace IngameScript {
         void GetPowInput() {
             terminalCurrentInput = 0f;
             terminalMaxRequiredInput = 0f;
-            terminalMaxInput = 0f;
-            foreach (IMyTerminalBlock block in TERMINALS) {
-                if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) {
-                    if (block is IMyJumpDrive || block.CustomName.Contains("Railgun")) {//TODO
-                        terminalCurrentInput += sink.CurrentInputByType(electricityId);
-                        terminalMaxRequiredInput += sink.CurrentInputByType(electricityId);
-                        terminalMaxInput += sink.MaxRequiredInputByType(electricityId);
-                    } else {
-                        terminalCurrentInput += sink.CurrentInputByType(electricityId);
-                        terminalMaxRequiredInput += sink.MaxRequiredInputByType(electricityId);
-                        terminalMaxInput += sink.MaxRequiredInputByType(electricityId);
-                    }
-                }
+            foreach (Electric block in ELECTRICS) {
+                terminalCurrentInput += block.GetCurrentInput();
+                terminalMaxRequiredInput += block.GetMaxInput();
             }
         }
 
@@ -349,7 +330,7 @@ namespace IngameScript {
 
         void SendBroadcastMessage() {
             var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                    MyTuple<string, float, float, float>,
+                    MyTuple<string, float, float>,
                     MyTuple<float, float, float, int, string>,
                     MyTuple<float, float, int>,
                     MyTuple<float, float, int>,
@@ -369,7 +350,7 @@ namespace IngameScript {
             }
 
             var tuple = MyTuple.Create(
-                MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput, terminalMaxInput),
+                MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput),
                 MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battStoredPow.ToString()),
                 MyTuple.Create(reactorsCurrentOutput, reactorsMaxOutput, REACTORS.Count),
                 MyTuple.Create(hEngCurrentOutput, hEngMaxOutput, HENGINES.Count),
@@ -381,8 +362,15 @@ namespace IngameScript {
         }
 
         void GetBlocks() {
-            TERMINALS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(TERMINALS, block => block.CustomName.Contains("[CRX]") && !(block is IMyPowerProducer) && !(block is IMySolarPanel) && !(block is IMyBatteryBlock) && !(block is IMyReactor) && !block.CustomName.Contains("[CRX] HThruster"));
+            ELECTRICS.Clear();
+            MyResourceSinkComponent sink;
+            List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
+            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(terminals, block => block.CustomName.Contains("[CRX]") && !(block is IMyPowerProducer) && !(block is IMySolarPanel) && !(block is IMyBatteryBlock) && !(block is IMyReactor) && !block.CustomName.Contains("[CRX] HThruster"));
+            foreach (IMyTerminalBlock block in terminals) {
+                if (block.Components.TryGet<MyResourceSinkComponent>(out sink)) {
+                    ELECTRICS.Add(new Electric(sink));
+                }
+            }
             BATTERIES.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(BATTERIES, block => block.CustomName.Contains("[CRX] Battery"));
             REACTORS.Clear();
@@ -395,9 +383,24 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyPowerProducer>(HENGINES, block => block.CustomName.Contains("[CRX] HEngine"));
             HTANKS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyGasTank>(HTANKS, block => block.CustomName.Contains("[CRX] HTank"));
-            LCDPOWERMANAGER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Power Manager") as IMyTextPanel;
         }
 
+        public class Electric {
+            readonly MyDefinitionId electricity = new MyDefinitionId(typeof(VRage.Game.ObjectBuilders.Definitions.MyObjectBuilder_GasProperties), "Electricity");
+            readonly MyResourceSinkComponent electricSinkComponent;
+
+            public Electric(MyResourceSinkComponent sink) {
+                electricSinkComponent = sink;
+            }
+
+            public float GetCurrentInput() {
+                return electricSinkComponent.CurrentInputByType(electricity);
+            }
+
+            public float GetMaxInput() {
+                return electricSinkComponent.MaxRequiredInputByType(electricity);
+            }
+        }
 
     }
 }

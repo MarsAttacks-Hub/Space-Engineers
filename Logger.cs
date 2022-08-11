@@ -48,8 +48,7 @@ namespace IngameScript {
 
         string powerStatus;
         float terminalCurrentInput;
-        //float terminalMaxRequiredInput;
-        float terminalMaxInput;
+        float terminalMaxRequiredInput;
         float battsCurrentInput;
         float battsCurrentOutput;
         //float battsMaxOutput;
@@ -76,8 +75,8 @@ namespace IngameScript {
         public List<MyPanel> POWER = new List<MyPanel>();
         public List<MyPanel> NAVIGATOR = new List<MyPanel>();
         public List<MyPanel> PAINTER = new List<MyPanel>();
-        public List<MyPanel> INVENTORYOREINGOTS = new List<MyPanel>();
-        public List<MyPanel> INVENTORYCOMPONENTSAMMO = new List<MyPanel>();
+        public List<MyPanel> OREINGOTS = new List<MyPanel>();
+        public List<MyPanel> COMPONENTSAMMO = new List<MyPanel>();
 
         readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
@@ -252,7 +251,7 @@ namespace IngameScript {
                 }
                 //POWERMANAGER
                 else if (igcMessage.Data is ImmutableArray<MyTuple<
-                    MyTuple<string, float, float, float>,
+                    MyTuple<string, float, float>,
                     MyTuple<float, float, float, int, string>,
                     MyTuple<float, float, int>,
                     MyTuple<float, float, int>,
@@ -260,7 +259,7 @@ namespace IngameScript {
                     double
                 >>) {
                     var data = (ImmutableArray<MyTuple<
-                        MyTuple<string, float, float, float>,
+                        MyTuple<string, float, float>,
                         MyTuple<float, float, float, int, string>,
                         MyTuple<float, float, int>,
                         MyTuple<float, float, int>,
@@ -270,8 +269,7 @@ namespace IngameScript {
 
                     powerStatus = data[0].Item1.Item1;
                     terminalCurrentInput = data[0].Item1.Item2;
-                    //terminalMaxRequiredInput = data[0].Item1.Item3;
-                    terminalMaxInput = data[0].Item1.Item4;
+                    terminalMaxRequiredInput = data[0].Item1.Item3;
                     battsCurrentInput = data[0].Item2.Item1;
                     battsCurrentOutput = data[0].Item2.Item2;
                     //battsMaxOutput = data[0].Item2.Item3;
@@ -342,30 +340,40 @@ namespace IngameScript {
             Echo($"LogNavigator");
 
             foreach (MyPanel myPanel in NAVIGATOR) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 3f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 3f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 3f * 2f + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
 
                 data.Clear();
                 data2.Clear();
 
                 timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
-                data.Append($"JUMP DRIVE:\n"
-                    + $"Reload: {timeRemaining}\n"
-                    + $"Curr. Jump: {currentJump}\n"
-                    + $"Max Jump: {maxJump}\n"
-                    + $"Jump %: {totJumpPercent:0.0}\n"
-                    + $"Power: {currentStoredPower:0.0}/{maxStoredPower:0.0}\n");
+                data.Append($"JUMP DRIVE: \n"
+                    + $"Reload Time: \n"
+                    + $"Power: \n"
+                    + $"Jump: \n"
+                    + $"Max Jump: \n");
 
-                data2.Append($"RANGE FINDER:\n"
-                    + $"Name: {rangeFinderName}\n"
-                    + $"Distance: {(int)rangeFinderDistance}\n"
-                    + $"Diameter: {(int)rangeFinderDiameter}\n"
-                    + $"Position:\n"
-                    + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
+                data.Append($"RANGE FINDER:\n"
+                    + $"Name: \n"
+                    + $"Distance: \n"
+                    + $"Diameter: \n"
+                    + $"Position ");
+
+                data2.Append($"\n"
+                    + $"{timeRemaining}s\n"
+                    + $"{currentStoredPower:0.0}/{maxStoredPower:0.0}\n"
+                    + $"{currentJump:000,000,000} ({totJumpPercent:0.0}%)\n"
+                    + $"{maxJump:000,000,000}\n");
+
+                data2.Append($"\n"
+                   + $"{rangeFinderName}\n"
+                   + $"{(int)rangeFinderDistance}\n"
+                   + $"{(int)rangeFinderDiameter}\n"
+                   + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
 
                 sprites.Clear();
-                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X + Right.Width, Right.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 10, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(20, 0, 100)));
             }
 
             foreach (MyPanel myPanel in NAVIGATOR) {
@@ -432,7 +440,7 @@ namespace IngameScript {
                 data2.Clear();
 
                 data.Append($"Status: {powerStatus}\n"
-                    + $"Pow.: {terminalCurrentInput:0.0}/{terminalMaxInput:0.0}\n"
+                    + $"Pow.: {terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
                     + $"Batt. In: {battsCurrentInput}\n"
                     + $"Batt. Pow: {battsCurrentStoredPower}\n"
                     + $"Reactors Out: {reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
@@ -464,7 +472,7 @@ namespace IngameScript {
         void LogInventory() {
             Echo($"LogInventory");
 
-            foreach (MyPanel myPanel in INVENTORYCOMPONENTSAMMO) {
+            foreach (MyPanel myPanel in COMPONENTSAMMO) {
                 RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
                 RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
 
@@ -507,14 +515,14 @@ namespace IngameScript {
                 sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
             }
 
-            foreach (MyPanel myPanel in INVENTORYCOMPONENTSAMMO) {
+            foreach (MyPanel myPanel in COMPONENTSAMMO) {
                 foreach (var sprite in sprites) {
                     myPanel.frame.Add(sprite);
                 }
                 myPanel.frame.Dispose();
             }
 
-            foreach (MyPanel myPanel in INVENTORYOREINGOTS) {
+            foreach (MyPanel myPanel in OREINGOTS) {
                 RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
                 RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
 
@@ -554,7 +562,7 @@ namespace IngameScript {
                 sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
             }
 
-            foreach (MyPanel myPanel in INVENTORYOREINGOTS) {
+            foreach (MyPanel myPanel in OREINGOTS) {
                 foreach (var sprite in sprites) {
                     myPanel.frame.Add(sprite);
                 }
@@ -575,76 +583,76 @@ namespace IngameScript {
         }
 
         void GetBlocks() {
-            List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
-            GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, block => block.CustomName.Contains("[CRX] Controller Cockpit"));
+            List<IMyCockpit> cockpits = new List<IMyCockpit>();
+            GridTerminalSystem.GetBlocksOfType<IMyCockpit>(cockpits, block => block.CustomName.Contains("[CRX] Controller Cockpit"));
 
             NAVIGATOR.Clear();
-            List<IMyTextSurface> NAVIGATORSURFACES = new List<IMyTextSurface>();
+            List<IMyTextSurface> navigatorSurfaces = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
-            foreach (IMyCockpit cockpit in COCKPITS) {
+            foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
                     int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
-                    NAVIGATORSURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
+                    navigatorSurfaces.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
                 }
             }
-            foreach (IMyTextPanel panel in panels) { NAVIGATORSURFACES.Add(panel as IMyTextSurface); }
-            foreach (var surface in NAVIGATORSURFACES) {
+            foreach (IMyTextPanel panel in panels) { navigatorSurfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in navigatorSurfaces) {
                 NAVIGATOR.Add(new MyPanel(surface));
             }
             panels.Clear();
 
             PAINTER.Clear();
-            List<IMyTextSurface> PAINTERSURFACES = new List<IMyTextSurface>();
+            List<IMyTextSurface> painterSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Painter"));
-            foreach (IMyCockpit cockpit in COCKPITS) {
+            foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
                     int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
-                    PAINTERSURFACES.Add(cockpit.GetSurface(cockpitTargetSurface));//0
+                    painterSurfaces.Add(cockpit.GetSurface(cockpitTargetSurface));//0
                 }
             }
-            foreach (IMyTextPanel panel in panels) { PAINTERSURFACES.Add(panel as IMyTextSurface); }
-            foreach (var surface in PAINTERSURFACES) {
+            foreach (IMyTextPanel panel in panels) { painterSurfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in painterSurfaces) {
                 PAINTER.Add(new MyPanel(surface));
             }
             panels.Clear();
 
             POWER.Clear();
-            List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
+            List<IMyTextSurface> powerSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power"));
-            foreach (IMyTextPanel panel in panels) { POWERSURFACES.Add(panel as IMyTextSurface); }
-            foreach (IMyCockpit cockpit in COCKPITS) {
+            foreach (IMyTextPanel panel in panels) { powerSurfaces.Add(panel as IMyTextSurface); }
+            foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
                     int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
-                    POWERSURFACES.Add(cockpit.GetSurface(cockpitPowerSurface));//2
+                    powerSurfaces.Add(cockpit.GetSurface(cockpitPowerSurface));//2
                 }
             }
-            foreach (var surface in POWERSURFACES) {
+            foreach (var surface in powerSurfaces) {
                 POWER.Add(new MyPanel(surface));
             }
             panels.Clear();
 
-            INVENTORYOREINGOTS.Clear();
-            List<IMyTextSurface> INVENTORYOREINGOTSSURFACES = new List<IMyTextSurface>();
+            OREINGOTS.Clear();
+            List<IMyTextSurface> oreIngotsSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Ore Ingots"));
-            foreach (IMyTextPanel panel in panels) { INVENTORYOREINGOTSSURFACES.Add(panel as IMyTextSurface); }
-            foreach (var surface in INVENTORYOREINGOTSSURFACES) {
-                INVENTORYOREINGOTS.Add(new MyPanel(surface));
+            foreach (IMyTextPanel panel in panels) { oreIngotsSurfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in oreIngotsSurfaces) {
+                OREINGOTS.Add(new MyPanel(surface));
             }
             panels.Clear();
 
-            INVENTORYCOMPONENTSAMMO.Clear();
-            List<IMyTextSurface> INVENTORYCOMPONENTSAMMOSURFACES = new List<IMyTextSurface>();
+            COMPONENTSAMMO.Clear();
+            List<IMyTextSurface> componentsAmmoSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Components Ammo"));
-            foreach (IMyTextPanel panel in panels) { INVENTORYCOMPONENTSAMMOSURFACES.Add(panel as IMyTextSurface); }
-            foreach (var surface in INVENTORYCOMPONENTSAMMOSURFACES) {
-                INVENTORYCOMPONENTSAMMO.Add(new MyPanel(surface));
+            foreach (IMyTextPanel panel in panels) { componentsAmmoSurfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in componentsAmmoSurfaces) {
+                COMPONENTSAMMO.Add(new MyPanel(surface));
             }
             panels.Clear();
         }

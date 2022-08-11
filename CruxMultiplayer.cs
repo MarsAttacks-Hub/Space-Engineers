@@ -140,7 +140,6 @@ namespace IngameScript {
         IMyTextPanel LCDIDLETHRUSTERS;
         IMyTextPanel LCDAUTOFIRE;
         IMyTextPanel LCDCREATIVE;
-        IMyTextPanel LCDTOGGLE;
 
         PID yawController;
         PID pitchController;
@@ -176,7 +175,7 @@ namespace IngameScript {
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
             if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
-            //if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = togglePB ? new Color(20, 0, 0) : new Color(0, 0, 0); }
+            //Me.GetSurface(0).BackgroundColor = togglePB ? new Color(20, 0, 0) : new Color(0, 0, 0);
         }
 
         public void Main(string arg) {
@@ -332,13 +331,13 @@ namespace IngameScript {
                     break;
                 case "PBOn":
                     togglePB = true;
-                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(20, 0, 0); };
+                    Me.GetSurface(0).BackgroundColor = new Color(20, 0, 0);
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     InitMulti();
                     break;
                 case "PBOff":
                     togglePB = false;
-                    if (LCDTOGGLE != null) { LCDTOGGLE.BackgroundColor = new Color(0, 0, 0); };
+                    Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     ShutDownMulti();
                     break;
@@ -1311,7 +1310,6 @@ namespace IngameScript {
             LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Magnetic Drive") as IMyTextPanel;
             LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Fire") as IMyTextPanel;
             LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Creative") as IMyTextPanel;
-            LCDTOGGLE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Multi") as IMyTextPanel;
         }
 
         public class Gun {

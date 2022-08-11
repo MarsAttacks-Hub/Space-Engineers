@@ -467,21 +467,10 @@ namespace IngameScript {
         void GyroStabilize(bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity, double mySpeed, bool isTargetEmpty) {
             if (useGyrosToStabilize && !targetFound && !aimingTarget && !isAutoPiloted && isTargetEmpty) {
                 if (!Vector3D.IsZero(gravity)) {
-                    Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Forward, gravity));//left vector
                     double pitchAngle, rollAngle, yawAngle;
-                    GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                     double mouseYaw = CONTROLLER.RotationIndicator.Y;
                     double mousePitch = CONTROLLER.RotationIndicator.X;
                     double mouseRoll = CONTROLLER.RollIndicator;
-                    if (mousePitch != 0d) {
-                        mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
-                    }
-                    mousePitch = mousePitch == 0d ? pitchController.Control(pitchAngle) : pitchController.Control(mousePitch);
-                    if (mouseRoll != 0d) {
-                        mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
-                    }
-                    mouseRoll = mouseRoll == 0d ? rollController.Control(rollAngle) : rollController.Control(mouseRoll);
-                    yawAngle = 0d;
                     if (mySpeed > 2d) {
                         if (Vector3D.IsZero(lastForwardVector)) {
                             lastForwardVector = CONTROLLER.WorldMatrix.Forward;
@@ -491,11 +480,31 @@ namespace IngameScript {
                         GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                         lastForwardVector = CONTROLLER.WorldMatrix.Forward;
                         lastUpVector = CONTROLLER.WorldMatrix.Up;
+                        if (mousePitch != 0d) {
+                            mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
+                        }
+                        mousePitch = mousePitch == 0d ? pitchController.Control(pitchAngle) : pitchController.Control(mousePitch);
+                        if (mouseRoll != 0d) {
+                            mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
+                        }
+                        mouseRoll = mouseRoll == 0d ? rollController.Control(rollAngle) : rollController.Control(mouseRoll);
+                        if (mouseYaw != 0d) {
+                            mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
+                        }
+                        mouseYaw = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
+                    } else {
+                        //Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Forward, gravity));//left vector
+                        //GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);//TODO
+                        GetRotationAnglesSimultaneous(Vector3D.Zero, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+                        if (mousePitch != 0d) {
+                            mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
+                        }
+                        mousePitch = mousePitch == 0d ? pitchController.Control(pitchAngle) : pitchController.Control(mousePitch);
+                        if (mouseRoll != 0d) {
+                            mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
+                        }
+                        mouseRoll = mouseRoll == 0d ? rollController.Control(rollAngle) : rollController.Control(mouseRoll);
                     }
-                    if (mouseYaw != 0d) {
-                        mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
-                    }
-                    mouseYaw = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
                     if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
                         if (unlockGyrosOnce) {
                             UnlockGyros();
