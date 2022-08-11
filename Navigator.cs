@@ -27,7 +27,6 @@ namespace IngameScript {
         //thrusters doesn't turn off when idling in gravity
         //when autofighting the ship goes down when in gravity, impact avoidance is useless
         //NAVIGATOR
-        readonly bool useRoll = false;//enable/disable roll when gyro stabilizing
         bool magneticDrive = true;//enable/disable magnetic drive
         bool safetyDampeners = true;//enable/disable safety dampeners, valid only if magneticDrive is false
         bool idleThrusters = false;//enable/disable thrusters
@@ -262,7 +261,7 @@ namespace IngameScript {
                 ManagePIDControllers(isTargetEmpty, targFound);
 
                 double mySpeed = myVelocity.Length();
-                GyroStabilize(targFound, aimTarget, isAutoPiloted, useRoll, gravity, mySpeed, isTargetEmpty);
+                GyroStabilize(targFound, aimTarget, isAutoPiloted, gravity, mySpeed, isTargetEmpty);
 
                 ManageMagneticDrive(needControl, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity, myVelocity, mySpeed);
 
@@ -464,7 +463,7 @@ namespace IngameScript {
             IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
         }
 
-        void GyroStabilize(bool targetFound, bool aimingTarget, bool isAutoPiloted, bool useRoll, Vector3D gravity, double mySpeed, bool isTargetEmpty) {
+        void GyroStabilize(bool targetFound, bool aimingTarget, bool isAutoPiloted, Vector3D gravity, double mySpeed, bool isTargetEmpty) {
             if (useGyrosToStabilize && !targetFound && !aimingTarget && !isAutoPiloted && isTargetEmpty) {
                 if (!Vector3D.IsZero(gravity)) {
                     double pitchAngle, rollAngle, yawAngle;
@@ -476,7 +475,6 @@ namespace IngameScript {
                             lastForwardVector = CONTROLLER.WorldMatrix.Forward;
                             lastUpVector = CONTROLLER.WorldMatrix.Up;
                         }
-                        if (!useRoll) { lastUpVector = Vector3D.Zero; };
                         GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                         lastForwardVector = CONTROLLER.WorldMatrix.Forward;
                         lastUpVector = CONTROLLER.WorldMatrix.Up;
@@ -494,8 +492,8 @@ namespace IngameScript {
                         mouseYaw = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
                     } else {
                         //Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Forward, gravity));//left vector
-                        //GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);//TODO
-                        GetRotationAnglesSimultaneous(Vector3D.Zero, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+                        Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Right, gravity));//forward vector//TODO
+                        GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                         if (mousePitch != 0d) {
                             mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
                         }
@@ -523,7 +521,6 @@ namespace IngameScript {
                             lastForwardVector = CONTROLLER.WorldMatrix.Forward;
                             lastUpVector = CONTROLLER.WorldMatrix.Up;
                         }
-                        if (!useRoll) { lastUpVector = Vector3D.Zero; };
                         GetRotationAnglesSimultaneous(lastForwardVector, lastUpVector, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                         double mouseYaw = CONTROLLER.RotationIndicator.Y;
                         double mousePitch = CONTROLLER.RotationIndicator.X;
