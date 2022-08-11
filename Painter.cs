@@ -635,39 +635,48 @@ namespace IngameScript {
 
         void GetRotationAnglesSimultaneous(Vector3D desiredForwardVector, Vector3D desiredUpVector, MatrixD worldMatrix, out double pitch, out double yaw, out double roll) {
             desiredForwardVector = SafeNormalize(desiredForwardVector);
+
             MatrixD transposedWm;
             MatrixD.Transpose(ref worldMatrix, out transposedWm);
             Vector3D.Rotate(ref desiredForwardVector, ref transposedWm, out desiredForwardVector);
             Vector3D.Rotate(ref desiredUpVector, ref transposedWm, out desiredUpVector);
+
             Vector3D leftVector = Vector3D.Cross(desiredUpVector, desiredForwardVector);
             Vector3D axis;
             double angle;
+
             if (Vector3D.IsZero(desiredUpVector) || Vector3D.IsZero(leftVector)) {
-                axis = new Vector3D(desiredForwardVector.Y, -desiredForwardVector.X, 0d);
+                axis = new Vector3D(-desiredForwardVector.Y, desiredForwardVector.X, 0);
                 angle = Math.Acos(MathHelper.Clamp(-desiredForwardVector.Z, -1.0, 1.0));
             } else {
                 leftVector = SafeNormalize(leftVector);
-                MatrixD targetMatrix = MatrixD.Zero;//Create matrix
-                targetMatrix.Forward = desiredForwardVector;
-                targetMatrix.Left = leftVector;
-                targetMatrix.Up = Vector3D.Cross(desiredForwardVector, leftVector);
-                axis = new Vector3D(targetMatrix.M23 - targetMatrix.M32,
-                                    targetMatrix.M31 - targetMatrix.M13,
-                                    targetMatrix.M12 - targetMatrix.M21);
-                angle = Math.Acos(MathHelper.Clamp((targetMatrix.M11 + targetMatrix.M22 + targetMatrix.M33 - 1) * 0.5, -1d, 1d));
+                Vector3D upVector = Vector3D.Cross(desiredForwardVector, leftVector);
+                MatrixD targetOrientation = new MatrixD() {
+                    Forward = desiredForwardVector,
+                    Left = leftVector,
+                    Up = upVector,
+                };
+
+                axis = new Vector3D(targetOrientation.M32 - targetOrientation.M23,
+                                    targetOrientation.M13 - targetOrientation.M31,
+                                    targetOrientation.M21 - targetOrientation.M12);
+
+                double trace = targetOrientation.M11 + targetOrientation.M22 + targetOrientation.M33;
+                angle = Math.Acos(MathHelper.Clamp((trace - 1) * 0.5, -1.0, 1.0));
             }
+
             if (Vector3D.IsZero(axis)) {
-                angle = desiredForwardVector.Z < 0d ? 0d : Math.PI;
+                angle = desiredForwardVector.Z < 0 ? 0 : Math.PI;
                 yaw = angle;
-                pitch = 0d;
-                roll = 0d;
+                pitch = 0;
+                roll = 0;
                 return;
             }
-            axis = SafeNormalize(axis);
-            //Because gyros rotate about -X -Y -Z, we need to negate our angles
-            yaw = -axis.Y * angle;
-            pitch = -axis.X * angle;
-            roll = -axis.Z * angle;
+
+            Vector3D axisAngle = SafeNormalize(axis) * angle;
+            yaw = axisAngle.Y;
+            pitch = axisAngle.X;
+            roll = axisAngle.Z;
         }
 
         void ApplyGyroOverride(double pitchSpeed, double yawSpeed, double rollSpeed, List<IMyGyro> gyroList, MatrixD worldMatrix) {
@@ -1517,9 +1526,9 @@ namespace IngameScript {
         }
 
         void InitPIDControllers() {
-            yawController = new PID(5d, 0d, 5d, 0d, -0d, globalTimestep);
-            pitchController = new PID(5d, 0d, 5d, 0d, -0d, globalTimestep);
-            rollController = new PID(1d, 0d, 1d, 0d, -0d, globalTimestep);
+            yawController = new PID(5d, 0d, 5d, globalTimestep);
+            pitchController = new PID(5d, 0d, 5d, globalTimestep);
+            rollController = new PID(1d, 0d, 1d, globalTimestep);
         }
 
         void ManagePIDControllers(bool isTargetEmpty) {
@@ -1543,79 +1552,113 @@ namespace IngameScript {
         }
 
         public class PID {
-            public double kP = 0d;
-            public double kI = 0d;
-            public double kD = 0d;
-            public double integralDecayRatio = 0d;
-            public double lowerBound = 0d;
-            public double upperBound = 0d;
-            double timeStep = 0d;
-            double inverseTimeStep = 0d;
-            double errorSum = 0d;
-            double lastError = 0d;
-            bool firstRun = true;
-            public bool integralDecay = false;
+            double _kP = 0;
+            double _kI = 0;
+            double _kD = 0;
+
+            double _timeStep = 0;
+            double _inverseTimeStep = 0;
+            double _errorSum = 0;
+            double _lastError = 0;
+            bool _firstRun = true;
+
             public double Value { get; private set; }
 
-            public PID(double _kP, double _kI, double _kD, double _lowerBound, double _upperBound, double _timeStep) {
-                kP = _kP;
-                kI = _kI;
-                kD = _kD;
-                lowerBound = _lowerBound;
-                upperBound = _upperBound;
-                timeStep = _timeStep;
-                inverseTimeStep = 1d / timeStep;
-                integralDecay = false;
+            public PID(double kP, double kI, double kD, double timeStep) {
+                _kP = kP;
+                _kI = kI;
+                _kD = kD;
+                _timeStep = timeStep;
+                _inverseTimeStep = 1 / _timeStep;
             }
 
-            public PID(double _kP, double _kI, double _kD, double _integralDecayRatio, double _timeStep) {
-                kP = _kP;
-                kI = _kI;
-                kD = _kD;
-                timeStep = _timeStep;
-                inverseTimeStep = 1d / timeStep;
-                integralDecayRatio = _integralDecayRatio;
-                integralDecay = true;
+            protected virtual double GetIntegral(double currentError, double errorSum, double timeStep) {
+                return errorSum + currentError * timeStep;
             }
 
-            public void Update(double _kP, double _kI, double _kD) {
-                kP = _kP;
-                kI = _kI;
-                kD = _kD;
-                firstRun = true;
+            public void Update(double kP, double kI, double kD) {
+                _kP = kP;
+                _kI = kI;
+                _kD = kD;
+                _firstRun = true;
             }
 
-            public double Control(double _error) {
-                double errorDerivative = (_error - lastError) * inverseTimeStep;//Compute derivative term
-                if (firstRun) {
-                    errorDerivative = 0d;
-                    firstRun = false;
+            public double Control(double error) {
+                //Compute derivative term
+                var errorDerivative = (error - _lastError) * _inverseTimeStep;
+
+                if (_firstRun) {
+                    errorDerivative = 0;
+                    _firstRun = false;
                 }
-                if (!integralDecay) {//Compute integral term
-                    errorSum += _error * timeStep;
-                    if (errorSum > upperBound) {//Clamp integral term
-                        errorSum = upperBound;
-                    } else if (errorSum < lowerBound) {
-                        errorSum = lowerBound;
-                    }
-                } else {
-                    errorSum = errorSum * (1.0 - integralDecayRatio) + _error * timeStep;
-                }
-                lastError = _error;//Store this error as last error
-                this.Value = kP * _error + kI * errorSum + kD * errorDerivative;//Construct output
+
+                //Get error sum
+                _errorSum = GetIntegral(error, _errorSum, _timeStep);
+
+                //Store this error as last error
+                _lastError = error;
+
+                //Construct output
+                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
                 return this.Value;
             }
 
-            public double Control(double _error, double _timeStep) {
-                timeStep = _timeStep;
-                inverseTimeStep = 1d / timeStep;
-                return Control(_error);
+            public double Control(double error, double timeStep) {
+                if (timeStep != _timeStep) {
+                    _timeStep = timeStep;
+                    _inverseTimeStep = 1 / _timeStep;
+                }
+                return Control(error);
             }
 
             public void Reset() {
-                errorSum = 0d;
-                lastError = 0d;
-                firstRun = true;
+                _errorSum = 0;
+                _lastError = 0;
+                _firstRun = true;
+            }
+        }
+
+        public class DecayingIntegralPID : PID {
+            readonly double _decayRatio;
+
+            public DecayingIntegralPID(double kP, double kI, double kD, double timeStep, double decayRatio) : base(kP, kI, kD, timeStep) {
+                _decayRatio = decayRatio;
+            }
+
+            protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
+                //return errorSum = errorSum * (1.0 - _decayRatio) + currentError * timeStep;
+                return errorSum * (1.0 - _decayRatio) + currentError * timeStep;
+            }
+        }
+
+        public class ClampedIntegralPID : PID {
+            readonly double _upperBound;
+            readonly double _lowerBound;
+
+            public ClampedIntegralPID(double kP, double kI, double kD, double timeStep, double lowerBound, double upperBound) : base(kP, kI, kD, timeStep) {
+                _upperBound = upperBound;
+                _lowerBound = lowerBound;
+            }
+
+            protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
+                errorSum += currentError * timeStep;
+                return Math.Min(_upperBound, Math.Max(errorSum, _lowerBound));
+            }
+        }
+
+        public class BufferedIntegralPID : PID {
+            readonly Queue<double> _integralBuffer = new Queue<double>();
+            readonly int _bufferSize = 0;
+
+            public BufferedIntegralPID(double kP, double kI, double kD, double timeStep, int bufferSize) : base(kP, kI, kD, timeStep) {
+                _bufferSize = bufferSize;
+            }
+
+            protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
+                if (_integralBuffer.Count == _bufferSize)
+                    _integralBuffer.Dequeue();
+                _integralBuffer.Enqueue(currentError * timeStep);
+                return _integralBuffer.Sum();
             }
         }
 
