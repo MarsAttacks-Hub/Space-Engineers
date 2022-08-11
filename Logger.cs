@@ -54,7 +54,7 @@ namespace IngameScript {
         float battsCurrentOutput;
         //float battsMaxOutput;
         //int batteriesCount;
-        float[] battsCurrentStoredPower;
+        string battsCurrentStoredPower;
         float reactorsCurrentOutput;
         float reactorsMaxOutput;
         //int reactorsCount;
@@ -73,67 +73,52 @@ namespace IngameScript {
         Dictionary<string, string> ingotsLogDict = new Dictionary<string, string>();
         Dictionary<string, string> componentsLogDict = new Dictionary<string, string>();
 
-        public List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
-
-        public List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
-        public List<IMyTextSurface> NAVIGATORSURFACES = new List<IMyTextSurface>();
-        public List<IMyTextSurface> PAINTERSURFACES = new List<IMyTextSurface>();
-
-        public List<IMyTextSurface> INVENTORYOREINGOTSSURFACES = new List<IMyTextSurface>();
-        public List<IMyTextSurface> INVENTORYCOMPONENTSAMMOSURFACES = new List<IMyTextSurface>();
-
-        IMyTextPanel LCDTOGGLELOGGER;
+        public List<MyPanel> POWER = new List<MyPanel>();
+        public List<MyPanel> NAVIGATOR = new List<MyPanel>();
+        public List<MyPanel> PAINTER = new List<MyPanel>();
+        public List<MyPanel> INVENTORYOREINGOTS = new List<MyPanel>();
+        public List<MyPanel> INVENTORYCOMPONENTSAMMO = new List<MyPanel>();
 
         readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
+        IEnumerator<bool> stateMachine;
+
+        public List<MySprite> sprites = new List<MySprite>();
+
+        public StringBuilder data = new StringBuilder("");
+        public StringBuilder data2 = new StringBuilder("");
 
         Program() {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency |= UpdateFrequency.Update100;
             Setup();
         }
 
         void Setup() {
             GetBlocks();
-            ParseCockpitConfigData(COCKPITS);
-            if (LCDTOGGLELOGGER != null) { LCDTOGGLELOGGER.BackgroundColor = logger ? new Color(25, 0, 50) : new Color(0, 0, 0); };
+            BROADCASTLISTENER = IGC.RegisterBroadcastListener("[LOGGER]");
+            Me.GetSurface(0).BackgroundColor = logger ? new Color(25, 0, 50) : new Color(0, 0, 0);
+            stateMachine = RunOverTime();
         }
 
-        public void Main(string arg) {
+        public void Main(string arg, UpdateType updateType) {
             try {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
                     if (!logger) {
-                        LCDTOGGLELOGGER.BackgroundColor = new Color(0, 0, 0);
+                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                         return;
                     } else {
-                        LCDTOGGLELOGGER.BackgroundColor = new Color(25, 0, 50);
-                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 50);
+                        Runtime.UpdateFrequency = UpdateFrequency.Update100;
+                    }
+                } else {
+                    if ((updateType & UpdateType.Update100) == UpdateType.Update100) {
+                        RunStateMachine();
                     }
                 }
-
-                GetBroadcastMessages();
-
-                if (navigator) {
-                    LogNavigator();
-                }
-                if (painter) {
-                    LogPainter();
-                }
-                if (power) {
-                    LogPower();
-                }
-                if (inventory) {
-                    LogInventory();
-                }
-
-                navigator = false;
-                painter = false;
-                power = false;
-                inventory = false;
-
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
@@ -144,6 +129,46 @@ namespace IngameScript {
                     DEBUG.WriteText(debugLog);
                 }
                 Runtime.UpdateFrequency = UpdateFrequency.None;
+            }
+        }
+
+        public IEnumerator<bool> RunOverTime() {
+            GetBroadcastMessages();
+            yield return true;
+
+            if (navigator) {
+                LogNavigator();
+                navigator = false;
+                yield return true;
+            }
+            if (painter) {
+                LogPainter();
+                painter = false;
+                yield return true;
+            }
+            if (power) {
+                LogPower();
+                power = false;
+                yield return true;
+            }
+            if (inventory) {
+                LogInventory();
+                inventory = false;
+                yield return true;
+            }
+        }
+
+        public void RunStateMachine() {
+            if (stateMachine != null) {
+                bool hasMoreSteps = stateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update100;
+                } else {
+                    Echo($"Dispose");
+
+                    stateMachine.Dispose();
+                    stateMachine = RunOverTime();//stateMachine = null;
+                }
             }
         }
 
@@ -162,134 +187,145 @@ namespace IngameScript {
         }
 
         void GetBroadcastMessages() {
-            if (BROADCASTLISTENER.HasPendingMessage) {
-                while (BROADCASTLISTENER.HasPendingMessage) {
-                    MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    //NAVIGATOR
-                    if (igcMessage.Data is ImmutableArray<MyTuple<
+            Echo($"GetBroadcastMessages");
+
+            while (BROADCASTLISTENER.HasPendingMessage) {
+                MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
+                //NAVIGATOR
+                if (igcMessage.Data is ImmutableArray<MyTuple<
+                    MyTuple<string, int, int, double, double, double>,
+                    MyTuple<Vector3D, string, double, double>
+                >>) {
+                    var data = (ImmutableArray<MyTuple<
                         MyTuple<string, int, int, double, double, double>,
                         MyTuple<Vector3D, string, double, double>
-                    >>) {
-                        var data = (ImmutableArray<MyTuple<
-                            MyTuple<string, int, int, double, double, double>,
-                            MyTuple<Vector3D, string, double, double>
-                        >>)igcMessage.Data;
+                    >>)igcMessage.Data;
 
-                        timeRemaining = data[0].Item1.Item1;
-                        maxJump = data[0].Item1.Item2;
-                        currentJump = data[0].Item1.Item3;
-                        totJumpPercent = data[0].Item1.Item4;
-                        currentStoredPower = data[0].Item1.Item5;
-                        maxStoredPower = data[0].Item1.Item6;
+                    timeRemaining = data[0].Item1.Item1;
+                    maxJump = data[0].Item1.Item2;
+                    currentJump = data[0].Item1.Item3;
+                    totJumpPercent = data[0].Item1.Item4;
+                    currentStoredPower = data[0].Item1.Item5;
+                    maxStoredPower = data[0].Item1.Item6;
 
-                        rangeFinderPosition = data[0].Item2.Item1;
-                        rangeFinderName = data[0].Item2.Item2;
-                        rangeFinderDistance = data[0].Item2.Item3;
-                        rangeFinderDiameter = data[0].Item2.Item4;
+                    rangeFinderPosition = data[0].Item2.Item1;
+                    rangeFinderName = data[0].Item2.Item2;
+                    rangeFinderDistance = data[0].Item2.Item3;
+                    rangeFinderDiameter = data[0].Item2.Item4;
 
-                        navigator = true;
-                    }
-                    //PAINTER
-                    else if (igcMessage.Data is ImmutableArray<MyTuple<
+                    navigator = true;
+                }
+                //PAINTER
+                else if (igcMessage.Data is ImmutableArray<MyTuple<
+                    MyTuple<string, Vector3D, Vector3D, Vector3D>,
+                    string
+                >>) {
+                    var data = (ImmutableArray<MyTuple<
                         MyTuple<string, Vector3D, Vector3D, Vector3D>,
                         string
-                    >>) {
-                        var data = (ImmutableArray<MyTuple<
-                            MyTuple<string, Vector3D, Vector3D, Vector3D>,
-                            string
-                        >>)igcMessage.Data;
+                    >>)igcMessage.Data;
 
-                        targetName = data[0].Item1.Item1;
-                        //targetHitPosition = data[0].Item1.Item2;
-                        targetPosition = data[0].Item1.Item3;
-                        targetVelocity = data[0].Item1.Item4;
+                    targetName = data[0].Item1.Item1;
+                    //targetHitPosition = data[0].Item1.Item2;
+                    targetPosition = data[0].Item1.Item3;
+                    targetVelocity = data[0].Item1.Item4;
 
-                        missilesLog.Clear();
-                        if (!string.IsNullOrEmpty(data[0].Item2)) {
-                            char[] c = new char[] { '\n' };
-                            string[] missilesLogArray = data[0].Item2.Split(c);
-                            foreach (string element in missilesLogArray) {
-                                char[] a = new char[] { ',' };
-                                string[] elementArray = element.Split(a);
-                                List<string> values = new List<string>();
-                                foreach (string entry in elementArray) {
-                                    char[] b = new char[] { '=' };
-                                    string[] entryArray = entry.Split(b);
-                                    values.Add(entryArray[1]);
-                                }
-                                var tuple = MyTuple.Create(values.ElementAt(0), values.ElementAt(1), values.ElementAt(2), values.ElementAt(3), values.ElementAt(4));
-                                missilesLog.Add(tuple);
+                    missilesLog.Clear();
+                    if (!string.IsNullOrEmpty(data[0].Item2)) {
+                        char[] c = new char[] { '\n' };
+                        string[] missilesLogArray = data[0].Item2.Split(c);
+                        foreach (string element in missilesLogArray) {
+                            char[] a = new char[] { ',' };
+                            string[] elementArray = element.Split(a);
+                            List<string> values = new List<string>();
+                            foreach (string entry in elementArray) {
+                                char[] b = new char[] { '=' };
+                                string[] entryArray = entry.Split(b);
+                                values.Add(entryArray[1]);
                             }
+                            var tuple = MyTuple.Create(values.ElementAt(0), values.ElementAt(1), values.ElementAt(2), values.ElementAt(3), values.ElementAt(4));
+                            missilesLog.Add(tuple);
                         }
-
-                        painter = true;
                     }
-                    //POWERMANAGER
-                    else if (igcMessage.Data is ImmutableArray<MyTuple<
+
+                    painter = true;
+                }
+                //POWERMANAGER
+                else if (igcMessage.Data is ImmutableArray<MyTuple<
+                    MyTuple<string, float, float, float>,
+                    MyTuple<float, float, float, int, string>,
+                    MyTuple<float, float, int>,
+                    MyTuple<float, float, int>,
+                    MyTuple<float, int, float, int>,
+                    double
+                >>) {
+                    var data = (ImmutableArray<MyTuple<
                         MyTuple<string, float, float, float>,
-                        MyTuple<float, float, float, int, float[]>,
+                        MyTuple<float, float, float, int, string>,
                         MyTuple<float, float, int>,
                         MyTuple<float, float, int>,
                         MyTuple<float, int, float, int>,
                         double
-                    >>) {
-                        var data = (ImmutableArray<MyTuple<
-                            MyTuple<string, float, float, float>,
-                            MyTuple<float, float, float, int, float[]>,
-                            MyTuple<float, float, int>,
-                            MyTuple<float, float, int>,
-                            MyTuple<float, int, float, int>,
-                            double
-                        >>)igcMessage.Data;
+                    >>)igcMessage.Data;
 
-                        powerStatus = data[0].Item1.Item1;
-                        terminalCurrentInput = data[0].Item1.Item2;
-                        //terminalMaxRequiredInput = data[0].Item1.Item3;
-                        terminalMaxInput = data[0].Item1.Item4;
-                        battsCurrentInput = data[0].Item2.Item1;
-                        battsCurrentOutput = data[0].Item2.Item2;
-                        //battsMaxOutput = data[0].Item2.Item3;
-                        //batteriesCount = data[0].Item2.Item4;
-                        battsCurrentStoredPower = data[0].Item2.Item5;
-                        reactorsCurrentOutput = data[0].Item3.Item1;
-                        reactorsMaxOutput = data[0].Item3.Item2;
-                        //reactorsCount = data[0].Item3.Item3;
-                        hEngCurrentOutput = data[0].Item4.Item1;
-                        hEngMaxOutput = data[0].Item4.Item2;
-                        //hEnginesCount = data[0].Item4.Item3;
-                        solarMaxOutput = data[0].Item5.Item1;
-                        //solarsCount = data[0].Item5.Item2;
-                        turbineMaxOutput = data[0].Item5.Item3;
-                        //turbinesCount = data[0].Item5.Item4;
-                        tankCapacityPercent = data[0].Item6;
+                    powerStatus = data[0].Item1.Item1;
+                    terminalCurrentInput = data[0].Item1.Item2;
+                    //terminalMaxRequiredInput = data[0].Item1.Item3;
+                    terminalMaxInput = data[0].Item1.Item4;
+                    battsCurrentInput = data[0].Item2.Item1;
+                    battsCurrentOutput = data[0].Item2.Item2;
+                    //battsMaxOutput = data[0].Item2.Item3;
+                    //batteriesCount = data[0].Item2.Item4;
+                    battsCurrentStoredPower = data[0].Item2.Item5;
+                    reactorsCurrentOutput = data[0].Item3.Item1;
+                    reactorsMaxOutput = data[0].Item3.Item2;
+                    //reactorsCount = data[0].Item3.Item3;
+                    hEngCurrentOutput = data[0].Item4.Item1;
+                    hEngMaxOutput = data[0].Item4.Item2;
+                    //hEnginesCount = data[0].Item4.Item3;
+                    solarMaxOutput = data[0].Item5.Item1;
+                    //solarsCount = data[0].Item5.Item2;
+                    turbineMaxOutput = data[0].Item5.Item3;
+                    //turbinesCount = data[0].Item5.Item4;
+                    tankCapacityPercent = data[0].Item6;
 
-                        power = true;
+                    power = true;
+                }
+                //INVENTORYMANAGER
+                else if (igcMessage.Data is ImmutableArray<MyTuple<double, string, string, string, string>>) {
+                    var data = (ImmutableArray<MyTuple<double, string, string, string, string>>)igcMessage.Data;
+
+                    cargoPercentage = data[0].Item1;
+
+                    ammoLogDict.Clear();
+                    if (!string.IsNullOrEmpty(data[0].Item2)) {
+                        char[] c = new char[] { ',' };
+                        string[] ammoLogArray = data[0].Item2.Split(c);
+                        ParseLog(ref ammoLogDict, ammoLogArray);
                     }
-                    //INVENTORYMANAGER
-                    else if (igcMessage.Data is ImmutableArray<MyTuple<double, string, string, string, string>>) {
-                        var data = (ImmutableArray<MyTuple<double, string, string, string, string>>)igcMessage.Data;
 
-                        cargoPercentage = data[0].Item1;
-
-                        ammoLogDict.Clear();
-                        oreLogDict.Clear();
-                        ingotsLogDict.Clear();
-                        componentsLogDict.Clear();
-                        if (!string.IsNullOrEmpty(data[0].Item2)) {
-                            char[] c = new char[] { ',' };
-                            string[] ammoLogArray = data[0].Item2.Split(c);
-                            string[] oreLogArray = data[0].Item3.Split(c);
-                            string[] ingotsLogArray = data[0].Item4.Split(c);
-                            string[] componentsLogArray = data[0].Item5.Split(c);
-
-                            ParseLog(ref ammoLogDict, ammoLogArray);
-                            ParseLog(ref oreLogDict, oreLogArray);
-                            ParseLog(ref ingotsLogDict, ingotsLogArray);
-                            ParseLog(ref componentsLogDict, componentsLogArray);
-                        }
-
-                        inventory = true;
+                    oreLogDict.Clear();
+                    if (!string.IsNullOrEmpty(data[0].Item3)) {
+                        char[] c = new char[] { ',' };
+                        string[] oreLogArray = data[0].Item3.Split(c);
+                        ParseLog(ref oreLogDict, oreLogArray);
                     }
+
+                    ingotsLogDict.Clear();
+                    if (!string.IsNullOrEmpty(data[0].Item4)) {
+                        char[] c = new char[] { ',' };
+                        string[] ingotsLogArray = data[0].Item4.Split(c);
+                        ParseLog(ref ingotsLogDict, ingotsLogArray);
+                    }
+
+                    componentsLogDict.Clear();
+                    if (!string.IsNullOrEmpty(data[0].Item5)) {
+                        char[] c = new char[] { ',' };
+                        string[] componentsLogArray = data[0].Item4.Split(c);
+                        ParseLog(ref componentsLogDict, componentsLogArray);
+                    }
+
+                    inventory = true;
                 }
             }
         }
@@ -302,62 +338,59 @@ namespace IngameScript {
             }
         }
 
-        void ParseCockpitConfigData(List<IMyCockpit> cockpits) {
-            foreach (IMyCockpit cockpit in cockpits) {
-                MyIniParseResult result;
-                myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
-                if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
-                    int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
-                    PAINTERSURFACES.Add(cockpit.GetSurface(cockpitTargetSurface));//0
-                }
-                myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
-                if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
-                    int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
-                    NAVIGATORSURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
-                }
-                myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
-                if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
-                    int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
-                    POWERSURFACES.Add(cockpit.GetSurface(cockpitPowerSurface));//2
-                }
-            }
-        }
-
         void LogNavigator() {
-            foreach (IMyTextSurface surface in NAVIGATORSURFACES) {
-                RectangleF Left = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, new Vector2(surface.SurfaceSize.X / 2, surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+            Echo($"LogNavigator");
 
-                string data = $"JUMP DRIVE:\n"
+            foreach (MyPanel myPanel in NAVIGATOR) {
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+
+                data.Clear();
+                data2.Clear();
+
+                timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
+                data.Append($"JUMP DRIVE:\n"
                     + $"Reload: {timeRemaining}\n"
                     + $"Curr. Jump: {currentJump}\n"
                     + $"Max Jump: {maxJump}\n"
                     + $"Jump %: {totJumpPercent:0.0}\n"
-                    + $"Power: {currentStoredPower:0.0}\n"
-                    + $"Max Power: {maxStoredPower:0.0}";
-                WriteText(surface, new Vector2(Left.X, Left.Y), data, "Default", 1f, new Color(0, 100, 0));
+                    + $"Power: {currentStoredPower:0.0}/{maxStoredPower:0.0}\n");
 
-                data = $"RANGE FINDER:\n"
+                data2.Append($"RANGE FINDER:\n"
                     + $"Name: {rangeFinderName}\n"
                     + $"Distance: {(int)rangeFinderDistance}\n"
                     + $"Diameter: {(int)rangeFinderDiameter}\n"
-                    + $"Position: X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}";
-                WriteText(surface, new Vector2(Right.X, Right.Y), data, "Default", 1f, new Color(0, 100, 0));
+                    + $"Position:\n"
+                    + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
+
+                sprites.Clear();
+                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+            }
+
+            foreach (MyPanel myPanel in NAVIGATOR) {
+                foreach (var sprite in sprites) {
+                    myPanel.frame.Add(sprite);
+                }
+                myPanel.frame.Dispose();
             }
         }
 
         void LogPainter() {
-            foreach (IMyTextSurface surface in PAINTERSURFACES) {
-                RectangleF Left = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, new Vector2(surface.SurfaceSize.X / 2, surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+            Echo($"LogPainter");
 
-                StringBuilder data = new StringBuilder("");
+            foreach (MyPanel myPanel in PAINTER) {
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+
+                data.Clear();
+                data2.Clear();
+
                 data.Append($"PAINTER:\n"
                     + $"{targetName}\n"
                     + $"Velocity: {targetVelocity.Length():0.0}\n"
                     + $"\n");
 
-                StringBuilder data2 = new StringBuilder("");
                 data2.Append($"\n"
                     + $"\n"
                     + $"Position: X:{targetPosition.X:0.0}, Y:{targetPosition.Y:0.0}, Z:{targetPosition.Z:0.0}"
@@ -375,44 +408,72 @@ namespace IngameScript {
                     data2.Append($"\n\n");
                 }
 
-                WriteText(surface, new Vector2(Left.X, Left.Y), data.ToString(), "Default", 1f, new Color(0, 100, 0));
-                WriteText(surface, new Vector2(Right.X, Right.Y), data2.ToString(), "Default", 1f, new Color(0, 100, 0));
+                sprites.Clear();
+                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+            }
+
+            foreach (MyPanel myPanel in PAINTER) {
+                foreach (var sprite in sprites) {
+                    myPanel.frame.Add(sprite);
+                }
+                myPanel.frame.Dispose();
             }
         }
 
         void LogPower() {
-            foreach (IMyTextSurface surface in POWERSURFACES) {
-                RectangleF Left = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, new Vector2(surface.SurfaceSize.X / 2, surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+            Echo($"LogPower");
 
-                string data = $"Status: {powerStatus}\n"
-                    + $"Curr In: {terminalCurrentInput:0.0}\n"
+            foreach (MyPanel myPanel in POWER) {
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+
+                data.Clear();
+                data2.Clear();
+
+                data.Append($"Status: {powerStatus}\n"
+                    + $"Pow.: {terminalCurrentInput:0.0}/{terminalMaxInput:0.0}\n"
                     + $"Batt. In: {battsCurrentInput}\n"
-                    + $"Batt. Pow: {battsCurrentStoredPower:0.0}\n"
-                    + $"Reactors Out: {reactorsCurrentOutput:0.0}\n"
-                    + $"H2 Out: {hEngCurrentOutput:0.0}\n"
+                    + $"Batt. Pow: {battsCurrentStoredPower}\n"
+                    + $"Reactors Out: {reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
+                    + $"H2 Out: {hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
                     + $"Solar: {solarMaxOutput:0.0}\n"
-                    + $"H2 Tank %: {tankCapacityPercent:0.0}\n";
-                WriteText(surface, new Vector2(Left.X, Left.Y), data, "Default", 1f, new Color(0, 100, 0));
+                    + $"H2 Tank %: {tankCapacityPercent:0.0}\n");
 
-                data = $"\n"
-                    + $"Max In: {terminalMaxInput:0.0}\n"
+                data2.Append($"\n"
+                    + $"\n"
                     + $"Batt. Out: {battsCurrentOutput:0.0}\n"
                     + $"\n"
-                    + $"Max Out: {reactorsMaxOutput:0.0}\n"
-                    + $"Max Out: X:{hEngMaxOutput:0.0}\n"
-                    + $"Turbines: X:{turbineMaxOutput:0.0}\n";
-                WriteText(surface, new Vector2(Right.X, Right.Y), data, "Default", 1f, new Color(0, 100, 0));
+                    + $"\n"
+                    + $"\n"
+                    + $"Turbines: {turbineMaxOutput:0.0}\n");
+
+                sprites.Clear();
+                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+            }
+
+            foreach (MyPanel myPanel in POWER) {
+                foreach (var sprite in sprites) {
+                    myPanel.frame.Add(sprite);
+                }
+                myPanel.frame.Dispose();
             }
         }
 
         void LogInventory() {
-            foreach (IMyTextSurface surface in INVENTORYCOMPONENTSAMMOSURFACES) {
-                RectangleF Left = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, new Vector2(surface.SurfaceSize.X / 2, surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+            Echo($"LogInventory");
 
-                StringBuilder data = new StringBuilder("");
-                StringBuilder data2 = new StringBuilder("");
+            foreach (MyPanel myPanel in INVENTORYCOMPONENTSAMMO) {
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+
+                data.Clear();
+                data2.Clear();
+
+                data.Append($"Inventory Fill: {cargoPercentage:0.0}%\n\n");
+                data2.Append($"\n\n");
+
                 data.Append($"COMPONENTS:\n");
                 data2.Append($"\n");
 
@@ -428,7 +489,7 @@ namespace IngameScript {
                 }
 
                 data.Append($"\nAMMO:\n");
-                data2.Append($"\n\n");
+                data2.Append($"\n\n\n");
 
                 alternate = true;
                 foreach (var log in ammoLogDict) {
@@ -441,19 +502,24 @@ namespace IngameScript {
                     }
                 }
 
-                WriteText(surface, new Vector2(Left.X, Left.Y), data.ToString(), "Default", 1f, new Color(0, 100, 0));
-                WriteText(surface, new Vector2(Right.X, Right.Y), data2.ToString(), "Default", 1f, new Color(0, 100, 0));
+                sprites.Clear();
+                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
             }
 
-            foreach (IMyTextSurface surface in INVENTORYOREINGOTSSURFACES) {
-                RectangleF Left = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, new Vector2(surface.SurfaceSize.X / 2, surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+            foreach (MyPanel myPanel in INVENTORYCOMPONENTSAMMO) {
+                foreach (var sprite in sprites) {
+                    myPanel.frame.Add(sprite);
+                }
+                myPanel.frame.Dispose();
+            }
 
-                StringBuilder data = new StringBuilder("");
-                StringBuilder data2 = new StringBuilder("");
+            foreach (MyPanel myPanel in INVENTORYOREINGOTS) {
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
 
-                data.Append($"Inventory Fill: {cargoPercentage:0.0}%\n\n");
-                data2.Append($"\n\n");
+                data.Clear();
+                data2.Clear();
 
                 data.Append($"ORE:\n");
                 data2.Append($"\n");
@@ -470,7 +536,7 @@ namespace IngameScript {
                 }
 
                 data.Append($"\nINGOTS:\n");
-                data2.Append($"\n\n");
+                data2.Append($"\n\n\n");
 
                 alternate = true;
                 foreach (var log in ingotsLogDict) {
@@ -483,13 +549,21 @@ namespace IngameScript {
                     }
                 }
 
-                WriteText(surface, new Vector2(Left.X, Left.Y), data.ToString(), "Default", 1f, new Color(0, 100, 0));
-                WriteText(surface, new Vector2(Right.X, Right.Y), data2.ToString(), "Default", 1f, new Color(0, 100, 0));
+                sprites.Clear();
+                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+            }
+
+            foreach (MyPanel myPanel in INVENTORYOREINGOTS) {
+                foreach (var sprite in sprites) {
+                    myPanel.frame.Add(sprite);
+                }
+                myPanel.frame.Dispose();
             }
         }
 
-        void WriteText(IMyTextSurface surface, Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
-            surface.DrawFrame().Add(new MySprite() {
+        MySprite DrawSpriteText(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
+            return new MySprite() {
                 Type = SpriteType.TEXT,
                 Data = data,
                 RotationOrScale = scale,
@@ -497,38 +571,133 @@ namespace IngameScript {
                 FontId = font,
                 Color = color,
                 Alignment = alignment
-            });
+            };
         }
 
         void GetBlocks() {
-            COCKPITS.Clear();
+            List<IMyCockpit> COCKPITS = new List<IMyCockpit>();
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(COCKPITS, block => block.CustomName.Contains("[CRX] Controller Cockpit"));
-            NAVIGATORSURFACES.Clear();
+
+            NAVIGATOR.Clear();
+            List<IMyTextSurface> NAVIGATORSURFACES = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
+            foreach (IMyCockpit cockpit in COCKPITS) {
+                MyIniParseResult result;
+                myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
+                if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
+                    int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
+                    NAVIGATORSURFACES.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
+                }
+            }
             foreach (IMyTextPanel panel in panels) { NAVIGATORSURFACES.Add(panel as IMyTextSurface); }
-            PAINTERSURFACES.Clear();
+            foreach (var surface in NAVIGATORSURFACES) {
+                NAVIGATOR.Add(new MyPanel(surface));
+            }
             panels.Clear();
+
+            PAINTER.Clear();
+            List<IMyTextSurface> PAINTERSURFACES = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Painter"));
+            foreach (IMyCockpit cockpit in COCKPITS) {
+                MyIniParseResult result;
+                myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
+                if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
+                    int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
+                    PAINTERSURFACES.Add(cockpit.GetSurface(cockpitTargetSurface));//0
+                }
+            }
             foreach (IMyTextPanel panel in panels) { PAINTERSURFACES.Add(panel as IMyTextSurface); }
-            POWERSURFACES.Clear();
+            foreach (var surface in PAINTERSURFACES) {
+                PAINTER.Add(new MyPanel(surface));
+            }
             panels.Clear();
+
+            POWER.Clear();
+            List<IMyTextSurface> POWERSURFACES = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power"));
             foreach (IMyTextPanel panel in panels) { POWERSURFACES.Add(panel as IMyTextSurface); }
-            INVENTORYOREINGOTSSURFACES.Clear();
+            foreach (IMyCockpit cockpit in COCKPITS) {
+                MyIniParseResult result;
+                myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
+                if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
+                    int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
+                    POWERSURFACES.Add(cockpit.GetSurface(cockpitPowerSurface));//2
+                }
+            }
+            foreach (var surface in POWERSURFACES) {
+                POWER.Add(new MyPanel(surface));
+            }
             panels.Clear();
+
+            INVENTORYOREINGOTS.Clear();
+            List<IMyTextSurface> INVENTORYOREINGOTSSURFACES = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Ore Ingots"));
             foreach (IMyTextPanel panel in panels) { INVENTORYOREINGOTSSURFACES.Add(panel as IMyTextSurface); }
-            INVENTORYCOMPONENTSAMMOSURFACES.Clear();
+            foreach (var surface in INVENTORYOREINGOTSSURFACES) {
+                INVENTORYOREINGOTS.Add(new MyPanel(surface));
+            }
             panels.Clear();
+
+            INVENTORYCOMPONENTSAMMO.Clear();
+            List<IMyTextSurface> INVENTORYCOMPONENTSAMMOSURFACES = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Components Ammo"));
             foreach (IMyTextPanel panel in panels) { INVENTORYCOMPONENTSAMMOSURFACES.Add(panel as IMyTextSurface); }
+            foreach (var surface in INVENTORYCOMPONENTSAMMOSURFACES) {
+                INVENTORYCOMPONENTSAMMO.Add(new MyPanel(surface));
+            }
             panels.Clear();
-            LCDTOGGLELOGGER = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Logger") as IMyTextPanel;
         }
 
-        //WriteText(lcd, new Vector2(Right.X + Right.Width, Right.Y), "Write on the Right side", "Default", 1f, Color.Red, TextAlignment.RIGHT);
-        //WriteText(lcd, new Vector2(Left.X + Left.Width, Left.Y), "Write on the Center Left", "Default", 1f, Color.Red, TextAlignment.RIGHT);
+        public class MyPanel {
+            public IMyTextSurface surface;
+            public MySpriteDrawFrame frame;
+            public RectangleF viewport;
+            public Vector2 margin;
+            public float minScale;
+
+            public MyPanel(IMyTextSurface _surface) {
+                surface = _surface;
+                frame = _surface.DrawFrame();
+                viewport = new RectangleF((_surface.TextureSize - _surface.SurfaceSize) / 2f, _surface.SurfaceSize);
+                margin = _surface.SurfaceSize / 100f * 2f;//margin = (_surface.TextureSize - _surface.SurfaceSize) / 100f * 2f;
+                Vector2 scale = _surface.SurfaceSize / 512f;
+                minScale = Math.Min(scale.X, scale.Y);
+                surface.ContentType = ContentType.SCRIPT;
+                surface.Script = "";
+                surface.BackgroundColor = Color.Black;
+                surface.FontColor = new Color(0, 100, 0);
+            }
+        }
+
+        /*
+        WriteText(lcd, new Vector2(Right.X + Right.Width, Right.Y), "Write on the Right side", "Default", 1f, Color.Red, TextAlignment.RIGHT);
+        WriteText(lcd, new Vector2(Left.X + Left.Width, Left.Y), "Write on the Center Left", "Default", 1f, Color.Red, TextAlignment.RIGHT);
+        
+        /// <summary>
+        /// Draws a line of specified width and color between two points.
+        /// </summary>
+        void DrawLine(MySpriteDrawFrame frame, Vector2 point1, Vector2 point2, float width, Color color)
+        {
+            Vector2 position = 0.5f * (point1 + point2);
+            Vector2 diff = point1 - point2;
+            float length = diff.Length();
+            if (length > 0)
+                diff /= length;
+
+            Vector2 size = new Vector2(length, width);
+            float angle = (float)Math.Acos(Vector2.Dot(diff, Vector2.UnitX));
+            angle *= Math.Sign(Vector2.Dot(diff, Vector2.UnitY));
+
+            MySprite sprite = MySprite.CreateSprite("SquareSimple", position, size);
+            sprite.RotationOrScale = angle;
+            sprite.Color = color;
+            frame.Add(sprite);
+        }
+
+        Vector2 textureSize = surface.TextureSize;
+        Vector2 screenCenter = textureSize * 0.5f;
+        */
 
     }
 }

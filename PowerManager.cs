@@ -247,6 +247,7 @@ namespace IngameScript {
                     if (block is IMyJumpDrive || block.CustomName.Contains("Railgun")) {//TODO
                         terminalCurrentInput += sink.CurrentInputByType(electricityId);
                         terminalMaxRequiredInput += sink.CurrentInputByType(electricityId);
+                        terminalMaxInput += sink.MaxRequiredInputByType(electricityId);
                     } else {
                         terminalCurrentInput += sink.CurrentInputByType(electricityId);
                         terminalMaxRequiredInput += sink.MaxRequiredInputByType(electricityId);
@@ -349,16 +350,21 @@ namespace IngameScript {
         void SendBroadcastMessage() {
             var immArray = ImmutableArray.CreateBuilder<MyTuple<
                     MyTuple<string, float, float, float>,
-                    MyTuple<float, float, float, int, float[]>,
+                    MyTuple<float, float, float, int, string>,
                     MyTuple<float, float, int>,
                     MyTuple<float, float, int>,
                     MyTuple<float, int, float, int>,
                     double
                     >>();
 
+            StringBuilder battStoredPow = new StringBuilder("");
+            foreach (float pow in battsCurrentStoredPower) {
+                battStoredPow.Append($"{pow:0.0},");
+            }
+
             var tuple = MyTuple.Create(
                 MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput, terminalMaxInput),
-                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battsCurrentStoredPower.ToArray()),
+                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battStoredPow.ToString()),//TODO
                 MyTuple.Create(reactorsCurrentOutput, reactorsMaxOutput, REACTORS.Count),
                 MyTuple.Create(hEngCurrentOutput, hEngMaxOutput, HENGINES.Count),
                 MyTuple.Create(solarMaxOutput, SOLARS.Count, turbineMaxOutput, TURBINES.Count),

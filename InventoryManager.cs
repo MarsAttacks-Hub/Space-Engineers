@@ -277,6 +277,7 @@ namespace IngameScript {
         public void Main(string argument) {
             try {
                 Echo($"ticks:{ticks}");
+                Echo($"productionTicks:{productionTicks}");
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(argument)) {
@@ -386,20 +387,44 @@ namespace IngameScript {
             StringBuilder ammosLog = new StringBuilder("");
             StringBuilder componentsLog = new StringBuilder("");
 
+            int count = 0;
             foreach (KeyValuePair<MyDefinitionId, double> entry in ammosDict) {
-                ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                if (count == ammosDict.Count - 1) {
+                    ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
+                } else {
+                    ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                }
+                count++;
             }
 
+            count = 0;
             foreach (KeyValuePair<MyDefinitionId, double> entry in oreDict) {
-                oresLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                if (count == oreDict.Count - 1) {
+                    oresLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
+                } else {
+                    oresLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                }
+                count++;
             }
 
+            count = 0;
             foreach (KeyValuePair<MyDefinitionId, double> entry in ingotsDict) {
-                ingotsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                if (count == ingotsDict.Count - 1) {
+                    ingotsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
+                } else {
+                    ingotsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                }
+                count++;
             }
 
+            count = 0;
             foreach (KeyValuePair<MyDefinitionId, double> entry in componentsDict) {
-                componentsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                if (count == componentsDict.Count - 1) {
+                    componentsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
+                } else {
+                    componentsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
+                }
+                count++;
             }
 
             var immArray = ImmutableArray.CreateBuilder<MyTuple<
