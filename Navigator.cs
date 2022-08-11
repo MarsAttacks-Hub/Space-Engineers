@@ -502,6 +502,10 @@ namespace IngameScript {
                             mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
                         }
                         mouseRoll = mouseRoll == 0d ? rollController.Control(rollAngle) : rollController.Control(mouseRoll);
+                        if (mouseYaw != 0d) {//TODO
+                            mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
+                        }
+                        mouseYaw = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
                     }
                     if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
                         if (unlockGyrosOnce) {
