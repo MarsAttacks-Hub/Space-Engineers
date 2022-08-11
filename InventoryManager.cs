@@ -387,9 +387,9 @@ namespace IngameScript {
             StringBuilder ammosLog = new StringBuilder("");
             StringBuilder componentsLog = new StringBuilder("");
 
-            int count = 0;
+            int count = 1;
             foreach (KeyValuePair<MyDefinitionId, double> entry in ammosDict) {
-                if (count == ammosDict.Count - 1) {
+                if (count == ammosDict.Count) {
                     ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
                 } else {
                     ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
@@ -397,9 +397,9 @@ namespace IngameScript {
                 count++;
             }
 
-            count = 0;
+            count = 1;
             foreach (KeyValuePair<MyDefinitionId, double> entry in oreDict) {
-                if (count == oreDict.Count - 1) {
+                if (count == oreDict.Count) {
                     oresLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
                 } else {
                     oresLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
@@ -407,9 +407,9 @@ namespace IngameScript {
                 count++;
             }
 
-            count = 0;
+            count = 1;
             foreach (KeyValuePair<MyDefinitionId, double> entry in ingotsDict) {
-                if (count == ingotsDict.Count - 1) {
+                if (count == ingotsDict.Count) {
                     ingotsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
                 } else {
                     ingotsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
@@ -417,9 +417,9 @@ namespace IngameScript {
                 count++;
             }
 
-            count = 0;
+            count = 1;
             foreach (KeyValuePair<MyDefinitionId, double> entry in componentsDict) {
-                if (count == componentsDict.Count - 1) {
+                if (count == componentsDict.Count) {
                     componentsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
                 } else {
                     componentsLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");

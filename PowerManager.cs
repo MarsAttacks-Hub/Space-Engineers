@@ -358,13 +358,19 @@ namespace IngameScript {
                     >>();
 
             StringBuilder battStoredPow = new StringBuilder("");
+            int count = 1;
             foreach (float pow in battsCurrentStoredPower) {
-                battStoredPow.Append($"{pow:0.0},");
+                if (count == battsCurrentStoredPower.Count) {
+                    battStoredPow.Append($"{pow:0.0}");
+                } else {
+                    battStoredPow.Append($"{pow:0.0},");
+                }
+                count++;
             }
 
             var tuple = MyTuple.Create(
                 MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput, terminalMaxInput),
-                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battStoredPow.ToString()),//TODO
+                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battStoredPow.ToString()),
                 MyTuple.Create(reactorsCurrentOutput, reactorsMaxOutput, REACTORS.Count),
                 MyTuple.Create(hEngCurrentOutput, hEngMaxOutput, HENGINES.Count),
                 MyTuple.Create(solarMaxOutput, SOLARS.Count, turbineMaxOutput, TURBINES.Count),
