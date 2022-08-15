@@ -25,7 +25,6 @@ namespace IngameScript {
         bool logger = true;
 
         bool navigator = false;
-        bool painter = false;
         bool power = false;
         bool inventory = false;
 
@@ -44,6 +43,7 @@ namespace IngameScript {
         //Vector3D targetHitPosition;
         Vector3D targetPosition;
         Vector3D targetVelocity;
+        double targetDistance;//TODO
         public List<MyTuple<string, string, string, string, string>> missilesLog = new List<MyTuple<string, string, string, string, string>>();
 
         string powerStatus;
@@ -51,7 +51,7 @@ namespace IngameScript {
         float terminalMaxRequiredInput;
         float battsCurrentInput;
         float battsCurrentOutput;
-        //float battsMaxOutput;
+        float battsMaxOutput;
         //int batteriesCount;
         string battsCurrentStoredPower;
         float reactorsCurrentOutput;
@@ -78,7 +78,7 @@ namespace IngameScript {
         public List<MyPanel> OREINGOTS = new List<MyPanel>();
         public List<MyPanel> COMPONENTSAMMO = new List<MyPanel>();
 
-        readonly MyIni myIni = new MyIni();
+        //readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
         IEnumerator<bool> stateMachine;
 
@@ -86,6 +86,9 @@ namespace IngameScript {
 
         public StringBuilder data = new StringBuilder("");
         public StringBuilder data2 = new StringBuilder("");
+        public StringBuilder data3 = new StringBuilder("");
+        public StringBuilder data4 = new StringBuilder("");
+        public StringBuilder data5 = new StringBuilder("");
 
         Program() {
             Runtime.UpdateFrequency |= UpdateFrequency.Update100;
@@ -102,6 +105,7 @@ namespace IngameScript {
         public void Main(string arg, UpdateType updateType) {
             try {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
+                Echo($"solarMaxOutput:{solarMaxOutput}");
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
@@ -140,11 +144,10 @@ namespace IngameScript {
                 navigator = false;
                 yield return true;
             }
-            if (painter) {
-                LogPainter();
-                painter = false;
-                yield return true;
-            }
+
+            LogPainter();
+            yield return true;
+
             if (power) {
                 LogPower();
                 power = false;
@@ -228,6 +231,7 @@ namespace IngameScript {
                     //targetHitPosition = data[0].Item1.Item2;
                     targetPosition = data[0].Item1.Item3;
                     targetVelocity = data[0].Item1.Item4;
+                    targetDistance = Vector3D.Distance(targetPosition, Me.CubeGrid.WorldVolume.Center);
 
                     missilesLog.Clear();
                     if (!string.IsNullOrEmpty(data[0].Item2)) {
@@ -246,8 +250,6 @@ namespace IngameScript {
                             missilesLog.Add(tuple);
                         }
                     }
-
-                    painter = true;
                 }
                 //POWERMANAGER
                 else if (igcMessage.Data is ImmutableArray<MyTuple<
@@ -272,7 +274,7 @@ namespace IngameScript {
                     terminalMaxRequiredInput = data[0].Item1.Item3;
                     battsCurrentInput = data[0].Item2.Item1;
                     battsCurrentOutput = data[0].Item2.Item2;
-                    //battsMaxOutput = data[0].Item2.Item3;
+                    battsMaxOutput = data[0].Item2.Item3;
                     //batteriesCount = data[0].Item2.Item4;
                     battsCurrentStoredPower = data[0].Item2.Item5;
                     reactorsCurrentOutput = data[0].Item3.Item1;
@@ -319,7 +321,7 @@ namespace IngameScript {
                     componentsLogDict.Clear();
                     if (!string.IsNullOrEmpty(data[0].Item5)) {
                         char[] c = new char[] { ',' };
-                        string[] componentsLogArray = data[0].Item4.Split(c);
+                        string[] componentsLogArray = data[0].Item5.Split(c);
                         ParseLog(ref componentsLogDict, componentsLogArray);
                     }
 
@@ -340,20 +342,17 @@ namespace IngameScript {
             Echo($"LogNavigator");
 
             foreach (MyPanel myPanel in NAVIGATOR) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 3f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 3f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 3f * 2f + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
-
-                data.Clear();
-                data2.Clear();
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 3f, new Vector2(myPanel.surface.SurfaceSize.X / 3f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 3f), Left.Y, Left.Width, Left.Height);
 
                 timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
-                data.Append($"JUMP DRIVE: \n"
+                data.Append($"\n"
                     + $"Reload Time: \n"
                     + $"Power: \n"
                     + $"Jump: \n"
                     + $"Max Jump: \n");
 
-                data.Append($"RANGE FINDER:\n"
+                data.Append($"\n"
                     + $"Name: \n"
                     + $"Distance: \n"
                     + $"Diameter: \n"
@@ -365,15 +364,28 @@ namespace IngameScript {
                     + $"{currentJump:000,000,000} ({totJumpPercent:0.0}%)\n"
                     + $"{maxJump:000,000,000}\n");
 
-                data2.Append($"\n"
+                if (!Vector3D.IsZero(rangeFinderPosition)) {
+                    data2.Append($"\n"
                    + $"{rangeFinderName}\n"
                    + $"{(int)rangeFinderDistance}\n"
                    + $"{(int)rangeFinderDiameter}\n"
                    + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
+                } else {
+                    data2.Append($"\n\n\n\n");
+                }
 
-                sprites.Clear();
-                sprites.Add(DrawSpriteText(new Vector2(Right.X + Right.Width, Right.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 10, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(20, 0, 100)));
+                data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 20f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X + 20f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 20f, Left.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X + 20f, Right.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.LEFT));
+
+                data.Clear();
+                data2.Clear();
+                data3.Clear();
+                data4.Clear();
             }
 
             foreach (MyPanel myPanel in NAVIGATOR) {
@@ -382,43 +394,86 @@ namespace IngameScript {
                 }
                 myPanel.frame.Dispose();
             }
+            sprites.Clear();
         }
 
         void LogPainter() {
             Echo($"LogPainter");
 
             foreach (MyPanel myPanel in PAINTER) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
+
+                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
+
+                data5.Append($"PAINTER");
+
+                data.Append($"\n"
+                    + $"Name:\n"
+                    + $"Velocity:\n"
+                    + $"Position:\n");
+
+
+                data3.Append($"\n"
+                    + $"\n"
+                    + $"Distance:\n"
+                    + $"\n");
+
+                if (!Vector3D.IsZero(targetPosition)) {
+                    data2.Append($"\n"
+                    + $"{targetName}\n"
+                    + $"{targetVelocity.Length():0.0}\n"
+                    + $"X:{targetPosition.X:0.0}, Y:{targetPosition.Y:0.0}, Z:{targetPosition.Z:0.0}\n");
+
+                    data4.Append($"\n"
+                    + $"\n"
+                    + $"{targetDistance:0.0}\n"
+                    + $"\n");
+                } else {
+                    data2.Append($"\n"
+                    + $"\n"
+                    + $"\n"
+                    + $"\n");
+
+                    data4.Append($"\n"
+                    + $"\n"
+                    + $"\n"
+                    + $"\n");
+                }
+
+                if (missilesLog.Count != 0) { data5.Append($"\n\n\nMISSILES\n"); }
+                foreach (MyTuple<string, string, string, string, string> log in missilesLog) {//toTarget=Item1,speed=Item2,command=command,status=status,type=type\n
+                    data.Append($"\n");
+                    data.Append($"Speed:\n");
+                    data.Append($"Status:\n");
+
+                    data2.Append($"{log.Item5}\n");
+                    data2.Append($"{log.Item2}\n");
+                    data2.Append($"{log.Item4}\n");
+
+                    data3.Append($"To Target:\n");
+                    data3.Append($"Command:\n");
+                    data3.Append($"\n");
+
+                    data4.Append($"{log.Item1}\n");
+                    data4.Append($"{log.Item3}\n");
+                    data4.Append($"\n");
+                }
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width, Left.Y + 10f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y + 10f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width, Left2.Y + 10f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right2.X, Right2.Y + 10f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width, Left.Y + 10f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
 
                 data.Clear();
                 data2.Clear();
-
-                data.Append($"PAINTER:\n"
-                    + $"{targetName}\n"
-                    + $"Velocity: {targetVelocity.Length():0.0}\n"
-                    + $"\n");
-
-                data2.Append($"\n"
-                    + $"\n"
-                    + $"Position: X:{targetPosition.X:0.0}, Y:{targetPosition.Y:0.0}, Z:{targetPosition.Z:0.0}"
-                    + $"\n");
-
-                if (missilesLog.Count != 0) { data.Append($"MISSILES:\n"); data2.Append($"\n"); }
-                foreach (MyTuple<string, string, string, string, string> log in missilesLog) {//toTarget=Item1,speed=Item2,command=command,status=status,type=type\n
-                    data.Append($"{log.Item5}\n");
-                    data.Append($"Speed: {log.Item2}\n");
-                    data.Append($"Status: {log.Item4}\n");
-                    data.Append($"\n");
-
-                    data2.Append($"To Target: {log.Item1}\n");
-                    data2.Append($"Command: {log.Item3}\n");
-                    data2.Append($"\n\n");
-                }
-
-                sprites.Clear();
-                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                data3.Clear();
+                data4.Clear();
+                data5.Clear();
             }
 
             foreach (MyPanel myPanel in PAINTER) {
@@ -427,38 +482,63 @@ namespace IngameScript {
                 }
                 myPanel.frame.Dispose();
             }
+            sprites.Clear();
         }
 
         void LogPower() {
             Echo($"LogPower");
 
             foreach (MyPanel myPanel in POWER) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
+
+                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
+
+                data.Append($"Status: \n"
+                    + $"Pow.: \n"
+                    + $"Batt. Out: \n"
+                    + $"Batt. Pow: \n"
+                    + $"Reactors: \n"
+                    + $"H2: \n"
+                    + $"Solar: \n"
+                    + $"H2 Tank: \n");
+
+                data2.Append($"{powerStatus}\n"
+                    + $"{terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
+                    + $"{battsCurrentOutput:0.0}/{battsMaxOutput:0.0}\n"
+                    + $"{battsCurrentStoredPower}\n"
+                    + $"{reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
+                    + $"{hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
+                    + $"{solarMaxOutput:0.0}\n"
+                    + $"{tankCapacityPercent:0.0}%\n");
+
+                data3.Append($"\n"
+                    + $"\n"
+                    + $"In: \n"
+                    + $"\n"
+                    + $"\n"
+                    + $"\n"
+                    + $"Turbines: \n");
+
+                data4.Append($"\n"
+                    + $"\n"
+                    + $"{battsCurrentInput:0.0}\n"
+                    + $"\n"
+                    + $"\n"
+                    + $"\n"
+                    + $"{turbineMaxOutput:0.0}\n");
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 20f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X + 20f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width + 20f, Left2.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right2.X + 20f, Right2.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
                 data.Clear();
                 data2.Clear();
-
-                data.Append($"Status: {powerStatus}\n"
-                    + $"Pow.: {terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
-                    + $"Batt. In: {battsCurrentInput}\n"
-                    + $"Batt. Pow: {battsCurrentStoredPower}\n"
-                    + $"Reactors Out: {reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
-                    + $"H2 Out: {hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
-                    + $"Solar: {solarMaxOutput:0.0}\n"
-                    + $"H2 Tank %: {tankCapacityPercent:0.0}\n");
-
-                data2.Append($"\n"
-                    + $"\n"
-                    + $"Batt. Out: {battsCurrentOutput:0.0}\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"Turbines: {turbineMaxOutput:0.0}\n");
-
-                sprites.Clear();
-                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                data3.Clear();
+                data4.Clear();
             }
 
             foreach (MyPanel myPanel in POWER) {
@@ -467,52 +547,86 @@ namespace IngameScript {
                 }
                 myPanel.frame.Dispose();
             }
+            sprites.Clear();
         }
 
         void LogInventory() {
             Echo($"LogInventory");
 
             foreach (MyPanel myPanel in COMPONENTSAMMO) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2), Left.Y, Left.Width, Left.Height);
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
 
-                data.Clear();
-                data2.Clear();
+                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
 
-                data.Append($"Inventory Fill: {cargoPercentage:0.0}%\n\n");
-                data2.Append($"\n\n");
+                data5.Append($"COMPONENTS\n\n\n\n\n\n\n\n\n\n\n\n\nAMMO");
 
-                data.Append($"COMPONENTS:\n");
+                data.Append($"\n");
                 data2.Append($"\n");
+                data3.Append($"\n");
+                data4.Append($"\n");
 
                 bool alternate = true;
                 foreach (var log in componentsLogDict) {
                     if (alternate) {
-                        data.Append($"{log.Key}: {log.Value}\n");
+                        data.Append($"{log.Key}: \n");
                         alternate = false;
                     } else {
-                        data2.Append($"{log.Key}: {log.Value}\n");
+                        data3.Append($"{log.Key.Replace("RadioCommunication", "RadioComm.")}: \n");
+                        alternate = true;
+                    }
+                }
+                alternate = true;
+                foreach (var log in componentsLogDict) {
+                    if (alternate) {
+                        data2.Append($"{log.Value}\n");
+                        alternate = false;
+                    } else {
+                        data4.Append($"{log.Value}\n");
                         alternate = true;
                     }
                 }
 
-                data.Append($"\nAMMO:\n");
-                data2.Append($"\n\n\n");
+                data.Append($"\n");
+                data2.Append($"\n");
+                data3.Append($"\n\n");
+                data4.Append($"\n\n");
 
                 alternate = true;
                 foreach (var log in ammoLogDict) {
                     if (alternate) {
-                        data.Append($"{log.Key}: {log.Value}\n");
+                        data.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "")}: \n");
                         alternate = false;
                     } else {
-                        data2.Append($"{log.Key}: {log.Value}\n");
+                        data3.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "")}: \n");
+                        alternate = true;
+                    }
+                }
+                alternate = true;
+                foreach (var log in ammoLogDict) {
+                    if (alternate) {
+                        data2.Append($"{log.Value}\n");
+                        alternate = false;
+                    } else {
+                        data4.Append($"{log.Value}\n");
                         alternate = true;
                     }
                 }
 
-                sprites.Clear();
-                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 75f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X + 75f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width + 50f, Left2.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right2.X + 50f, Right2.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 75f, Left.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, new Color(25, 0, 100), TextAlignment.RIGHT));
+
+                data.Clear();
+                data2.Clear();
+                data3.Clear();
+                data4.Clear();
+                data5.Clear();
             }
 
             foreach (MyPanel myPanel in COMPONENTSAMMO) {
@@ -521,45 +635,82 @@ namespace IngameScript {
                 }
                 myPanel.frame.Dispose();
             }
+            sprites.Clear();
 
             foreach (MyPanel myPanel in OREINGOTS) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 2f + myPanel.margin, new Vector2(myPanel.surface.SurfaceSize.X / 2, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 2 + myPanel.margin.X), Left.Y, Left.Width, Left.Height);
+                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
 
-                data.Clear();
-                data2.Clear();
+                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
+                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
 
-                data.Append($"ORE:\n");
-                data2.Append($"\n");
+                data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
+
+                data.Append($"Cargo:\n\n");
+                data2.Append($"{cargoPercentage:0.0}%\n\n");
+                data3.Append($"\n\n");
+                data4.Append($"\n\n");
 
                 bool alternate = true;
                 foreach (var log in oreLogDict) {
                     if (alternate) {
-                        data.Append($"{log.Key}: {log.Value}\n");
+                        data.Append($"{log.Key}: \n");
                         alternate = false;
                     } else {
-                        data2.Append($"{log.Key}: {log.Value}\n");
+                        data3.Append($"{log.Key}: \n");
+                        alternate = true;
+                    }
+                }
+                alternate = true;
+                foreach (var log in oreLogDict) {
+                    if (alternate) {
+                        data2.Append($"{log.Value}\n");
+                        alternate = false;
+                    } else {
+                        data4.Append($"{log.Value}\n");
                         alternate = true;
                     }
                 }
 
-                data.Append($"\nINGOTS:\n");
-                data2.Append($"\n\n\n");
+                data.Append($"\n");
+                data2.Append($"\n");
+                data3.Append($"\n\n");
+                data4.Append($"\n\n");
 
                 alternate = true;
                 foreach (var log in ingotsLogDict) {
                     if (alternate) {
-                        data.Append($"{log.Key}: {log.Value}\n");
+                        data.Append($"{log.Key}: \n");
                         alternate = false;
                     } else {
-                        data2.Append($"{log.Key}: {log.Value}\n");
+                        data3.Append($"{log.Key}: \n");
+                        alternate = true;
+                    }
+                }
+                alternate = true;
+                foreach (var log in ingotsLogDict) {
+                    if (alternate) {
+                        data2.Append($"{log.Value}\n");
+                        alternate = false;
+                    } else {
+                        data4.Append($"{log.Value}\n");
                         alternate = true;
                     }
                 }
 
-                sprites.Clear();
-                sprites.Add(DrawSpriteText(new Vector2(Left.X, Left.Y), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y), data2.ToString(), "Default", myPanel.minScale, new Color(0, 100, 0)));
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 50f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right.X + 50f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width + 50f, Left2.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(Right2.X + 50f, Right2.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 50f, Left.Y + 20f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+
+                data.Clear();
+                data2.Clear();
+                data3.Clear();
+                data4.Clear();
+                data5.Clear();
             }
 
             foreach (MyPanel myPanel in OREINGOTS) {
@@ -568,6 +719,7 @@ namespace IngameScript {
                 }
                 myPanel.frame.Dispose();
             }
+            sprites.Clear();
         }
 
         MySprite DrawSpriteText(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
@@ -590,14 +742,14 @@ namespace IngameScript {
             List<IMyTextSurface> navigatorSurfaces = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
-            foreach (IMyCockpit cockpit in cockpits) {
+            /*foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
                     int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
                     navigatorSurfaces.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
                 }
-            }
+            }*/
             foreach (IMyTextPanel panel in panels) { navigatorSurfaces.Add(panel as IMyTextSurface); }
             foreach (var surface in navigatorSurfaces) {
                 NAVIGATOR.Add(new MyPanel(surface));
@@ -607,14 +759,14 @@ namespace IngameScript {
             PAINTER.Clear();
             List<IMyTextSurface> painterSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Painter"));
-            foreach (IMyCockpit cockpit in cockpits) {
+            /*foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
                     int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
                     painterSurfaces.Add(cockpit.GetSurface(cockpitTargetSurface));//0
                 }
-            }
+            }*/
             foreach (IMyTextPanel panel in panels) { painterSurfaces.Add(panel as IMyTextSurface); }
             foreach (var surface in painterSurfaces) {
                 PAINTER.Add(new MyPanel(surface));
@@ -625,14 +777,14 @@ namespace IngameScript {
             List<IMyTextSurface> powerSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power"));
             foreach (IMyTextPanel panel in panels) { powerSurfaces.Add(panel as IMyTextSurface); }
-            foreach (IMyCockpit cockpit in cockpits) {
+            /*foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
                     int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
                     powerSurfaces.Add(cockpit.GetSurface(cockpitPowerSurface));//2
                 }
-            }
+            }*/
             foreach (var surface in powerSurfaces) {
                 POWER.Add(new MyPanel(surface));
             }
@@ -668,7 +820,7 @@ namespace IngameScript {
                 surface = _surface;
                 frame = _surface.DrawFrame();
                 viewport = new RectangleF((_surface.TextureSize - _surface.SurfaceSize) / 2f, _surface.SurfaceSize);
-                margin = _surface.SurfaceSize / 100f * 2f;//margin = (_surface.TextureSize - _surface.SurfaceSize) / 100f * 2f;
+                margin = new Vector2(20f, 20f);//_surface.SurfaceSize / 100f * 2f;
                 Vector2 scale = _surface.SurfaceSize / 512f;
                 minScale = Math.Min(scale.X, scale.Y);
                 surface.ContentType = ContentType.SCRIPT;
