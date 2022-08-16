@@ -173,9 +173,9 @@ namespace IngameScript {
             if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
-            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
-            Me.GetSurface(0).BackgroundColor = togglePB ? new Color(20, 0, 0) : new Color(0, 0, 0);
+            if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(0, 0, 50) : new Color(0, 0, 0); }
+            if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(0, 0, 50) : new Color(0, 0, 0); }
+            Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
         }
 
         public void Main(string arg) {
@@ -323,15 +323,15 @@ namespace IngameScript {
                     break;
                 case "ToggleAutoFire":
                     autoFire = !autoFire;
-                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+                    if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(0, 0, 50) : new Color(0, 0, 0); }
                     break;
                 case "ToggleCreative":
                     creative = !creative;
-                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(20, 10, 0) : new Color(0, 0, 0); }
+                    if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(0, 0, 50) : new Color(0, 0, 0); }
                     break;
                 case "PBOn":
                     togglePB = true;
-                    Me.GetSurface(0).BackgroundColor = new Color(20, 0, 0);
+                    Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     InitMulti();
                     break;

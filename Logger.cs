@@ -106,7 +106,6 @@ namespace IngameScript {
         public void Main(string arg, UpdateType updateType) {
             try {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
-                Echo($"solarMaxOutput:{solarMaxOutput}");
 
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
@@ -382,16 +381,14 @@ namespace IngameScript {
                 data.Clear();
                 data2.Clear();
                 data3.Clear();
-            }
 
-            foreach (MyPanel myPanel in NAVIGATOR) {
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
                 frame.Dispose();
+                sprites.Clear();
             }
-            sprites.Clear();
         }
 
         void LogPainter() {
@@ -464,16 +461,14 @@ namespace IngameScript {
                 data3.Clear();
                 data4.Clear();
                 data5.Clear();
-            }
 
-            foreach (MyPanel myPanel in PAINTER) {
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
                 frame.Dispose();
+                sprites.Clear();
             }
-            sprites.Clear();
         }
 
         void LogPower() {
@@ -524,16 +519,14 @@ namespace IngameScript {
                 data2.Clear();
                 data3.Clear();
                 data4.Clear();
-            }
 
-            foreach (MyPanel myPanel in POWER) {
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
                 frame.Dispose();
+                sprites.Clear();
             }
-            sprites.Clear();
         }
 
         void LogInventory() {
@@ -607,19 +600,16 @@ namespace IngameScript {
                 data3.Clear();
                 data4.Clear();
                 data5.Clear();
-            }
 
-            foreach (MyPanel myPanel in COMPONENTSAMMO) {
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
                 frame.Dispose();
+                sprites.Clear();
             }
-            sprites.Clear();
 
             foreach (MyPanel myPanel in OREINGOTS) {
-
                 data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
 
                 data.Append($"Cargo:\n\n");
@@ -687,16 +677,14 @@ namespace IngameScript {
                 data3.Clear();
                 data4.Clear();
                 data5.Clear();
-            }
 
-            foreach (MyPanel myPanel in OREINGOTS) {
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
                 frame.Dispose();
+                sprites.Clear();
             }
-            sprites.Clear();
         }
 
         MySprite DrawSpriteText(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
@@ -716,73 +704,86 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(cockpits, block => block.CustomName.Contains("[CRX] Controller Cockpit"));
 
             NAVIGATOR.Clear();
-            List<IMyTextSurface> navigatorSurfaces = new List<IMyTextSurface>();
+            List<IMyTextSurface> surfaces = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
+            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in surfaces) {
+                NAVIGATOR.Add(new MyPanel(surface, false));
+            }
+            surfaces.Clear();
             foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
                     int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
-                    navigatorSurfaces.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
+                    surfaces.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
                 }
             }
-            foreach (IMyTextPanel panel in panels) { navigatorSurfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in navigatorSurfaces) {
-                NAVIGATOR.Add(new MyPanel(surface));
+            foreach (var surface in surfaces) {
+                NAVIGATOR.Add(new MyPanel(surface, true));
             }
+            surfaces.Clear();
             panels.Clear();
 
             PAINTER.Clear();
-            List<IMyTextSurface> painterSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Painter"));
+            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in surfaces) {
+                PAINTER.Add(new MyPanel(surface, false));
+            }
+            surfaces.Clear();
             foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
                     int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
-                    painterSurfaces.Add(cockpit.GetSurface(cockpitTargetSurface));//0
+                    surfaces.Add(cockpit.GetSurface(cockpitTargetSurface));//0
                 }
             }
-            foreach (IMyTextPanel panel in panels) { painterSurfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in painterSurfaces) {
-                PAINTER.Add(new MyPanel(surface));
+            foreach (var surface in surfaces) {
+                PAINTER.Add(new MyPanel(surface, true));
             }
+            surfaces.Clear();
             panels.Clear();
 
             POWER.Clear();
-            List<IMyTextSurface> powerSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power"));
-            foreach (IMyTextPanel panel in panels) { powerSurfaces.Add(panel as IMyTextSurface); }
+            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in surfaces) {
+                POWER.Add(new MyPanel(surface, false));
+            }
+            surfaces.Clear();
             foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
                     int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
-                    powerSurfaces.Add(cockpit.GetSurface(cockpitPowerSurface));//2
+                    surfaces.Add(cockpit.GetSurface(cockpitPowerSurface));//2
                 }
             }
-            foreach (var surface in powerSurfaces) {
-                POWER.Add(new MyPanel(surface));
+            foreach (var surface in surfaces) {
+                POWER.Add(new MyPanel(surface, true));
             }
+            surfaces.Clear();
             panels.Clear();
 
             OREINGOTS.Clear();
-            List<IMyTextSurface> oreIngotsSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Ore Ingots"));
-            foreach (IMyTextPanel panel in panels) { oreIngotsSurfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in oreIngotsSurfaces) {
-                OREINGOTS.Add(new MyPanel(surface));
+            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in surfaces) {
+                OREINGOTS.Add(new MyPanel(surface, false));
             }
+            surfaces.Clear();
             panels.Clear();
 
             COMPONENTSAMMO.Clear();
-            List<IMyTextSurface> componentsAmmoSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Components Ammo"));
-            foreach (IMyTextPanel panel in panels) { componentsAmmoSurfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in componentsAmmoSurfaces) {
-                COMPONENTSAMMO.Add(new MyPanel(surface));
+            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
+            foreach (var surface in surfaces) {
+                COMPONENTSAMMO.Add(new MyPanel(surface, false));
             }
+            surfaces.Clear();
             panels.Clear();
         }
 
@@ -796,11 +797,13 @@ namespace IngameScript {
             public readonly RectangleF col1_3;
             public readonly RectangleF col2_3;
 
-            public MyPanel(IMyTextSurface _surface) {
+            public MyPanel(IMyTextSurface _surface, bool _isWide) {
                 surface = _surface;
                 Vector2 scale = _surface.SurfaceSize / 512f;
                 minScale = Math.Min(scale.X, scale.Y);
-
+                if (_isWide) {
+                    minScale += 0.2f;
+                }
                 col1_4 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 4f, new Vector2(surface.SurfaceSize.X / 4f, surface.SurfaceSize.Y));
                 col2_4 = new RectangleF(col1_4.X + (surface.SurfaceSize.X / 4f), col1_4.Y, col1_4.Width, col1_4.Height);
                 col3_4 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 4f, new Vector2(surface.SurfaceSize.X / 4f * 3f, surface.SurfaceSize.Y));

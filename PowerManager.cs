@@ -85,7 +85,7 @@ namespace IngameScript {
             GetHydrogenEnginesMaxOutput();
             GetReactorsMaxOutput();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[POWERMANAGER]");
-            Me.GetSurface(0).BackgroundColor = togglePB ? new Color(0, 0, 50) : new Color(0, 0, 0);
+            Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
         }
 
         public void Main(string argument) {
@@ -128,7 +128,7 @@ namespace IngameScript {
                 case "TogglePB":
                     togglePB = !togglePB;
                     if (togglePB) {
-                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 50);
+                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     } else {
                         Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
@@ -141,7 +141,7 @@ namespace IngameScript {
                     break;
                 case "PBOn":
                     togglePB = true;
-                    Me.GetSurface(0).BackgroundColor = new Color(0, 0, 50);
+                    Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     break;
                 case "PBOff":
