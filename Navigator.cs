@@ -449,18 +449,11 @@ namespace IngameScript {
                     totJumpPercent = currentStoredPower / maxStoredPower * 100d;
                 }
             }
-
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                    MyTuple<string, int, int, double, double, double>,
-                    MyTuple<Vector3D, string, double, double>
-                    >>();
-
             var tuple = MyTuple.Create(
                 MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
                 MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter)
                 );
-            immArray.Add(tuple);
-            IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         void GyroStabilize(bool targetFound, bool aimingTarget, bool isAutoPiloted, Vector3D gravity, double mySpeed, bool isTargetEmpty) {

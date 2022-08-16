@@ -424,15 +424,6 @@ namespace IngameScript {
                 }
                 count++;
             }
-
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                double,
-                string,
-                string,
-                string,
-                string
-                >>();
-
             var tuple = MyTuple.Create(
                 cargoPercentage,
                 ammosLog.ToString(),
@@ -440,8 +431,7 @@ namespace IngameScript {
                 ingotsLog.ToString(),
                 componentsLog.ToString()
                 );
-            immArray.Add(tuple);
-            IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         void ReadInventoryInfos() {

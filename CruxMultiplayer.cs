@@ -375,19 +375,12 @@ namespace IngameScript {
 
         void SendBroadcastLogTargetMessage() {
             if (targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
-                var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                    MyTuple<string, Vector3D, Vector3D, Vector3D>,
-                    string
-                >>();
-
                 Vector3D targetVelocity = targetInfo.Velocity;
                 var tuple = MyTuple.Create(
                     MyTuple.Create(targetInfo.Name, targetInfo.HitPosition.Value, targetInfo.Position, targetVelocity),
                     ""
                 );
-
-                immArray.Add(tuple);
-                IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+                IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
             }
         }
 
@@ -413,18 +406,11 @@ namespace IngameScript {
                     totJumpPercent = currentStoredPower / maxStoredPower * 100d;
                 }
             }
-
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                    MyTuple<string, int, int, double, double, double>,
-                    MyTuple<Vector3D, string, double, double>
-                    >>();
-
             var tuple = MyTuple.Create(
                 MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
                 MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter)
                 );
-            immArray.Add(tuple);
-            IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         void ManageMagneticDrive(bool needControl, bool isAutoPiloted, bool idleThrusters, Vector3D gravity, Vector3D myVelocity) {

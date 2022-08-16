@@ -329,15 +329,6 @@ namespace IngameScript {
         }
 
         void SendBroadcastMessage() {
-            var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                    MyTuple<string, float, float>,
-                    MyTuple<float, float, float, int, string>,
-                    MyTuple<float, float, int>,
-                    MyTuple<float, float, int>,
-                    MyTuple<float, int, float, int>,
-                    double
-                    >>();
-
             StringBuilder battStoredPow = new StringBuilder("");
             int count = 1;
             foreach (float pow in battsCurrentStoredPower) {
@@ -348,7 +339,6 @@ namespace IngameScript {
                 }
                 count++;
             }
-
             var tuple = MyTuple.Create(
                 MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput),
                 MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battStoredPow.ToString()),
@@ -357,8 +347,7 @@ namespace IngameScript {
                 MyTuple.Create(solarMaxOutput, SOLARS.Count, turbineMaxOutput, TURBINES.Count),
                 tankCapacityPercent
                 );
-            immArray.Add(tuple);
-            IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
         void GetBlocks() {

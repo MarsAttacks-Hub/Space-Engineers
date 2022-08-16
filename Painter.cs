@@ -806,38 +806,23 @@ namespace IngameScript {
                     missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");//(info)"command=" + command + ",status=" + status + ",type=" + type;
                 }
 
-                var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                    MyTuple<string, Vector3D, Vector3D, Vector3D>,
-                    string
-                >>();
-
                 Vector3D targetVelocity = targetInfo.Velocity;
                 var tuple = MyTuple.Create(
                     MyTuple.Create(targetInfo.Name, targetInfo.HitPosition.Value, targetInfo.Position, targetVelocity),
                     missileLog.ToString()
                 );
-
-                immArray.Add(tuple);
-                IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+                IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
             } else {
                 if (missilesInfo.Count > 0) {
                     StringBuilder missileLog = new StringBuilder("");
                     foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
                         missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");
                     }
-
-                    var immArray = ImmutableArray.CreateBuilder<MyTuple<
-                        MyTuple<string, Vector3D, Vector3D, Vector3D>,
-                        string
-                    >>();
-
                     var tuple = MyTuple.Create(
                         MyTuple.Create("", Vector3D.Zero, Vector3D.Zero, Vector3D.Zero),
                         missileLog.ToString()
                     );
-
-                    immArray.Add(tuple);
-                    IGC.SendBroadcastMessage("[LOGGER]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+                    IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
                 }
             }
         }

@@ -43,7 +43,7 @@ namespace IngameScript {
         //Vector3D targetHitPosition;
         Vector3D targetPosition;
         Vector3D targetVelocity;
-        double targetDistance;//TODO
+        double targetDistance;
         public List<MyTuple<string, string, string, string, string>> missilesLog = new List<MyTuple<string, string, string, string, string>>();
 
         string powerStatus;
@@ -78,7 +78,7 @@ namespace IngameScript {
         public List<MyPanel> OREINGOTS = new List<MyPanel>();
         public List<MyPanel> COMPONENTSAMMO = new List<MyPanel>();
 
-        //readonly MyIni myIni = new MyIni();
+        readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
         IEnumerator<bool> stateMachine;
 
@@ -98,6 +98,7 @@ namespace IngameScript {
         void Setup() {
             GetBlocks();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[LOGGER]");
+            //BROADCASTLISTENER.SetMessageCallback();
             Me.GetSurface(0).BackgroundColor = logger ? new Color(25, 0, 50) : new Color(0, 0, 0);
             stateMachine = RunOverTime();
         }
@@ -194,49 +195,49 @@ namespace IngameScript {
             while (BROADCASTLISTENER.HasPendingMessage) {
                 MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
                 //NAVIGATOR
-                if (igcMessage.Data is ImmutableArray<MyTuple<
+                if (igcMessage.Data is MyTuple<
                     MyTuple<string, int, int, double, double, double>,
                     MyTuple<Vector3D, string, double, double>
-                >>) {
-                    var data = (ImmutableArray<MyTuple<
+                >) {
+                    var data = (MyTuple<
                         MyTuple<string, int, int, double, double, double>,
                         MyTuple<Vector3D, string, double, double>
-                    >>)igcMessage.Data;
+                    >)igcMessage.Data;
 
-                    timeRemaining = data[0].Item1.Item1;
-                    maxJump = data[0].Item1.Item2;
-                    currentJump = data[0].Item1.Item3;
-                    totJumpPercent = data[0].Item1.Item4;
-                    currentStoredPower = data[0].Item1.Item5;
-                    maxStoredPower = data[0].Item1.Item6;
+                    timeRemaining = data.Item1.Item1;
+                    maxJump = data.Item1.Item2;
+                    currentJump = data.Item1.Item3;
+                    totJumpPercent = data.Item1.Item4;
+                    currentStoredPower = data.Item1.Item5;
+                    maxStoredPower = data.Item1.Item6;
 
-                    rangeFinderPosition = data[0].Item2.Item1;
-                    rangeFinderName = data[0].Item2.Item2;
-                    rangeFinderDistance = data[0].Item2.Item3;
-                    rangeFinderDiameter = data[0].Item2.Item4;
+                    rangeFinderPosition = data.Item2.Item1;
+                    rangeFinderName = data.Item2.Item2;
+                    rangeFinderDistance = data.Item2.Item3;
+                    rangeFinderDiameter = data.Item2.Item4;
 
                     navigator = true;
                 }
                 //PAINTER
-                else if (igcMessage.Data is ImmutableArray<MyTuple<
+                else if (igcMessage.Data is MyTuple<
                     MyTuple<string, Vector3D, Vector3D, Vector3D>,
                     string
-                >>) {
-                    var data = (ImmutableArray<MyTuple<
+                >) {
+                    var data = (MyTuple<
                         MyTuple<string, Vector3D, Vector3D, Vector3D>,
                         string
-                    >>)igcMessage.Data;
+                    >)igcMessage.Data;
 
-                    targetName = data[0].Item1.Item1;
-                    //targetHitPosition = data[0].Item1.Item2;
-                    targetPosition = data[0].Item1.Item3;
-                    targetVelocity = data[0].Item1.Item4;
+                    targetName = data.Item1.Item1;
+                    //targetHitPosition = data.Item1.Item2;
+                    targetPosition = data.Item1.Item3;
+                    targetVelocity = data.Item1.Item4;
                     targetDistance = Vector3D.Distance(targetPosition, Me.CubeGrid.WorldVolume.Center);
 
                     missilesLog.Clear();
-                    if (!string.IsNullOrEmpty(data[0].Item2)) {
+                    if (!string.IsNullOrEmpty(data.Item2)) {
                         char[] c = new char[] { '\n' };
-                        string[] missilesLogArray = data[0].Item2.Split(c);
+                        string[] missilesLogArray = data.Item2.Split(c);
                         foreach (string element in missilesLogArray) {
                             char[] a = new char[] { ',' };
                             string[] elementArray = element.Split(a);
@@ -252,76 +253,76 @@ namespace IngameScript {
                     }
                 }
                 //POWERMANAGER
-                else if (igcMessage.Data is ImmutableArray<MyTuple<
+                else if (igcMessage.Data is MyTuple<
                     MyTuple<string, float, float>,
                     MyTuple<float, float, float, int, string>,
                     MyTuple<float, float, int>,
                     MyTuple<float, float, int>,
                     MyTuple<float, int, float, int>,
                     double
-                >>) {
-                    var data = (ImmutableArray<MyTuple<
+                >) {
+                    var data = (MyTuple<
                         MyTuple<string, float, float>,
                         MyTuple<float, float, float, int, string>,
                         MyTuple<float, float, int>,
                         MyTuple<float, float, int>,
                         MyTuple<float, int, float, int>,
                         double
-                    >>)igcMessage.Data;
+                    >)igcMessage.Data;
 
-                    powerStatus = data[0].Item1.Item1;
-                    terminalCurrentInput = data[0].Item1.Item2;
-                    terminalMaxRequiredInput = data[0].Item1.Item3;
-                    battsCurrentInput = data[0].Item2.Item1;
-                    battsCurrentOutput = data[0].Item2.Item2;
-                    battsMaxOutput = data[0].Item2.Item3;
-                    //batteriesCount = data[0].Item2.Item4;
-                    battsCurrentStoredPower = data[0].Item2.Item5;
-                    reactorsCurrentOutput = data[0].Item3.Item1;
-                    reactorsMaxOutput = data[0].Item3.Item2;
-                    //reactorsCount = data[0].Item3.Item3;
-                    hEngCurrentOutput = data[0].Item4.Item1;
-                    hEngMaxOutput = data[0].Item4.Item2;
-                    //hEnginesCount = data[0].Item4.Item3;
-                    solarMaxOutput = data[0].Item5.Item1;
-                    //solarsCount = data[0].Item5.Item2;
-                    turbineMaxOutput = data[0].Item5.Item3;
-                    //turbinesCount = data[0].Item5.Item4;
-                    tankCapacityPercent = data[0].Item6;
+                    powerStatus = data.Item1.Item1;
+                    terminalCurrentInput = data.Item1.Item2;
+                    terminalMaxRequiredInput = data.Item1.Item3;
+                    battsCurrentInput = data.Item2.Item1;
+                    battsCurrentOutput = data.Item2.Item2;
+                    battsMaxOutput = data.Item2.Item3;
+                    //batteriesCount = data.Item2.Item4;
+                    battsCurrentStoredPower = data.Item2.Item5;
+                    reactorsCurrentOutput = data.Item3.Item1;
+                    reactorsMaxOutput = data.Item3.Item2;
+                    //reactorsCount = data.Item3.Item3;
+                    hEngCurrentOutput = data.Item4.Item1;
+                    hEngMaxOutput = data.Item4.Item2;
+                    //hEnginesCount = data.Item4.Item3;
+                    solarMaxOutput = data.Item5.Item1;
+                    //solarsCount = data.Item5.Item2;
+                    turbineMaxOutput = data.Item5.Item3;
+                    //turbinesCount = data.Item5.Item4;
+                    tankCapacityPercent = data.Item6;
 
                     power = true;
                 }
                 //INVENTORYMANAGER
-                else if (igcMessage.Data is ImmutableArray<MyTuple<double, string, string, string, string>>) {
-                    var data = (ImmutableArray<MyTuple<double, string, string, string, string>>)igcMessage.Data;
+                else if (igcMessage.Data is MyTuple<double, string, string, string, string>) {
+                    var data = (MyTuple<double, string, string, string, string>)igcMessage.Data;
 
-                    cargoPercentage = data[0].Item1;
+                    cargoPercentage = data.Item1;
 
                     ammoLogDict.Clear();
-                    if (!string.IsNullOrEmpty(data[0].Item2)) {
+                    if (!string.IsNullOrEmpty(data.Item2)) {
                         char[] c = new char[] { ',' };
-                        string[] ammoLogArray = data[0].Item2.Split(c);
+                        string[] ammoLogArray = data.Item2.Split(c);
                         ParseLog(ref ammoLogDict, ammoLogArray);
                     }
 
                     oreLogDict.Clear();
-                    if (!string.IsNullOrEmpty(data[0].Item3)) {
+                    if (!string.IsNullOrEmpty(data.Item3)) {
                         char[] c = new char[] { ',' };
-                        string[] oreLogArray = data[0].Item3.Split(c);
+                        string[] oreLogArray = data.Item3.Split(c);
                         ParseLog(ref oreLogDict, oreLogArray);
                     }
 
                     ingotsLogDict.Clear();
-                    if (!string.IsNullOrEmpty(data[0].Item4)) {
+                    if (!string.IsNullOrEmpty(data.Item4)) {
                         char[] c = new char[] { ',' };
-                        string[] ingotsLogArray = data[0].Item4.Split(c);
+                        string[] ingotsLogArray = data.Item4.Split(c);
                         ParseLog(ref ingotsLogDict, ingotsLogArray);
                     }
 
                     componentsLogDict.Clear();
-                    if (!string.IsNullOrEmpty(data[0].Item5)) {
+                    if (!string.IsNullOrEmpty(data.Item5)) {
                         char[] c = new char[] { ',' };
-                        string[] componentsLogArray = data[0].Item5.Split(c);
+                        string[] componentsLogArray = data.Item5.Split(c);
                         ParseLog(ref componentsLogDict, componentsLogArray);
                     }
 
@@ -342,9 +343,6 @@ namespace IngameScript {
             Echo($"LogNavigator");
 
             foreach (MyPanel myPanel in NAVIGATOR) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 3f, new Vector2(myPanel.surface.SurfaceSize.X / 3f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 3f), Left.Y, Left.Width, Left.Height);
-
                 timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
                 data.Append($"\n"
                     + $"Reload Time: \n"
@@ -376,23 +374,22 @@ namespace IngameScript {
 
                 data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 20f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X + 20f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 20f, Left.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X + 20f, Right.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
 
                 data.Clear();
                 data2.Clear();
                 data3.Clear();
-                data4.Clear();
             }
 
             foreach (MyPanel myPanel in NAVIGATOR) {
+                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
-                    myPanel.frame.Add(sprite);
+                    frame.Add(sprite);
                 }
-                myPanel.frame.Dispose();
+                frame.Dispose();
             }
             sprites.Clear();
         }
@@ -401,19 +398,12 @@ namespace IngameScript {
             Echo($"LogPainter");
 
             foreach (MyPanel myPanel in PAINTER) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
-
-                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
-
                 data5.Append($"PAINTER");
 
                 data.Append($"\n"
                     + $"Name:\n"
                     + $"Velocity:\n"
                     + $"Position:\n");
-
 
                 data3.Append($"\n"
                     + $"\n"
@@ -461,13 +451,13 @@ namespace IngameScript {
                     data4.Append($"\n");
                 }
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width, Left.Y + 10f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X, Right.Y + 10f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width, Left2.Y + 10f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right2.X, Right2.Y + 10f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width, Left.Y + 10f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
 
                 data.Clear();
                 data2.Clear();
@@ -477,10 +467,11 @@ namespace IngameScript {
             }
 
             foreach (MyPanel myPanel in PAINTER) {
+                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
-                    myPanel.frame.Add(sprite);
+                    frame.Add(sprite);
                 }
-                myPanel.frame.Dispose();
+                frame.Dispose();
             }
             sprites.Clear();
         }
@@ -489,12 +480,6 @@ namespace IngameScript {
             Echo($"LogPower");
 
             foreach (MyPanel myPanel in POWER) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
-
-                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
-
                 data.Append($"Status: \n"
                     + $"Pow.: \n"
                     + $"Batt. Out: \n"
@@ -529,11 +514,11 @@ namespace IngameScript {
                     + $"\n"
                     + $"{turbineMaxOutput:0.0}\n");
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 20f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X + 20f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width + 20f, Left2.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right2.X + 20f, Right2.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
                 data.Clear();
                 data2.Clear();
@@ -542,10 +527,11 @@ namespace IngameScript {
             }
 
             foreach (MyPanel myPanel in POWER) {
+                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
-                    myPanel.frame.Add(sprite);
+                    frame.Add(sprite);
                 }
-                myPanel.frame.Dispose();
+                frame.Dispose();
             }
             sprites.Clear();
         }
@@ -554,12 +540,6 @@ namespace IngameScript {
             Echo($"LogInventory");
 
             foreach (MyPanel myPanel in COMPONENTSAMMO) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
-
-                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
-
                 data5.Append($"COMPONENTS\n\n\n\n\n\n\n\n\n\n\n\n\nAMMO");
 
                 data.Append($"\n");
@@ -614,13 +594,13 @@ namespace IngameScript {
                     }
                 }
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 75f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X + 75f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width + 50f, Left2.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right2.X + 50f, Right2.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 75f, Left.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, new Color(25, 0, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, new Color(25, 0, 100), TextAlignment.RIGHT));
 
                 data.Clear();
                 data2.Clear();
@@ -630,19 +610,15 @@ namespace IngameScript {
             }
 
             foreach (MyPanel myPanel in COMPONENTSAMMO) {
+                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
-                    myPanel.frame.Add(sprite);
+                    frame.Add(sprite);
                 }
-                myPanel.frame.Dispose();
+                frame.Dispose();
             }
             sprites.Clear();
 
             foreach (MyPanel myPanel in OREINGOTS) {
-                RectangleF Left = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right = new RectangleF(Left.X + (myPanel.surface.SurfaceSize.X / 4f), Left.Y, Left.Width, Left.Height);
-
-                RectangleF Left2 = new RectangleF((myPanel.surface.TextureSize - myPanel.surface.SurfaceSize) / 4f, new Vector2(myPanel.surface.SurfaceSize.X / 4f * 3f, myPanel.surface.SurfaceSize.Y));
-                RectangleF Right2 = new RectangleF(Left2.X + (myPanel.surface.SurfaceSize.X / 4f * 3f), Left2.Y, Left2.Width, Left2.Height);
 
                 data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
 
@@ -698,13 +674,13 @@ namespace IngameScript {
                     }
                 }
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 50f, Left.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right.X + 50f, Right.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left2.X + Left2.Width + 50f, Left2.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(Right2.X + 50f, Right2.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(Left.X + Left.Width + 50f, Left.Y + 20f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
 
                 data.Clear();
                 data2.Clear();
@@ -714,10 +690,11 @@ namespace IngameScript {
             }
 
             foreach (MyPanel myPanel in OREINGOTS) {
+                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
                 foreach (var sprite in sprites) {
-                    myPanel.frame.Add(sprite);
+                    frame.Add(sprite);
                 }
-                myPanel.frame.Dispose();
+                frame.Dispose();
             }
             sprites.Clear();
         }
@@ -742,14 +719,14 @@ namespace IngameScript {
             List<IMyTextSurface> navigatorSurfaces = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
-            /*foreach (IMyCockpit cockpit in cockpits) {
+            foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
                     int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
                     navigatorSurfaces.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
                 }
-            }*/
+            }
             foreach (IMyTextPanel panel in panels) { navigatorSurfaces.Add(panel as IMyTextSurface); }
             foreach (var surface in navigatorSurfaces) {
                 NAVIGATOR.Add(new MyPanel(surface));
@@ -759,14 +736,14 @@ namespace IngameScript {
             PAINTER.Clear();
             List<IMyTextSurface> painterSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Painter"));
-            /*foreach (IMyCockpit cockpit in cockpits) {
+            foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
                     int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
                     painterSurfaces.Add(cockpit.GetSurface(cockpitTargetSurface));//0
                 }
-            }*/
+            }
             foreach (IMyTextPanel panel in panels) { painterSurfaces.Add(panel as IMyTextSurface); }
             foreach (var surface in painterSurfaces) {
                 PAINTER.Add(new MyPanel(surface));
@@ -777,14 +754,14 @@ namespace IngameScript {
             List<IMyTextSurface> powerSurfaces = new List<IMyTextSurface>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power"));
             foreach (IMyTextPanel panel in panels) { powerSurfaces.Add(panel as IMyTextSurface); }
-            /*foreach (IMyCockpit cockpit in cockpits) {
+            foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
                     int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
                     powerSurfaces.Add(cockpit.GetSurface(cockpitPowerSurface));//2
                 }
-            }*/
+            }
             foreach (var surface in powerSurfaces) {
                 POWER.Add(new MyPanel(surface));
             }
@@ -810,54 +787,34 @@ namespace IngameScript {
         }
 
         public class MyPanel {
-            public IMyTextSurface surface;
-            public MySpriteDrawFrame frame;
-            public RectangleF viewport;
-            public Vector2 margin;
-            public float minScale;
+            public readonly IMyTextSurface surface;
+            public readonly float minScale;
+            public readonly RectangleF col1_4;
+            public readonly RectangleF col2_4;
+            public readonly RectangleF col3_4;
+            public readonly RectangleF col4_4;
+            public readonly RectangleF col1_3;
+            public readonly RectangleF col2_3;
 
             public MyPanel(IMyTextSurface _surface) {
                 surface = _surface;
-                frame = _surface.DrawFrame();
-                viewport = new RectangleF((_surface.TextureSize - _surface.SurfaceSize) / 2f, _surface.SurfaceSize);
-                margin = new Vector2(20f, 20f);//_surface.SurfaceSize / 100f * 2f;
                 Vector2 scale = _surface.SurfaceSize / 512f;
                 minScale = Math.Min(scale.X, scale.Y);
+
+                col1_4 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 4f, new Vector2(surface.SurfaceSize.X / 4f, surface.SurfaceSize.Y));
+                col2_4 = new RectangleF(col1_4.X + (surface.SurfaceSize.X / 4f), col1_4.Y, col1_4.Width, col1_4.Height);
+                col3_4 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 4f, new Vector2(surface.SurfaceSize.X / 4f * 3f, surface.SurfaceSize.Y));
+                col4_4 = new RectangleF(col3_4.X + (surface.SurfaceSize.X / 4f * 3f), col3_4.Y, col3_4.Width, col3_4.Height);
+
+                col1_3 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 3f, new Vector2(surface.SurfaceSize.X / 3f, surface.SurfaceSize.Y));
+                col2_3 = new RectangleF(col1_3.X + (surface.SurfaceSize.X / 3f), col1_3.Y, col1_3.Width, col1_3.Height);
+
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = "";
                 surface.BackgroundColor = Color.Black;
                 surface.FontColor = new Color(0, 100, 0);
             }
         }
-
-        /*
-        WriteText(lcd, new Vector2(Right.X + Right.Width, Right.Y), "Write on the Right side", "Default", 1f, Color.Red, TextAlignment.RIGHT);
-        WriteText(lcd, new Vector2(Left.X + Left.Width, Left.Y), "Write on the Center Left", "Default", 1f, Color.Red, TextAlignment.RIGHT);
-        
-        /// <summary>
-        /// Draws a line of specified width and color between two points.
-        /// </summary>
-        void DrawLine(MySpriteDrawFrame frame, Vector2 point1, Vector2 point2, float width, Color color)
-        {
-            Vector2 position = 0.5f * (point1 + point2);
-            Vector2 diff = point1 - point2;
-            float length = diff.Length();
-            if (length > 0)
-                diff /= length;
-
-            Vector2 size = new Vector2(length, width);
-            float angle = (float)Math.Acos(Vector2.Dot(diff, Vector2.UnitX));
-            angle *= Math.Sign(Vector2.Dot(diff, Vector2.UnitY));
-
-            MySprite sprite = MySprite.CreateSprite("SquareSimple", position, size);
-            sprite.RotationOrScale = angle;
-            sprite.Color = color;
-            frame.Add(sprite);
-        }
-
-        Vector2 textureSize = surface.TextureSize;
-        Vector2 screenCenter = textureSize * 0.5f;
-        */
 
     }
 }
