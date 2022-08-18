@@ -701,83 +701,87 @@ namespace IngameScript {
         }
 
         public void DrawSpritesTabsOreIngots(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
-            Color transparentAzure = new Color(0, 0, 255, 20);
+            Color transparentBlue = new Color(0, 0, 255, 20);
+            Color tranparentMagenta = new Color(64, 0, 64, 20);
+            Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
+            Color neonAzure = new Color(0, 255, 255, 255);
+            Color tranparentNeonAzure = new Color(0, 100, 100, 20);
 
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -90f) * scale + centerPos, new Vector2(500f, 179f) * scale, new Color(64, 0, 64, 20), null, TextAlignment.CENTER, 0f)); // purple base
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 12f) * scale + centerPos, new Vector2(350f, 25f) * scale, new Color(64, 0, 64, 20), null, TextAlignment.CENTER, 0f)); // purple bottom corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 12f) * scale + centerPos, new Vector2(25f, 25f) * scale, new Color(64, 0, 64, 20), null, TextAlignment.CENTER, 1.5708f)); // purple bottom triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -192f) * scale + centerPos, new Vector2(275f, 25f) * scale, new Color(64, 0, 64, 20), null, TextAlignment.CENTER, 0f)); // purple top corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(25f, 25f) * scale, new Color(64, 0, 64, 20), null, TextAlignment.CENTER, 4.7124f)); // purple top triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -77f) * scale + centerPos, new Vector2(2f, 206f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // purple left line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -101f) * scale + centerPos, new Vector2(2f, 204f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // purple right line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 25f) * scale + centerPos, new Vector2(351f, 2f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // purple bottom line a
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 0f) * scale + centerPos, new Vector2(126f, 2f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // purple bottom line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 12f) * scale + centerPos, new Vector2(35f, 2f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 2.3562f)); // purple bottom line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -179f) * scale + centerPos, new Vector2(200f, 2f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // purple top line a
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -204f) * scale + centerPos, new Vector2(277f, 2f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // purple top line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, new Color(128, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // inv bar
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -90f) * scale + centerPos, new Vector2(500f, 179f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // purple base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 12f) * scale + centerPos, new Vector2(350f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 12f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 1.5708f)); // purple bottom triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -192f) * scale + centerPos, new Vector2(275f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // purple top corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // purple top triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -77f) * scale + centerPos, new Vector2(2f, 206f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -101f) * scale + centerPos, new Vector2(2f, 204f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 25f) * scale + centerPos, new Vector2(351f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 0f) * scale + centerPos, new Vector2(126f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 12f) * scale + centerPos, new Vector2(35f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3562f)); // purple bottom line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -179f) * scale + centerPos, new Vector2(200f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple top line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -204f) * scale + centerPos, new Vector2(277f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple top line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // inv bar
             if (cargoPercentage > 0d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(5f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 10
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(5f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 10
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(5f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 10
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(5f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 10
             }
             if (cargoPercentage > 10d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(20f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 20
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(20f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 20
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(20f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 20
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(20f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 20
             }
             if (cargoPercentage > 20d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 30
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 30
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 30
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 30
             }
             if (cargoPercentage > 30d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(50f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 40
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(50f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 40
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(50f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 40
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(50f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 40
             }
             if (cargoPercentage > 40d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(65f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 50
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(65f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 50
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(65f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 50
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(65f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 50
             }
             if (cargoPercentage > 50d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(80f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 60
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(80f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 60
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(80f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 60
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(80f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 60
             }
             if (cargoPercentage > 60d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(95f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 70
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(95f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 70
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(95f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 70
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(95f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 70
             }
             if (cargoPercentage > 70d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(110f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 80
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(110f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 80
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(110f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 80
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(110f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 80
             }
             if (cargoPercentage > 80d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 90
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 90
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 90
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 90
             }
             if (cargoPercentage > 90d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 100
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 100
             } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 100
+                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 100
             }
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 4.7124f)); // triangle6
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 4.7124f)); // triangle5
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 4.7124f)); // triangle4
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 4.7124f)); // triangle3
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 4.7124f)); // triangle2
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 4.7124f)); // triangle1
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, new Color(0, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // blue base
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 0f)); // blue line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 51f) * scale + centerPos, new Vector2(500f, 2f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 0f)); // blue line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 0f)); // blue line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, new Color(0, 0, 255, 20), null, TextAlignment.CENTER, 0f)); // blue line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 51f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
         }
 
         void GetBlocks() {
