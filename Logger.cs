@@ -762,7 +762,7 @@ namespace IngameScript {
             } else {
                 frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 90
             }
-            if (cargoPercentage > 80d) {
+            if (cargoPercentage > 90d) {
                 frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 255, 255, 255), null, TextAlignment.CENTER, 0f)); // inv 100
             } else {
                 frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, new Color(0, 100, 100, 20), null, TextAlignment.CENTER, 0f)); // inv 100
