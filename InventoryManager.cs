@@ -61,6 +61,7 @@ namespace IngameScript {
         double cargoPercentage = 0;
         int ticks = 0;
         int productionTicks = 0;
+        int messageTicks = 0;
 
         public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
         public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
@@ -291,10 +292,6 @@ namespace IngameScript {
                     SortCargos();
                 } else if (ticks == 7) {
                     ReadInventoryInfos();
-                } else if (ticks >= 9) {
-                    if (logger) {
-                        SendBroadcastMessage();
-                    }
                     ticks = -1;
                 }
                 ticks++;
@@ -309,6 +306,14 @@ namespace IngameScript {
                     productionTicks = -1;
                 }
                 productionTicks++;
+
+                if (logger) {
+                    if (messageTicks >= 40) {
+                        SendBroadcastMessage();
+                        messageTicks = 0;
+                    }
+                    messageTicks++;
+                }
 
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;

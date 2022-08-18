@@ -262,7 +262,7 @@ namespace IngameScript {
                 }
 
                 if (logger) {
-                    if (sendMessageCount >= 10) {
+                    if (sendMessageCount >= 40) {
                         SendBroadcastLogMessage();
                         sendMessageCount = 0;
                     }
@@ -800,7 +800,7 @@ namespace IngameScript {
         }
 
         void SendBroadcastLogMessage() {
-            if (targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+            if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                 StringBuilder missileLog = new StringBuilder("");
                 foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
                     missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");//(info)"command=" + command + ",status=" + status + ",type=" + type;

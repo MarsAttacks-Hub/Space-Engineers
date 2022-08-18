@@ -99,7 +99,7 @@ namespace IngameScript {
             GetBlocks();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[LOGGER]");
             //BROADCASTLISTENER.SetMessageCallback();
-            Me.GetSurface(0).BackgroundColor = logger ? new Color(25, 0, 50) : new Color(0, 0, 0);
+            Me.GetSurface(0).BackgroundColor = logger ? new Color(25, 0, 100) : new Color(0, 0, 0);
             stateMachine = RunOverTime();
         }
 
@@ -114,7 +114,7 @@ namespace IngameScript {
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                         return;
                     } else {
-                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 50);
+                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
                         Runtime.UpdateFrequency = UpdateFrequency.Update100;
                     }
                 } else {

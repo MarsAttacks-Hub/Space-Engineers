@@ -266,7 +266,7 @@ namespace IngameScript {
                 ManageMagneticDrive(needControl, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity, myVelocity, mySpeed);
 
                 if (logger) {
-                    if (sendMessageCount >= 10) {
+                    if (sendMessageCount >= 40) {
                         SendBroadcastLogMessage();
                         sendMessageCount = 0;
                     }
@@ -1531,16 +1531,58 @@ namespace IngameScript {
         }
 
         void SetSensorsExtend() {
-            if (UPSENSOR != null) { UPSENSOR.LeftExtend = 30f; UPSENSOR.RightExtend = 30f; UPSENSOR.BottomExtend = 28.5f; UPSENSOR.TopExtend = 40f; BACKWARDSENSOR.BackExtend = 0.1f; UPSENSOR.FrontExtend = 50f; }
-            if (DOWNSENSOR != null) { DOWNSENSOR.LeftExtend = 30f; DOWNSENSOR.RightExtend = 30f; DOWNSENSOR.BottomExtend = 38.5f; DOWNSENSOR.TopExtend = 30f; DOWNSENSOR.BackExtend = 5f; DOWNSENSOR.FrontExtend = 50f; }
-            if (FORWARDSENSOR != null) { FORWARDSENSOR.LeftExtend = 30f; FORWARDSENSOR.RightExtend = 30f; FORWARDSENSOR.BottomExtend = 12.5f; FORWARDSENSOR.TopExtend = 8.5f; FORWARDSENSOR.BackExtend = 50f; FORWARDSENSOR.FrontExtend = 0.1f; }
-            if (BACKWARDSENSOR != null) { BACKWARDSENSOR.LeftExtend = 30f; BACKWARDSENSOR.RightExtend = 30f; BACKWARDSENSOR.BottomExtend = 15f; BACKWARDSENSOR.TopExtend = 6f; BACKWARDSENSOR.BackExtend = 0.1f; BACKWARDSENSOR.FrontExtend = 50f; }
-            if (LEFTSENSOR != null) { LEFTSENSOR.LeftExtend = 33f; LEFTSENSOR.RightExtend = 36f; LEFTSENSOR.BottomExtend = 7.5f; LEFTSENSOR.TopExtend = 13.5f; LEFTSENSOR.BackExtend = 0.1f; LEFTSENSOR.FrontExtend = 50f; }
-            if (RIGHTSENSOR != null) { RIGHTSENSOR.LeftExtend = 36f; RIGHTSENSOR.RightExtend = 33f; RIGHTSENSOR.BottomExtend = 7.5f; RIGHTSENSOR.TopExtend = 13.5f; RIGHTSENSOR.BackExtend = 0.1f; RIGHTSENSOR.FrontExtend = 50f; }
+            if (UPSENSOR != null) {
+                UPSENSOR.LeftExtend = 36f;
+                UPSENSOR.RightExtend = 36f;
+                UPSENSOR.BottomExtend = 28.5f;
+                UPSENSOR.TopExtend = 42f;
+                BACKWARDSENSOR.BackExtend = 0.1f;
+                UPSENSOR.FrontExtend = 50f;
+            }
+            if (DOWNSENSOR != null) {
+                DOWNSENSOR.LeftExtend = 36f;
+                DOWNSENSOR.RightExtend = 36f;
+                DOWNSENSOR.BottomExtend = 43.5f;
+                DOWNSENSOR.TopExtend = 27f;
+                DOWNSENSOR.BackExtend = 0.1f;
+                DOWNSENSOR.FrontExtend = 50f;
+            }
+            if (FORWARDSENSOR != null) {
+                FORWARDSENSOR.LeftExtend = 36f;
+                FORWARDSENSOR.RightExtend = 36f;
+                FORWARDSENSOR.BottomExtend = 16f;
+                FORWARDSENSOR.TopExtend = 11f;
+                FORWARDSENSOR.BackExtend = 50f;
+                FORWARDSENSOR.FrontExtend = 0.1f;
+            }
+            if (BACKWARDSENSOR != null) {
+                BACKWARDSENSOR.LeftExtend = 36f;
+                BACKWARDSENSOR.RightExtend = 36f;
+                BACKWARDSENSOR.BottomExtend = 18f;
+                BACKWARDSENSOR.TopExtend = 8.5f;
+                BACKWARDSENSOR.BackExtend = 0.1f;
+                BACKWARDSENSOR.FrontExtend = 50f;
+            }
+            if (LEFTSENSOR != null) {
+                LEFTSENSOR.LeftExtend = 33.5f;
+                LEFTSENSOR.RightExtend = 37f;
+                LEFTSENSOR.BottomExtend = 13f;
+                LEFTSENSOR.TopExtend = 13.5f;
+                LEFTSENSOR.BackExtend = 0.1f;
+                LEFTSENSOR.FrontExtend = 50f;
+            }
+            if (RIGHTSENSOR != null) {
+                RIGHTSENSOR.LeftExtend = 37f;
+                RIGHTSENSOR.RightExtend = 33.5f;
+                RIGHTSENSOR.BottomExtend = 13f;
+                RIGHTSENSOR.TopExtend = 13.5f;
+                RIGHTSENSOR.BackExtend = 0.1f;
+                RIGHTSENSOR.FrontExtend = 50f;
+            }
         }
 
         void SetSensorsStopDistance(float stopDistance) {
-            stopDistance += 250f;
+            stopDistance += 250f;//TODO
             if (UPSENSOR != null && stopDistance < UPSENSOR.MaxRange) {
                 if (UPSENSOR != null) { UPSENSOR.FrontExtend = stopDistance; }
                 if (DOWNSENSOR != null) { DOWNSENSOR.FrontExtend = stopDistance; }
@@ -1653,17 +1695,17 @@ namespace IngameScript {
             ROTORSINV.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyMotorStator>(ROTORSINV, block => block.CustomName.Contains("Rotor_MD_B"));
             MERGESPLUSX.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSX, block => block.CustomName.Contains("Merge_MD-X"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSX, block => block.CustomName.Contains("Merge_MD+X"));
             MERGESPLUSY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSY, block => block.CustomName.Contains("Merge_MD+Z"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSY, block => block.CustomName.Contains("Merge_MD+Y"));
             MERGESPLUSZ.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSZ, block => block.CustomName.Contains("Merge_MD+Y"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSZ, block => block.CustomName.Contains("Merge_MD+Z"));
             MERGESMINUSX.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSX, block => block.CustomName.Contains("Merge_MD+X"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSX, block => block.CustomName.Contains("Merge_MD-X"));
             MERGESMINUSY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSY, block => block.CustomName.Contains("Merge_MD-Z"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSY, block => block.CustomName.Contains("Merge_MD-Y"));
             MERGESMINUSZ.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains("Merge_MD-Y"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains("Merge_MD-Z"));
             LCDSAFETYDAMPENERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Safety Dampeners") as IMyTextPanel;
             LCDIDLETHRUSTERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Thrusters") as IMyTextPanel;
             LCDSUNALIGN = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Sun Align") as IMyTextPanel;
@@ -1677,7 +1719,7 @@ namespace IngameScript {
             LCDMODDEDSENSOR = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Modded Sensor") as IMyTextPanel;
             LCDCLOSECOMBAT = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Close Combat") as IMyTextPanel;
             SENSORS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(SENSORS, block => block.CustomName.Contains("[CRX] Sensor"));
+            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(SENSORS, block => block.CustomName.Contains("[CRX] Sensor Obstacles"));
             foreach (IMySensorBlock sensor in SENSORS) {
                 if (sensor.CustomName.Contains("UP")) { UPSENSOR = sensor; } else if (sensor.CustomName.Contains("DOWN")) { DOWNSENSOR = sensor; } else if (sensor.CustomName.Contains("LEFT")) { LEFTSENSOR = sensor; } else if (sensor.CustomName.Contains("RIGHT")) { RIGHTSENSOR = sensor; } else if (sensor.CustomName.Contains("FORWARD")) { FORWARDSENSOR = sensor; } else if (sensor.CustomName.Contains("BACKWARD")) { BACKWARDSENSOR = sensor; }
             }

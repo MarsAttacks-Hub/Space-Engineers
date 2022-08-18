@@ -270,7 +270,7 @@ namespace IngameScript {
                 SyncGuns(timeSinceLastRun);
 
                 if (logger) {
-                    if (sendMessageCount >= 10) {
+                    if (sendMessageCount >= 40) {
                         SendBroadcastLogRangeFinderMessage();
                         SendBroadcastLogTargetMessage();
                         sendMessageCount = 0;
@@ -374,7 +374,7 @@ namespace IngameScript {
         }
 
         void SendBroadcastLogTargetMessage() {
-            if (targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
+            if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                 Vector3D targetVelocity = targetInfo.Velocity;
                 var tuple = MyTuple.Create(
                     MyTuple.Create(targetInfo.Name, targetInfo.HitPosition.Value, targetInfo.Position, targetVelocity),
@@ -1250,17 +1250,17 @@ namespace IngameScript {
             ROTORSINV.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyMotorStator>(ROTORSINV, block => block.CustomName.Contains("Rotor_MD_B"));
             MERGESPLUSX.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSX, block => block.CustomName.Contains("Merge_MD-X"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSX, block => block.CustomName.Contains("Merge_MD+X"));
             MERGESPLUSY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSY, block => block.CustomName.Contains("Merge_MD+Z"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSY, block => block.CustomName.Contains("Merge_MD+Y"));
             MERGESPLUSZ.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSZ, block => block.CustomName.Contains("Merge_MD+Y"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESPLUSZ, block => block.CustomName.Contains("Merge_MD+Z"));
             MERGESMINUSX.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSX, block => block.CustomName.Contains("Merge_MD+X"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSX, block => block.CustomName.Contains("Merge_MD-X"));
             MERGESMINUSY.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSY, block => block.CustomName.Contains("Merge_MD-Z"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSY, block => block.CustomName.Contains("Merge_MD-Y"));
             MERGESMINUSZ.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains("Merge_MD-Y"));//TODO
+            GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGESMINUSZ, block => block.CustomName.Contains("Merge_MD-Z"));
             GATLINGS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(GATLINGS, b => b.CustomName.Contains("[CRX] Gatling Gun"));
             AUTOCANNONS.Clear();

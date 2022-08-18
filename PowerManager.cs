@@ -103,7 +103,7 @@ namespace IngameScript {
                 PowerFlow();
 
                 if (logger) {
-                    if (sendCount == 10) {
+                    if (sendCount >= 40) {
                         SendBroadcastMessage();
                         sendCount = 0;
                     }
