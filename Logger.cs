@@ -53,7 +53,8 @@ namespace IngameScript {
         float battsCurrentOutput;
         float battsMaxOutput;
         //int batteriesCount;
-        string battsCurrentStoredPower;
+        float battsCurrentStoredPower;
+        float battsMaxStoredPower;
         float reactorsCurrentOutput;
         float reactorsMaxOutput;
         //int reactorsCount;
@@ -262,7 +263,7 @@ namespace IngameScript {
                 >) {
                     var data = (MyTuple<
                         MyTuple<string, float, float>,
-                        MyTuple<float, float, float, int, string>,
+                        MyTuple<float, float, float, int, float, float>,
                         MyTuple<float, float, int>,
                         MyTuple<float, float, int>,
                         MyTuple<float, int, float, int>,
@@ -277,6 +278,7 @@ namespace IngameScript {
                     battsMaxOutput = data.Item2.Item3;
                     //batteriesCount = data.Item2.Item4;
                     battsCurrentStoredPower = data.Item2.Item5;
+                    battsMaxStoredPower = data.Item2.Item6;
                     reactorsCurrentOutput = data.Item3.Item1;
                     reactorsMaxOutput = data.Item3.Item2;
                     //reactorsCount = data.Item3.Item3;
@@ -487,7 +489,7 @@ namespace IngameScript {
                 data2.Append($"{powerStatus}\n"
                     + $"{terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
                     + $"{battsCurrentOutput:0.0}/{battsMaxOutput:0.0}\n"
-                    + $"{battsCurrentStoredPower}\n"
+                    + $"{battsCurrentStoredPower}/{battsMaxStoredPower}\n"
                     + $"{reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
                     + $"{hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
                     + $"{solarMaxOutput:0.0}\n"

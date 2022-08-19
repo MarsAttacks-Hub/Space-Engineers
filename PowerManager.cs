@@ -38,7 +38,8 @@ namespace IngameScript {
         float battsCurrentInput;
         float battsCurrentOutput;
         float battsMaxOutput;
-        public List<float> battsCurrentStoredPower = new List<float>();
+        float battsCurrentStoredPower;
+        float battsMaxStoredPower;
 
         float reactorsCurrentOutput;
         float reactorsMaxOutput;
@@ -281,13 +282,15 @@ namespace IngameScript {
         }
 
         void GetBatteriesCurrentInOut() {
-            battsCurrentStoredPower.Clear();
+            battsCurrentStoredPower = 0f;
+            battsMaxStoredPower = 0f;
             battsCurrentInput = 0f;
             battsCurrentOutput = 0f;
             foreach (IMyBatteryBlock block in BATTERIES) {
                 battsCurrentInput += block.CurrentInput;
                 battsCurrentOutput += block.CurrentOutput;
-                battsCurrentStoredPower.Add(block.CurrentStoredPower);
+                battsCurrentStoredPower += block.CurrentStoredPower;
+                battsMaxStoredPower += block.MaxStoredPower;
             }
         }
 
@@ -329,19 +332,9 @@ namespace IngameScript {
         }
 
         void SendBroadcastMessage() {
-            StringBuilder battStoredPow = new StringBuilder("");
-            int count = 1;
-            foreach (float pow in battsCurrentStoredPower) {
-                if (count == battsCurrentStoredPower.Count) {
-                    battStoredPow.Append($"{pow:0.0}");
-                } else {
-                    battStoredPow.Append($"{pow:0.0},");
-                }
-                count++;
-            }
             var tuple = MyTuple.Create(
                 MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput),
-                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battStoredPow.ToString()),
+                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battsCurrentStoredPower, battsMaxStoredPower),
                 MyTuple.Create(reactorsCurrentOutput, reactorsMaxOutput, REACTORS.Count),
                 MyTuple.Create(hEngCurrentOutput, hEngMaxOutput, HENGINES.Count),
                 MyTuple.Create(solarMaxOutput, SOLARS.Count, turbineMaxOutput, TURBINES.Count),
