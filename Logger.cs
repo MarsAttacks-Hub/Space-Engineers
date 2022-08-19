@@ -23,6 +23,7 @@ namespace IngameScript {
 
         //LOGGER
         bool logger = true;
+        bool beautifyLog = true;
 
         bool navigator = false;
         bool power = false;
@@ -92,7 +93,7 @@ namespace IngameScript {
         public StringBuilder data5 = new StringBuilder("");
 
         Program() {
-            Runtime.UpdateFrequency |= UpdateFrequency.Update100;
+            Runtime.UpdateFrequency |= UpdateFrequency.Update10;
             Setup();
         }
 
@@ -116,10 +117,10 @@ namespace IngameScript {
                         return;
                     } else {
                         Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
-                        Runtime.UpdateFrequency = UpdateFrequency.Update100;
+                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     }
                 } else {
-                    if ((updateType & UpdateType.Update100) == UpdateType.Update100) {
+                    if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
                         RunStateMachine();
                     }
                 }
@@ -141,23 +142,36 @@ namespace IngameScript {
             yield return true;
 
             if (navigator) {
-                LogNavigator();
+                foreach (MyPanel myPanel in NAVIGATOR) {
+                    LogNavigator(myPanel);
+                    yield return true;
+                }
                 navigator = false;
-                yield return true;
             }
 
-            LogPainter();
-            yield return true;
+            foreach (MyPanel myPanel in PAINTER) {
+                LogPainter(myPanel);
+                yield return true;
+            }
 
             if (power) {
-                LogPower();
+                foreach (MyPanel myPanel in POWER) {
+                    LogPower(myPanel);
+                    yield return true;
+                }
                 power = false;
-                yield return true;
             }
+
             if (inventory) {
-                LogInventory();
+                foreach (MyPanel myPanel in COMPONENTSAMMO) {
+                    LogComponentsAmmo(myPanel);
+                    yield return true;
+                }
+                foreach (MyPanel myPanel in OREINGOTS) {
+                    LogOreIngots(myPanel);
+                    yield return true;
+                }
                 inventory = false;
-                yield return true;
             }
         }
 
@@ -165,7 +179,7 @@ namespace IngameScript {
             if (stateMachine != null) {
                 bool hasMoreSteps = stateMachine.MoveNext();
                 if (hasMoreSteps) {
-                    Runtime.UpdateFrequency |= UpdateFrequency.Update100;
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
                 } else {
                     Echo($"Dispose");
 
@@ -185,6 +199,9 @@ namespace IngameScript {
                     break;
                 case "LoggerOff":
                     logger = false;
+                    break;
+                case "ToggleBeautify":
+                    beautifyLog = !beautifyLog;
                     break;
             }
         }
@@ -255,7 +272,7 @@ namespace IngameScript {
                 //POWERMANAGER
                 else if (igcMessage.Data is MyTuple<
                     MyTuple<string, float, float>,
-                    MyTuple<float, float, float, int, string>,
+                    MyTuple<float, float, float, int, float, float>,
                     MyTuple<float, float, int>,
                     MyTuple<float, float, int>,
                     MyTuple<float, int, float, int>,
@@ -340,355 +357,356 @@ namespace IngameScript {
             }
         }
 
-        void LogNavigator() {
+        void LogNavigator(MyPanel myPanel) {
             Echo($"LogNavigator");
 
-            foreach (MyPanel myPanel in NAVIGATOR) {
-                timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
-                data.Append($"\n"
-                    + $"Reload Time: \n"
-                    + $"Power: \n"
-                    + $"Jump: \n"
-                    + $"Max Jump: \n");
+            timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
+            data.Append($"\n"
+                + $"Reload Time: \n"
+                + $"Power: \n"
+                + $"Jump: \n"
+                + $"Max Jump: \n");
 
-                data.Append($"\n"
-                    + $"Name: \n"
-                    + $"Distance: \n"
-                    + $"Diameter: \n"
-                    + $"Position ");
+            data.Append($"\n"
+                + $"Name: \n"
+                + $"Distance: \n"
+                + $"Diameter: \n"
+                + $"Position ");
 
+            data2.Append($"\n"
+                + $"{timeRemaining}s\n"
+                + $"{currentStoredPower:0.0}/{maxStoredPower:0.0}\n"
+                + $"{currentJump:000,000,000} ({totJumpPercent:0.0}%)\n"
+                + $"{maxJump:000,000,000}\n");
+
+            if (!Vector3D.IsZero(rangeFinderPosition)) {
                 data2.Append($"\n"
-                    + $"{timeRemaining}s\n"
-                    + $"{currentStoredPower:0.0}/{maxStoredPower:0.0}\n"
-                    + $"{currentJump:000,000,000} ({totJumpPercent:0.0}%)\n"
-                    + $"{maxJump:000,000,000}\n");
-
-                if (!Vector3D.IsZero(rangeFinderPosition)) {
-                    data2.Append($"\n"
-                   + $"{rangeFinderName}\n"
-                   + $"{(int)rangeFinderDistance}\n"
-                   + $"{(int)rangeFinderDiameter}\n"
-                   + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
-                } else {
-                    data2.Append($"\n\n\n\n");
-                }
-
-                data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
-
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
-
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
-
-                data.Clear();
-                data2.Clear();
-                data3.Clear();
-
-                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-                foreach (var sprite in sprites) {
-                    frame.Add(sprite);
-                }
-                frame.Dispose();
-                sprites.Clear();
+                + $"{rangeFinderName}\n"
+                + $"{(int)rangeFinderDistance}\n"
+                + $"{(int)rangeFinderDiameter}\n"
+                + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
+            } else {
+                data2.Append($"\n\n\n\n");
             }
+
+            data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+
+            data.Clear();
+            data2.Clear();
+            data3.Clear();
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
         }
 
-        void LogPainter() {
+        void LogPainter(MyPanel myPanel) {
             Echo($"LogPainter");
 
-            foreach (MyPanel myPanel in PAINTER) {
-                data5.Append($"PAINTER");
+            data5.Append($"PAINTER");
 
-                data.Append($"\n"
-                    + $"Name:\n"
-                    + $"Velocity:\n"
-                    + $"Position:\n");
+            data.Append($"\n"
+                + $"Name:\n"
+                + $"Velocity:\n"
+                + $"Position:\n");
 
-                data3.Append($"\n"
-                    + $"\n"
-                    + $"Distance:\n"
-                    + $"\n");
+            data3.Append($"\n"
+                + $"\n"
+                + $"Distance:\n"
+                + $"\n");
 
-                if (!Vector3D.IsZero(targetPosition)) {
-                    data2.Append($"\n"
-                    + $"{targetName}\n"
-                    + $"{targetVelocity.Length():0.0}\n"
-                    + $"X:{targetPosition.X:0.0}, Y:{targetPosition.Y:0.0}, Z:{targetPosition.Z:0.0}\n");
-
-                    data4.Append($"\n"
-                    + $"\n"
-                    + $"{targetDistance:0.0}\n"
-                    + $"\n");
-                } else {
-                    data2.Append($"\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"\n");
-
-                    data4.Append($"\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"\n");
-                }
-
-                if (missilesLog.Count != 0) { data5.Append($"\n\n\nMISSILES\n"); }
-                foreach (MyTuple<string, string, string, string, string> log in missilesLog) {//toTarget=Item1,speed=Item2,command=command,status=status,type=type\n
-                    data.Append($"\n");
-                    data.Append($"Speed:\n");
-                    data.Append($"Status:\n");
-
-                    data2.Append($"{log.Item5}\n");
-                    data2.Append($"{log.Item2}\n");
-                    data2.Append($"{log.Item4}\n");
-
-                    data3.Append($"To Target:\n");
-                    data3.Append($"Command:\n");
-                    data3.Append($"\n");
-
-                    data4.Append($"{log.Item1}\n");
-                    data4.Append($"{log.Item3}\n");
-                    data4.Append($"\n");
-                }
-
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
-
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
-
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
-
-                data.Clear();
-                data2.Clear();
-                data3.Clear();
-                data4.Clear();
-                data5.Clear();
-
-                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-                foreach (var sprite in sprites) {
-                    frame.Add(sprite);
-                }
-                frame.Dispose();
-                sprites.Clear();
-            }
-        }
-
-        void LogPower() {
-            Echo($"LogPower");
-
-            foreach (MyPanel myPanel in POWER) {
-                data.Append($"Status: \n"
-                    + $"Pow.: \n"
-                    + $"Batt. Out: \n"
-                    + $"Batt. Pow: \n"
-                    + $"Reactors: \n"
-                    + $"H2: \n"
-                    + $"Solar: \n"
-                    + $"H2 Tank: \n");
-
-                data2.Append($"{powerStatus}\n"
-                    + $"{terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
-                    + $"{battsCurrentOutput:0.0}/{battsMaxOutput:0.0}\n"
-                    + $"{battsCurrentStoredPower}/{battsMaxStoredPower}\n"
-                    + $"{reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
-                    + $"{hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
-                    + $"{solarMaxOutput:0.0}\n"
-                    + $"{tankCapacityPercent:0.0}%\n");
-
-                data3.Append($"\n"
-                    + $"\n"
-                    + $"In: \n"
-                    + $"\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"Turbines: \n");
+            if (!Vector3D.IsZero(targetPosition)) {
+                data2.Append($"\n"
+                + $"{targetName}\n"
+                + $"{targetVelocity.Length():0.0}\n"
+                + $"X:{targetPosition.X:0.0}, Y:{targetPosition.Y:0.0}, Z:{targetPosition.Z:0.0}\n");
 
                 data4.Append($"\n"
-                    + $"\n"
-                    + $"{battsCurrentInput:0.0}\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"\n"
-                    + $"{turbineMaxOutput:0.0}\n");
+                + $"\n"
+                + $"{targetDistance:0.0}\n"
+                + $"\n");
+            } else {
+                data2.Append($"\n"
+                + $"\n"
+                + $"\n"
+                + $"\n");
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
-
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
-
-                data.Clear();
-                data2.Clear();
-                data3.Clear();
-                data4.Clear();
-
-                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-                foreach (var sprite in sprites) {
-                    frame.Add(sprite);
-                }
-                frame.Dispose();
-                sprites.Clear();
+                data4.Append($"\n"
+                + $"\n"
+                + $"\n"
+                + $"\n");
             }
+
+            if (missilesLog.Count != 0) { data5.Append($"\n\n\nMISSILES\n"); }
+            foreach (MyTuple<string, string, string, string, string> log in missilesLog) {//toTarget=Item1,speed=Item2,command=command,status=status,type=type\n
+                data.Append($"\n");
+                data.Append($"Speed:\n");
+                data.Append($"Status:\n");
+
+                data2.Append($"{log.Item5}\n");
+                data2.Append($"{log.Item2}\n");
+                data2.Append($"{log.Item4}\n");
+
+                data3.Append($"To Target:\n");
+                data3.Append($"Command:\n");
+                data3.Append($"\n");
+
+                data4.Append($"{log.Item1}\n");
+                data4.Append($"{log.Item3}\n");
+                data4.Append($"\n");
+            }
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+
+            data.Clear();
+            data2.Clear();
+            data3.Clear();
+            data4.Clear();
+            data5.Clear();
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
         }
 
-        void LogInventory() {
-            Echo($"LogInventory");
+        void LogPower(MyPanel myPanel) {
+            Echo($"LogPower");
 
-            foreach (MyPanel myPanel in COMPONENTSAMMO) {
-                data5.Append($"COMPONENTS\n\n\n\n\n\n\n\n\n\n\n\n\nAMMO");
+            data.Append($"Status: \n"
+                + $"Pow.: \n"
+                + $"Batt. Out: \n"
+                + $"Batt. Pow: \n"
+                + $"Reactors: \n"
+                + $"H2: \n"
+                + $"Solar: \n"
+                + $"H2 Tank: \n");
 
-                data.Append($"\n");
-                data2.Append($"\n");
-                data3.Append($"\n");
-                data4.Append($"\n");
+            data2.Append($"{powerStatus}\n"
+                + $"{terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
+                + $"{battsCurrentOutput:0.0}/{battsMaxOutput:0.0}\n"
+                + $"{battsCurrentStoredPower}/{battsMaxStoredPower}\n"
+                + $"{reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
+                + $"{hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
+                + $"{solarMaxOutput:0.0}\n"
+                + $"{tankCapacityPercent:0.0}%\n");
 
-                bool alternate = true;
-                foreach (var log in componentsLogDict) {
-                    if (alternate) {
-                        data.Append($"{log.Key}: \n");
-                        alternate = false;
-                    } else {
-                        data3.Append($"{log.Key.Replace("RadioCommunication", "RadioComm.")}: \n");
-                        alternate = true;
-                    }
+            data3.Append($"\n"
+                + $"\n"
+                + $"In: \n"
+                + $"\n"
+                + $"\n"
+                + $"\n"
+                + $"Turbines: \n");
+
+            data4.Append($"\n"
+                + $"\n"
+                + $"{battsCurrentInput:0.0}\n"
+                + $"\n"
+                + $"\n"
+                + $"\n"
+                + $"{turbineMaxOutput:0.0}\n");
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+
+            data.Clear();
+            data2.Clear();
+            data3.Clear();
+            data4.Clear();
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
+                DrawSpritesTabsPower(frame, myPanel.viewport.Center);//TODO
+            }
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
+        }
+
+        void LogComponentsAmmo(MyPanel myPanel) {
+            Echo($"LogComponentsAmmo");
+
+            data5.Append($"COMPONENTS\n\n\n\n\n\n\n\n\n\n\n\n\nAMMO");
+
+            data.Append($"\n");
+            data2.Append($"\n");
+            data3.Append($"\n");
+            data4.Append($"\n");
+
+            bool alternate = true;
+            foreach (var log in componentsLogDict) {
+                if (alternate) {
+                    data.Append($"{log.Key}: \n");
+                    alternate = false;
+                } else {
+                    data3.Append($"{log.Key.Replace("RadioCommunication", "RadioComm.")}: \n");
+                    alternate = true;
                 }
-                alternate = true;
-                foreach (var log in componentsLogDict) {
-                    if (alternate) {
-                        data2.Append($"{log.Value}\n");
-                        alternate = false;
-                    } else {
-                        data4.Append($"{log.Value}\n");
-                        alternate = true;
-                    }
+            }
+            alternate = true;
+            foreach (var log in componentsLogDict) {
+                if (alternate) {
+                    data2.Append($"{log.Value}\n");
+                    alternate = false;
+                } else {
+                    data4.Append($"{log.Value}\n");
+                    alternate = true;
                 }
+            }
 
-                data.Append($"\n");
-                data2.Append($"\n");
-                data3.Append($"\n\n");
-                data4.Append($"\n\n");
+            data.Append($"\n");
+            data2.Append($"\n");
+            data3.Append($"\n\n");
+            data4.Append($"\n\n");
 
-                alternate = true;
-                foreach (var log in ammoLogDict) {
-                    if (alternate) {
-                        data.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "")}: \n");
-                        alternate = false;
-                    } else {
-                        data3.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "")}: \n");
-                        alternate = true;
-                    }
+            alternate = true;
+            foreach (var log in ammoLogDict) {
+                if (alternate) {
+                    data.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "")}: \n");
+                    alternate = false;
+                } else {
+                    data3.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "")}: \n");
+                    alternate = true;
                 }
-                alternate = true;
-                foreach (var log in ammoLogDict) {
-                    if (alternate) {
-                        data2.Append($"{log.Value}\n");
-                        alternate = false;
-                    } else {
-                        data4.Append($"{log.Value}\n");
-                        alternate = true;
-                    }
+            }
+            alternate = true;
+            foreach (var log in ammoLogDict) {
+                if (alternate) {
+                    data2.Append($"{log.Value}\n");
+                    alternate = false;
+                } else {
+                    data4.Append($"{log.Value}\n");
+                    alternate = true;
                 }
+            }
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, new Color(25, 0, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, new Color(25, 0, 100), TextAlignment.RIGHT));
 
-                data.Clear();
-                data2.Clear();
-                data3.Clear();
-                data4.Clear();
-                data5.Clear();
+            data.Clear();
+            data2.Clear();
+            data3.Clear();
+            data4.Clear();
+            data5.Clear();
 
-                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
                 DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center);//TODO
-                foreach (var sprite in sprites) {
-                    frame.Add(sprite);
+            }
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
+        }
+
+        void LogOreIngots(MyPanel myPanel) {
+            Echo($"LogOreIngots");
+
+            data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
+
+            data.Append($"Cargo:\n\n");
+            data2.Append($"{cargoPercentage:0.0}%\n\n");
+            data3.Append($"\n\n");
+            data4.Append($"\n\n");
+
+            bool alternate = true;
+            foreach (var log in oreLogDict) {
+                if (alternate) {
+                    data.Append($"{log.Key}: \n");
+                    alternate = false;
+                } else {
+                    data3.Append($"{log.Key}: \n");
+                    alternate = true;
                 }
-                frame.Dispose();
-                sprites.Clear();
+            }
+            alternate = true;
+            foreach (var log in oreLogDict) {
+                if (alternate) {
+                    data2.Append($"{log.Value}\n");
+                    alternate = false;
+                } else {
+                    data4.Append($"{log.Value}\n");
+                    alternate = true;
+                }
             }
 
-            foreach (MyPanel myPanel in OREINGOTS) {
-                data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
+            data.Append($"\n");
+            data2.Append($"\n");
+            data3.Append($"\n\n");
+            data4.Append($"\n\n");
 
-                data.Append($"Cargo:\n\n");
-                data2.Append($"{cargoPercentage:0.0}%\n\n");
-                data3.Append($"\n\n");
-                data4.Append($"\n\n");
-
-                bool alternate = true;
-                foreach (var log in oreLogDict) {
-                    if (alternate) {
-                        data.Append($"{log.Key}: \n");
-                        alternate = false;
-                    } else {
-                        data3.Append($"{log.Key}: \n");
-                        alternate = true;
-                    }
+            alternate = true;
+            foreach (var log in ingotsLogDict) {
+                if (alternate) {
+                    data.Append($"{log.Key}: \n");
+                    alternate = false;
+                } else {
+                    data3.Append($"{log.Key}: \n");
+                    alternate = true;
                 }
-                alternate = true;
-                foreach (var log in oreLogDict) {
-                    if (alternate) {
-                        data2.Append($"{log.Value}\n");
-                        alternate = false;
-                    } else {
-                        data4.Append($"{log.Value}\n");
-                        alternate = true;
-                    }
+            }
+            alternate = true;
+            foreach (var log in ingotsLogDict) {
+                if (alternate) {
+                    data2.Append($"{log.Value}\n");
+                    alternate = false;
+                } else {
+                    data4.Append($"{log.Value}\n");
+                    alternate = true;
                 }
+            }
 
-                data.Append($"\n");
-                data2.Append($"\n");
-                data3.Append($"\n\n");
-                data4.Append($"\n\n");
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                alternate = true;
-                foreach (var log in ingotsLogDict) {
-                    if (alternate) {
-                        data.Append($"{log.Key}: \n");
-                        alternate = false;
-                    } else {
-                        data3.Append($"{log.Key}: \n");
-                        alternate = true;
-                    }
-                }
-                alternate = true;
-                foreach (var log in ingotsLogDict) {
-                    if (alternate) {
-                        data2.Append($"{log.Value}\n");
-                        alternate = false;
-                    } else {
-                        data4.Append($"{log.Value}\n");
-                        alternate = true;
-                    }
-                }
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            data.Clear();
+            data2.Clear();
+            data3.Clear();
+            data4.Clear();
+            data5.Clear();
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
-
-                data.Clear();
-                data2.Clear();
-                data3.Clear();
-                data4.Clear();
-                data5.Clear();
-
-                MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
                 DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center);//TODO
-                foreach (var sprite in sprites) {
-                    frame.Add(sprite);
-                }
-                frame.Dispose();
-                sprites.Clear();
             }
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
         }
 
         MySprite DrawSpriteText(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
@@ -819,95 +837,173 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 181f) * scale + centerPos, new Vector2(2f, 113f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta left line
         }
 
+        public void DrawSpritesTabsPower(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+            Color transparentNeonAzure = new Color(0, 255, 255, 20);
+            Color tranparentMagenta = new Color(64, 0, 64, 20);
+            Color tranparentBlue = new Color(0, 0, 255, 20);
+            Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
+
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -120f) * scale + centerPos, new Vector2(500f, 240f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -240f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // top line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 0f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // bottom line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar6
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar5
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar4
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar3
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar2
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar1
+
+            if (tankCapacityPercent > 0d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_10
+            if (tankCapacityPercent > 10d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_20
+            if (tankCapacityPercent > 20d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_30
+            if (tankCapacityPercent > 30d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_40
+            if (tankCapacityPercent > 40d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_50
+            if (tankCapacityPercent > 50d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_60
+            if (tankCapacityPercent > 60d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_70
+            if (tankCapacityPercent > 70d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_80
+            if (tankCapacityPercent > 80d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_90
+            if (tankCapacityPercent > 90d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_100
+
+            if (hEngMaxOutput != 0f) {
+                float hEngPercent = hEngCurrentOutput / hEngMaxOutput * 100f;
+                if (hEngPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_10
+                if (hEngPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_20
+                if (hEngPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_30
+                if (hEngPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_40
+                if (hEngPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_50
+                if (hEngPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_60
+                if (hEngPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_70
+                if (hEngPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_80
+                if (hEngPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_90
+                if (hEngPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_100
+            }
+
+            if (reactorsMaxOutput != 0f) {
+                float reactorsPercent = reactorsCurrentOutput / reactorsMaxOutput * 100f;
+                if (reactorsPercent > 0d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_10
+                if (reactorsPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_20
+                if (reactorsPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_30
+                if (reactorsPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_40
+                if (reactorsPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_50
+                if (reactorsPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_60
+                if (reactorsPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_70
+                if (reactorsPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_80
+                if (reactorsPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_90
+                if (reactorsPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_100
+            }
+
+            if (battsMaxStoredPower != 0f) {
+                float battStoredPercent = battsCurrentStoredPower / battsMaxStoredPower * 100f;
+                if (battStoredPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_10
+                if (battStoredPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_20
+                if (battStoredPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_30
+                if (battStoredPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_40
+                if (battStoredPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_50
+                if (battStoredPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_60
+                if (battStoredPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_70
+                if (battStoredPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_80
+                if (battStoredPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_90
+                if (battStoredPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_100
+            }
+
+            if (battsMaxOutput != 0f) {
+                float battPercent = battsCurrentOutput / battsMaxOutput * 100f;
+                if (battPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_10
+                if (battPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_20
+                if (battPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_30
+                if (battPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_40
+                if (battPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_50
+                if (battPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_60
+                if (battPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_70
+                if (battPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_80
+                if (battPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_90
+                if (battPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_100
+            }
+
+            if (terminalMaxRequiredInput != 0f) {
+                float terminalPercent = terminalCurrentInput / terminalMaxRequiredInput * 100f;
+                if (terminalPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_10
+                if (terminalPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_20
+                if (terminalPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_30
+                if (terminalPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_40
+                if (terminalPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_50
+                if (terminalPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_60
+                if (terminalPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_70
+                if (terminalPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_80
+                if (terminalPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_90
+                if (terminalPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_100
+            }
+        }
+
         void GetBlocks() {
             List<IMyCockpit> cockpits = new List<IMyCockpit>();
             GridTerminalSystem.GetBlocksOfType<IMyCockpit>(cockpits, block => block.CustomName.Contains("[CRX] Controller Cockpit"));
 
             NAVIGATOR.Clear();
-            List<IMyTextSurface> surfaces = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
-            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }//TODO panel.BlockDefinition.SubtypeId
-            foreach (var surface in surfaces) {
-                NAVIGATOR.Add(new MyPanel(surface, false));
+            foreach (IMyTextPanel panel in panels) {
+                NAVIGATOR.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
             }
-            surfaces.Clear();
             foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
                     int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
-                    surfaces.Add(cockpit.GetSurface(cockpitRangeFinderSurface));//4
+                    NAVIGATOR.Add(new MyPanel(cockpit.GetSurface(cockpitRangeFinderSurface), "SmallLCDPanel"));//TODO 1
                 }
             }
-            foreach (var surface in surfaces) {
-                NAVIGATOR.Add(new MyPanel(surface, true));
-            }
-            surfaces.Clear();
             panels.Clear();
 
             PAINTER.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Painter"));
-            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in surfaces) {
-                PAINTER.Add(new MyPanel(surface, false));
+            foreach (IMyTextPanel panel in panels) {
+                PAINTER.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
             }
-            surfaces.Clear();
             foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
                     int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
-                    surfaces.Add(cockpit.GetSurface(cockpitTargetSurface));//0
+                    PAINTER.Add(new MyPanel(cockpit.GetSurface(cockpitTargetSurface), "SmallLCDPanel"));//TODO 0
                 }
             }
-            foreach (var surface in surfaces) {
-                PAINTER.Add(new MyPanel(surface, true));
-            }
-            surfaces.Clear();
             panels.Clear();
 
             POWER.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Power"));
-            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in surfaces) {
-                POWER.Add(new MyPanel(surface, false));
+            foreach (IMyTextPanel panel in panels) {
+                POWER.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
             }
-            surfaces.Clear();
             foreach (IMyCockpit cockpit in cockpits) {
                 MyIniParseResult result;
                 myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
                     int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
-                    surfaces.Add(cockpit.GetSurface(cockpitPowerSurface));//2
+                    POWER.Add(new MyPanel(cockpit.GetSurface(cockpitPowerSurface), "SmallLCDPanel"));//TODO 2
                 }
             }
-            foreach (var surface in surfaces) {
-                POWER.Add(new MyPanel(surface, true));
-            }
-            surfaces.Clear();
             panels.Clear();
 
             OREINGOTS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Ore Ingots"));
-            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in surfaces) {
-                OREINGOTS.Add(new MyPanel(surface, false));
+            foreach (IMyTextPanel panel in panels) {
+                OREINGOTS.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
             }
-            surfaces.Clear();
             panels.Clear();
 
             COMPONENTSAMMO.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Components Ammo"));
-            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
-            foreach (var surface in surfaces) {
-                COMPONENTSAMMO.Add(new MyPanel(surface, false));
+            foreach (IMyTextPanel panel in panels) {
+                COMPONENTSAMMO.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
             }
-            surfaces.Clear();
             panels.Clear();
         }
 
         public class MyPanel {
+            public readonly string subTypeId;
             public readonly IMyTextSurface surface;
             public readonly float minScale;
             public readonly RectangleF col1_4;
@@ -916,14 +1012,14 @@ namespace IngameScript {
             public readonly RectangleF col4_4;
             public readonly RectangleF col1_3;
             public readonly RectangleF col2_3;
-
             public readonly RectangleF viewport;
 
-            public MyPanel(IMyTextSurface _surface, bool _isWide) {
+            public MyPanel(IMyTextSurface _surface, string _subTypeId) {
+                subTypeId = _subTypeId;
                 surface = _surface;
                 Vector2 scale = _surface.SurfaceSize / 512f;
                 minScale = Math.Min(scale.X, scale.Y);
-                if (_isWide) {
+                if (_subTypeId == "SmallLCDPanel") {//TODO cockpit panel
                     minScale += 0.2f;
                 }
                 col1_4 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 4f, new Vector2(surface.SurfaceSize.X / 4f, surface.SurfaceSize.Y));

@@ -308,7 +308,7 @@ namespace IngameScript {
                 productionTicks++;
 
                 if (logger) {
-                    if (messageTicks >= 40) {
+                    if (messageTicks >= 10) {
                         SendBroadcastMessage();
                         messageTicks = 0;
                     }

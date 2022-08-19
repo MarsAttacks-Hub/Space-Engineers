@@ -262,7 +262,7 @@ namespace IngameScript {
                 }
 
                 if (logger) {
-                    if (sendMessageCount >= 40) {
+                    if (sendMessageCount >= 10) {
                         SendBroadcastLogMessage();
                         sendMessageCount = 0;
                     }

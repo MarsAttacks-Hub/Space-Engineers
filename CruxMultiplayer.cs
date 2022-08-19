@@ -270,7 +270,7 @@ namespace IngameScript {
                 SyncGuns(timeSinceLastRun);
 
                 if (logger) {
-                    if (sendMessageCount >= 40) {
+                    if (sendMessageCount >= 10) {
                         SendBroadcastLogRangeFinderMessage();
                         SendBroadcastLogTargetMessage();
                         sendMessageCount = 0;

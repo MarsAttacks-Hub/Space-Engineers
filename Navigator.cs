@@ -266,7 +266,7 @@ namespace IngameScript {
                 ManageMagneticDrive(needControl, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity, myVelocity, mySpeed);
 
                 if (logger) {
-                    if (sendMessageCount >= 40) {
+                    if (sendMessageCount >= 10) {
                         SendBroadcastLogMessage();
                         sendMessageCount = 0;
                     }
