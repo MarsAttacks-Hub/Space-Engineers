@@ -371,12 +371,12 @@ namespace IngameScript {
                 + $"Name: \n"
                 + $"Distance: \n"
                 + $"Diameter: \n"
-                + $"Position ");
+                + $"Safe Pos XYZ: ");
 
             data2.Append($"\n"
                 + $"{timeRemaining}s\n"
-                + $"{currentStoredPower:#.#}/{maxStoredPower:#.#}\n"
-                + $"{currentJump:###,###,###} ({totJumpPercent:#.#}%)\n"
+                + $"{currentStoredPower:0.#}/{maxStoredPower:0.#}\n"
+                + $"{currentJump:###,###,###} ({totJumpPercent:0.#}%)\n"
                 + $"{maxJump:###,###,###}\n");
 
             if (!Vector3D.IsZero(rangeFinderPosition)) {
@@ -384,7 +384,7 @@ namespace IngameScript {
                 + $"{rangeFinderName}\n"
                 + $"{(int)rangeFinderDistance}\n"
                 + $"{(int)rangeFinderDiameter}\n"
-                + $"X:{rangeFinderPosition.X:#.#}, Y:{rangeFinderPosition.Y:#.#}, Z:{rangeFinderPosition.Z:#.#}");
+                + $"{rangeFinderPosition.X:0.#},{rangeFinderPosition.Y:0.#},{rangeFinderPosition.Z:0.#}");
             } else {
                 data2.Append($"\n\n\n\n");
             }
@@ -426,12 +426,12 @@ namespace IngameScript {
             if (!Vector3D.IsZero(targetPosition)) {
                 data2.Append($"\n"
                 + $"{targetName}\n"
-                + $"{targetVelocity.Length():#.#}\n"
-                + $"X:{targetPosition.X:#.#}, Y:{targetPosition.Y:#.#}, Z:{targetPosition.Z:#.#}\n");
+                + $"{targetVelocity.Length():0.#}\n"
+                + $"X:{targetPosition.X:0.#}, Y:{targetPosition.Y:0.#}, Z:{targetPosition.Z:0.#}\n");
 
                 data4.Append($"\n"
                 + $"\n"
-                + $"{targetDistance:#.#}\n"
+                + $"{targetDistance:0.#}\n"
                 + $"\n");
             } else {
                 data2.Append($"\n"
@@ -445,7 +445,7 @@ namespace IngameScript {
                 + $"\n");
             }
 
-            if (missilesLog.Count != 0) { data5.Append($"\n\n\nMISSILES\n"); }
+            data5.Append($"\n\n\n\nMISSILES\n");
             foreach (MyTuple<string, string, string, string, string> log in missilesLog) {//toTarget=Item1,speed=Item2,command=command,status=status,type=type\n
                 data.Append($"\n");
                 data.Append($"Speed:\n");
@@ -499,13 +499,13 @@ namespace IngameScript {
                 + $"H2 Tank: \n");
 
             data2.Append($"{powerStatus}\n"
-                + $"{terminalCurrentInput:#.#}/{terminalMaxRequiredInput:#.#}\n"
-                + $"{battsCurrentOutput:#.#}/{battsMaxOutput:#.#}\n"
-                + $"{battsCurrentStoredPower:#.#}/{battsMaxStoredPower:#.#}\n"
-                + $"{reactorsCurrentOutput:#.#}/{reactorsMaxOutput:#.#}\n"
-                + $"{hEngCurrentOutput:#.#}/{hEngMaxOutput:#.#}\n"
-                + $"{solarMaxOutput:#.#}\n"
-                + $"{tankCapacityPercent:#.#}%\n");
+                + $"{terminalCurrentInput:0.#}/{terminalMaxRequiredInput:0.#}\n"
+                + $"{battsCurrentOutput:0.#}/{battsMaxOutput:0.#}\n"
+                + $"{battsCurrentStoredPower:0.#}/{battsMaxStoredPower:0.#}\n"
+                + $"{reactorsCurrentOutput:0.#}/{reactorsMaxOutput:0.#}\n"
+                + $"{hEngCurrentOutput:0.#}/{hEngMaxOutput:0.#}\n"
+                + $"{solarMaxOutput:0.#}\n"
+                + $"{tankCapacityPercent:0.#}%\n");
 
             data3.Append($"\n"
                 + $"\n"
@@ -517,11 +517,11 @@ namespace IngameScript {
 
             data4.Append($"\n"
                 + $"\n"
-                + $"{battsCurrentInput:#.#}\n"
+                + $"{battsCurrentInput:0.###}\n"
                 + $"\n"
                 + $"\n"
                 + $"\n"
-                + $"{turbineMaxOutput:#.#}\n");
+                + $"{turbineMaxOutput:0.#}\n");
 
             sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
             sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
@@ -535,8 +535,12 @@ namespace IngameScript {
             data4.Clear();
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-            if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsPower(frame, myPanel.viewport.Center);//TODO
+            if (beautifyLog) {
+                if (myPanel.subTypeId == "LargeLCDPanel") {
+                    DrawSpritesTabsPower(frame, myPanel.viewport.Center, myPanel.minScale);//TODO
+                } else if (myPanel.subTypeId == "SmallLCDPanel") {
+                    DrawSpritesTabsPower(frame, myPanel.viewport.Center + new Vector2(0f, 40f), myPanel.minScale);//TODO
+                }
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -618,7 +622,7 @@ namespace IngameScript {
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center);//TODO
+                DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center, myPanel.minScale);//TODO
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -633,7 +637,7 @@ namespace IngameScript {
             data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
 
             data.Append($"Cargo:\n\n");
-            data2.Append($"{cargoPercentage:#.#}%\n\n");
+            data2.Append($"{cargoPercentage:0.#}%\n\n");
             data3.Append($"\n\n");
             data4.Append($"\n\n");
 
@@ -700,7 +704,11 @@ namespace IngameScript {
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center);//TODO
+                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center, myPanel.trianglesCount, myPanel.minScale);//TODO
+                myPanel.trianglesCount++;
+                if (myPanel.trianglesCount >= 6) {
+                    myPanel.trianglesCount = 0;
+                }
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -721,7 +729,7 @@ namespace IngameScript {
             };
         }
 
-        public void DrawSpritesTabsOreIngots(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+        public void DrawSpritesTabsOreIngots(MySpriteDrawFrame frame, Vector2 centerPos, int trianglesCount, float scale = 1f) {
             Color transparentBlue = new Color(0, 0, 255, 20);
             Color tranparentMagenta = new Color(64, 0, 64, 20);
             Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
@@ -742,62 +750,16 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -204f) * scale + centerPos, new Vector2(277f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple top line b
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // inv bar
-            if (cargoPercentage > 0d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(5f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 10
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(5f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 10
-            }
-            if (cargoPercentage > 10d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(20f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 20
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(20f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 20
-            }
-            if (cargoPercentage > 20d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 30
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 30
-            }
-            if (cargoPercentage > 30d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(50f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 40
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(50f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 40
-            }
-            if (cargoPercentage > 40d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(65f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 50
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(65f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 50
-            }
-            if (cargoPercentage > 50d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(80f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 60
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(80f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 60
-            }
-            if (cargoPercentage > 60d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(95f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 70
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(95f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 70
-            }
-            if (cargoPercentage > 70d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(110f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 80
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(110f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 80
-            }
-            if (cargoPercentage > 80d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 90
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(125f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 90
-            }
-            if (cargoPercentage > 90d) {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, neonAzure, null, TextAlignment.CENTER, 0f)); // inv 100
-            } else {
-                frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(140f, -223f) * scale + centerPos, new Vector2(10f, 25f) * scale, tranparentNeonAzure, null, TextAlignment.CENTER, 0f)); // inv 100
-            }
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
+
+            DrawStatusBar(frame, new Vector2(90f, -223f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)cargoPercentage / 100f, transparentBlue, neonAzure, TextAlignment.LEFT);
+
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 0 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 1 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 2 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 3 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 4 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 5 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
+
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, new Color(0, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // dark blue base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 51f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
@@ -848,93 +810,51 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // left line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -240f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // top line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 0f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // bottom line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar6
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar5
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar4
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar3
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar2
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // bar1
 
-            if (tankCapacityPercent > 0d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_10
-            if (tankCapacityPercent > 10d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_20
-            if (tankCapacityPercent > 20d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_30
-            if (tankCapacityPercent > 30d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_40
-            if (tankCapacityPercent > 40d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_50
-            if (tankCapacityPercent > 50d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_60
-            if (tankCapacityPercent > 60d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_70
-            if (tankCapacityPercent > 70d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_80
-            if (tankCapacityPercent > 80d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_90
-            if (tankCapacityPercent > 90d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -18f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar6_100
+            DrawStatusBar(frame, new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)tankCapacityPercent / 100f, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
 
             if (hEngMaxOutput != 0f) {
-                float hEngPercent = hEngCurrentOutput / hEngMaxOutput * 100f;
-                if (hEngPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_10
-                if (hEngPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_20
-                if (hEngPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_30
-                if (hEngPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_40
-                if (hEngPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_50
-                if (hEngPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_60
-                if (hEngPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_70
-                if (hEngPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_80
-                if (hEngPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_90
-                if (hEngPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -76f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar5_100
+                DrawStatusBar(frame, new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, hEngCurrentOutput / hEngMaxOutput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
-
             if (reactorsMaxOutput != 0f) {
-                float reactorsPercent = reactorsCurrentOutput / reactorsMaxOutput * 100f;
-                if (reactorsPercent > 0d) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_10
-                if (reactorsPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_20
-                if (reactorsPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_30
-                if (reactorsPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_40
-                if (reactorsPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_50
-                if (reactorsPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_60
-                if (reactorsPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_70
-                if (reactorsPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_80
-                if (reactorsPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_90
-                if (reactorsPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -105f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar4_100
+                DrawStatusBar(frame, new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, reactorsCurrentOutput / reactorsMaxOutput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
-
             if (battsMaxStoredPower != 0f) {
-                float battStoredPercent = battsCurrentStoredPower / battsMaxStoredPower * 100f;
-                if (battStoredPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_10
-                if (battStoredPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_20
-                if (battStoredPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_30
-                if (battStoredPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_40
-                if (battStoredPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_50
-                if (battStoredPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_60
-                if (battStoredPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_70
-                if (battStoredPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_80
-                if (battStoredPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_90
-                if (battStoredPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -134f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar3_100
+                DrawStatusBar(frame, new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentStoredPower / battsMaxStoredPower, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
-
             if (battsMaxOutput != 0f) {
-                float battPercent = battsCurrentOutput / battsMaxOutput * 100f;
-                if (battPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_10
-                if (battPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_20
-                if (battPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_30
-                if (battPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_40
-                if (battPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_50
-                if (battPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_60
-                if (battPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_70
-                if (battPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_80
-                if (battPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_90
-                if (battPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -163f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar2_100
+                DrawStatusBar(frame, new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentOutput / battsMaxOutput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
-
             if (terminalMaxRequiredInput != 0f) {
-                float terminalPercent = terminalCurrentInput / terminalMaxRequiredInput * 100f;
-                if (terminalPercent > 0f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(75f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_10
-                if (terminalPercent > 10f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(55f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_20
-                if (terminalPercent > 20f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(35f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_30
-                if (terminalPercent > 30f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(15f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_40
-                if (terminalPercent > 40f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-5f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_50
-                if (terminalPercent > 50f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-25f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_60
-                if (terminalPercent > 60f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-45f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_70
-                if (terminalPercent > 70f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-65f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_80
-                if (terminalPercent > 80f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-85f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_90
-                if (terminalPercent > 90f) { frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-105f, -192f) * scale + centerPos, new Vector2(20f, 25f) * scale, transparentNeonAzure, null, TextAlignment.CENTER, 0f)); } // bar1_100
+                DrawStatusBar(frame, new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, terminalCurrentInput / terminalMaxRequiredInput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
+        }
+
+        void DrawStatusBar(MySpriteDrawFrame frame, Vector2 position, Vector2 size, float proportion, Color backgroundColor, Color barColor, TextAlignment barAlignment) {
+            proportion = MathHelper.Clamp(proportion, 0, 1);
+
+            var barBackground = MySprite.CreateSprite("SquareSimple", position, size);
+            barBackground.Color = backgroundColor;
+            frame.Add(barBackground);
+
+            Vector2 barSize = size * new Vector2(proportion, 1f);
+
+            Vector2 barPosition;
+            switch (barAlignment) {
+                default:
+                case TextAlignment.CENTER:
+                    barPosition = position;
+                    break;
+                case TextAlignment.LEFT:
+                    barPosition = position + new Vector2(-0.5f * (size.X - barSize.X), 0);
+                    break;
+                case TextAlignment.RIGHT:
+                    barPosition = position + new Vector2(0.5f * (size.X - barSize.X), 0);
+                    break;
+            }
+            var barSprite = MySprite.CreateSprite("SquareSimple", barPosition, barSize);
+            barSprite.Color = barColor;
+            frame.Add(barSprite);
         }
 
         void GetBlocks() {
@@ -1013,6 +933,7 @@ namespace IngameScript {
             public readonly RectangleF col1_3;
             public readonly RectangleF col2_3;
             public readonly RectangleF viewport;
+            public int trianglesCount = 0;
 
             public MyPanel(IMyTextSurface _surface, string _subTypeId) {
                 subTypeId = _subTypeId;

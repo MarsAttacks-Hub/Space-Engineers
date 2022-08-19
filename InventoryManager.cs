@@ -825,5 +825,16 @@ namespace IngameScript {
             };
         }
 
+        /*
+        float GetMyTerminalBlockHealth(IMyTerminalBlock block)
+        {
+            IMySlimBlock slimblock = block.CubeGrid.GetCubeBlock(block.Position);
+            float maxIntegrity = slimblock.MaxIntegrity;
+            float buildIntegrity = slimblock.BuildIntegrity;
+            float currentDamage = slimblock.CurrentDamage;
+            float health = (buildIntegrity - currentDamage) / maxIntegrity;
+            return health;
+        }
+        */
     }
 }
