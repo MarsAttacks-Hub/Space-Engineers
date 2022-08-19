@@ -545,12 +545,8 @@ namespace IngameScript {
             data4.Clear();
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-            if (beautifyLog) {
-                if (myPanel.subTypeId == "LargeLCDPanel") {
-                    DrawSpritesTabsPower(frame, myPanel.viewport.Center, myPanel.minScale);//TODO
-                } else if (myPanel.subTypeId == "SmallLCDPanel") {
-                    DrawSpritesTabsPower(frame, myPanel.viewport.Center + new Vector2(0f, 40f), myPanel.minScale);//TODO
-                }
+            if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
+                DrawSpritesTabsPower(frame, myPanel.viewport.Center, myPanel.minScale);
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -632,7 +628,7 @@ namespace IngameScript {
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center, myPanel.minScale);//TODO
+                DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center, myPanel.minScale);
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -714,9 +710,9 @@ namespace IngameScript {
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center, myPanel.animationCount, myPanel.minScale);//TODO
+                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center, myPanel.animationCount, myPanel.minScale);
                 myPanel.animationCount++;
-                if (myPanel.animationCount >= 6) {
+                if (myPanel.animationCount > 5) {
                     myPanel.animationCount = 0;
                 }
             }
@@ -950,7 +946,7 @@ namespace IngameScript {
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = "";
                 surface.BackgroundColor = Color.Black;
-                surface.FontColor = Color.Green;
+                surface.FontColor = Color.Magenta;
             }
         }
 
