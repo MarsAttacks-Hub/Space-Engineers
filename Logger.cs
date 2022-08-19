@@ -375,16 +375,16 @@ namespace IngameScript {
 
             data2.Append($"\n"
                 + $"{timeRemaining}s\n"
-                + $"{currentStoredPower:0.0}/{maxStoredPower:0.0}\n"
-                + $"{currentJump:000,000,000} ({totJumpPercent:0.0}%)\n"
-                + $"{maxJump:000,000,000}\n");
+                + $"{currentStoredPower:#.#}/{maxStoredPower:#.#}\n"
+                + $"{currentJump:###,###,###} ({totJumpPercent:#.#}%)\n"
+                + $"{maxJump:###,###,###}\n");
 
             if (!Vector3D.IsZero(rangeFinderPosition)) {
                 data2.Append($"\n"
                 + $"{rangeFinderName}\n"
                 + $"{(int)rangeFinderDistance}\n"
                 + $"{(int)rangeFinderDiameter}\n"
-                + $"X:{rangeFinderPosition.X:0.0}, Y:{rangeFinderPosition.Y:0.0}, Z:{rangeFinderPosition.Z:0.0}");
+                + $"X:{rangeFinderPosition.X:#.#}, Y:{rangeFinderPosition.Y:#.#}, Z:{rangeFinderPosition.Z:#.#}");
             } else {
                 data2.Append($"\n\n\n\n");
             }
@@ -426,12 +426,12 @@ namespace IngameScript {
             if (!Vector3D.IsZero(targetPosition)) {
                 data2.Append($"\n"
                 + $"{targetName}\n"
-                + $"{targetVelocity.Length():0.0}\n"
-                + $"X:{targetPosition.X:0.0}, Y:{targetPosition.Y:0.0}, Z:{targetPosition.Z:0.0}\n");
+                + $"{targetVelocity.Length():#.#}\n"
+                + $"X:{targetPosition.X:#.#}, Y:{targetPosition.Y:#.#}, Z:{targetPosition.Z:#.#}\n");
 
                 data4.Append($"\n"
                 + $"\n"
-                + $"{targetDistance:0.0}\n"
+                + $"{targetDistance:#.#}\n"
                 + $"\n");
             } else {
                 data2.Append($"\n"
@@ -499,13 +499,13 @@ namespace IngameScript {
                 + $"H2 Tank: \n");
 
             data2.Append($"{powerStatus}\n"
-                + $"{terminalCurrentInput:0.0}/{terminalMaxRequiredInput:0.0}\n"
-                + $"{battsCurrentOutput:0.0}/{battsMaxOutput:0.0}\n"
-                + $"{battsCurrentStoredPower}/{battsMaxStoredPower}\n"
-                + $"{reactorsCurrentOutput:0.0}/{reactorsMaxOutput:0.0}\n"
-                + $"{hEngCurrentOutput:0.0}/{hEngMaxOutput:0.0}\n"
-                + $"{solarMaxOutput:0.0}\n"
-                + $"{tankCapacityPercent:0.0}%\n");
+                + $"{terminalCurrentInput:#.#}/{terminalMaxRequiredInput:#.#}\n"
+                + $"{battsCurrentOutput:#.#}/{battsMaxOutput:#.#}\n"
+                + $"{battsCurrentStoredPower:#.#}/{battsMaxStoredPower:#.#}\n"
+                + $"{reactorsCurrentOutput:#.#}/{reactorsMaxOutput:#.#}\n"
+                + $"{hEngCurrentOutput:#.#}/{hEngMaxOutput:#.#}\n"
+                + $"{solarMaxOutput:#.#}\n"
+                + $"{tankCapacityPercent:#.#}%\n");
 
             data3.Append($"\n"
                 + $"\n"
@@ -517,11 +517,11 @@ namespace IngameScript {
 
             data4.Append($"\n"
                 + $"\n"
-                + $"{battsCurrentInput:0.0}\n"
+                + $"{battsCurrentInput:#.#}\n"
                 + $"\n"
                 + $"\n"
                 + $"\n"
-                + $"{turbineMaxOutput:0.0}\n");
+                + $"{turbineMaxOutput:#.#}\n");
 
             sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
             sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
@@ -633,7 +633,7 @@ namespace IngameScript {
             data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
 
             data.Append($"Cargo:\n\n");
-            data2.Append($"{cargoPercentage:0.0}%\n\n");
+            data2.Append($"{cargoPercentage:#.#}%\n\n");
             data3.Append($"\n\n");
             data4.Append($"\n\n");
 
