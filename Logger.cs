@@ -92,6 +92,16 @@ namespace IngameScript {
         public StringBuilder data4 = new StringBuilder("");
         public StringBuilder data5 = new StringBuilder("");
 
+        Color transparentBlue = new Color(0, 0, 255, 20);
+        Color transparentDarkBlue = new Color(0, 0, 128, 20);
+        Color transparentNeonAzure = new Color(0, 255, 255, 20);
+        Color neonAzure = new Color(0, 255, 255, 255);
+        Color transparentMagenta = new Color(64, 0, 64, 20);
+        Color transparentNeonMagenta = new Color(128, 0, 128, 20);
+        Color magenta = new Color(100, 0, 100);
+        Color purple = new Color(25, 0, 100);
+        Color azure = new Color(0, 100, 100);
+
         Program() {
             Runtime.UpdateFrequency |= UpdateFrequency.Update10;
             Setup();
@@ -101,7 +111,7 @@ namespace IngameScript {
             GetBlocks();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[LOGGER]");
             //BROADCASTLISTENER.SetMessageCallback();
-            Me.GetSurface(0).BackgroundColor = logger ? new Color(25, 0, 100) : new Color(0, 0, 0);
+            Me.GetSurface(0).BackgroundColor = logger ? purple : Color.Black;
             stateMachine = RunOverTime();
         }
 
@@ -112,11 +122,11 @@ namespace IngameScript {
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
                     if (!logger) {
-                        Me.GetSurface(0).BackgroundColor = new Color(0, 0, 0);
+                        Me.GetSurface(0).BackgroundColor = Color.Black;
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                         return;
                     } else {
-                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
+                        Me.GetSurface(0).BackgroundColor = purple;
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     }
                 } else {
@@ -391,10 +401,10 @@ namespace IngameScript {
 
             data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -464,13 +474,13 @@ namespace IngameScript {
                 data4.Append($"\n");
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -523,11 +533,11 @@ namespace IngameScript {
                 + $"\n"
                 + $"{turbineMaxOutput:0.#}\n");
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
             data.Clear();
             data2.Clear();
@@ -606,13 +616,13 @@ namespace IngameScript {
                 }
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, new Color(25, 0, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -688,13 +698,13 @@ namespace IngameScript {
                 }
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, new Color(0, 100, 100), TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, new Color(100, 0, 100), TextAlignment.LEFT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, new Color(25, 0, 100), TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -704,10 +714,10 @@ namespace IngameScript {
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center, myPanel.trianglesCount, myPanel.minScale);//TODO
-                myPanel.trianglesCount++;
-                if (myPanel.trianglesCount >= 6) {
-                    myPanel.trianglesCount = 0;
+                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center, myPanel.animationCount, myPanel.minScale);//TODO
+                myPanel.animationCount++;
+                if (myPanel.animationCount >= 6) {
+                    myPanel.animationCount = 0;
                 }
             }
             foreach (var sprite in sprites) {
@@ -729,38 +739,32 @@ namespace IngameScript {
             };
         }
 
-        public void DrawSpritesTabsOreIngots(MySpriteDrawFrame frame, Vector2 centerPos, int trianglesCount, float scale = 1f) {
-            Color transparentBlue = new Color(0, 0, 255, 20);
-            Color tranparentMagenta = new Color(64, 0, 64, 20);
-            Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
-            Color neonAzure = new Color(0, 255, 255, 255);
-            Color tranparentNeonAzure = new Color(0, 100, 100, 20);
-
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -90f) * scale + centerPos, new Vector2(500f, 179f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // purple base
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 12f) * scale + centerPos, new Vector2(350f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 12f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 1.5708f)); // purple bottom triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -192f) * scale + centerPos, new Vector2(275f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // purple top corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // purple top triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -77f) * scale + centerPos, new Vector2(2f, 206f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple left line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -101f) * scale + centerPos, new Vector2(2f, 204f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple right line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 25f) * scale + centerPos, new Vector2(351f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom line a
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 0f) * scale + centerPos, new Vector2(126f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 12f) * scale + centerPos, new Vector2(35f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3562f)); // purple bottom line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -179f) * scale + centerPos, new Vector2(200f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple top line a
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -204f) * scale + centerPos, new Vector2(277f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // purple top line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // inv bar
+        public void DrawSpritesTabsOreIngots(MySpriteDrawFrame frame, Vector2 centerPos, int animationCount, float scale = 1f) {
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -90f) * scale + centerPos, new Vector2(500f, 179f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 12f) * scale + centerPos, new Vector2(350f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 12f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 1.5708f)); // purple bottom triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -192f) * scale + centerPos, new Vector2(275f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple top corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // purple top triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -77f) * scale + centerPos, new Vector2(2f, 206f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -101f) * scale + centerPos, new Vector2(2f, 204f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 25f) * scale + centerPos, new Vector2(351f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 0f) * scale + centerPos, new Vector2(126f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 12f) * scale + centerPos, new Vector2(35f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 2.3562f)); // purple bottom line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -179f) * scale + centerPos, new Vector2(200f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple top line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -204f) * scale + centerPos, new Vector2(277f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple top line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // inv bar
 
             DrawStatusBar(frame, new Vector2(90f, -223f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)cargoPercentage / 100f, transparentBlue, neonAzure, TextAlignment.LEFT);
 
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 0 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 1 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 2 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 3 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 4 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, trianglesCount == 5 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 0 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 1 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 2 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 3 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 4 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 5 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
 
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, new Color(0, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // dark blue base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // dark blue base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 51f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
@@ -768,65 +772,55 @@ namespace IngameScript {
         }
 
         public void DrawSpritesTabsComponentsAmmo(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
-            Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
-            Color tranparentDarkBlue = new Color(0, 0, 128, 20);
-            Color tranparentBlue = new Color(0, 0, 255, 20);
-            Color tranparentMagenta = new Color(64, 0, 64, 20);
-
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -64f) * scale + centerPos, new Vector2(500f, 286f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 91f) * scale + centerPos, new Vector2(350f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue bottom corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 91f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 1.5708f)); // blue bottom triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -219f) * scale + centerPos, new Vector2(275f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue top corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -219f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 4.7124f)); // blue top triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -52f) * scale + centerPos, new Vector2(2f, 311f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue left line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -77f) * scale + centerPos, new Vector2(2f, 310f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue right line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 103f) * scale + centerPos, new Vector2(351f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line a
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 79f) * scale + centerPos, new Vector2(126f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 90f) * scale + centerPos, new Vector2(35f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 2.3562f)); // blue bottom line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -207f) * scale + centerPos, new Vector2(200f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue top line a
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -232f) * scale + centerPos, new Vector2(277f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue top line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -220f) * scale + centerPos, new Vector2(36f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 2.3736f)); // blue top line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 181f) * scale + centerPos, new Vector2(500f, 112f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 113f) * scale + centerPos, new Vector2(123f, 24f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta top corne
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(114f, 113f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // magenta top triangle
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(187f, 225f) * scale + centerPos, new Vector2(123f, 24f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta bottom corner
-            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(113f, 225f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 4.7124f)); // magenta top triangleCopy
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta bottom line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 125f) * scale + centerPos, new Vector2(351f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta top line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 101f) * scale + centerPos, new Vector2(126f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta top line b
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 170f) * scale + centerPos, new Vector2(2f, 137f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta right line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 113f) * scale + centerPos, new Vector2(35f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3562f)); // magenta top line c
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 181f) * scale + centerPos, new Vector2(2f, 113f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -64f) * scale + centerPos, new Vector2(500f, 286f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 91f) * scale + centerPos, new Vector2(350f, 25f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue bottom corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 91f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 1.5708f)); // blue bottom triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -219f) * scale + centerPos, new Vector2(275f, 25f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue top corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -219f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 4.7124f)); // blue top triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -52f) * scale + centerPos, new Vector2(2f, 311f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -77f) * scale + centerPos, new Vector2(2f, 310f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 103f) * scale + centerPos, new Vector2(351f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 79f) * scale + centerPos, new Vector2(126f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 90f) * scale + centerPos, new Vector2(35f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 2.3562f)); // blue bottom line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -207f) * scale + centerPos, new Vector2(200f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue top line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -232f) * scale + centerPos, new Vector2(277f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue top line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -220f) * scale + centerPos, new Vector2(36f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 2.3736f)); // blue top line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 181f) * scale + centerPos, new Vector2(500f, 112f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 113f) * scale + centerPos, new Vector2(123f, 24f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta top corne
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(114f, 113f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // magenta top triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(187f, 225f) * scale + centerPos, new Vector2(123f, 24f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta bottom corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(113f, 225f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 4.7124f)); // magenta top triangleCopy
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta bottom line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 125f) * scale + centerPos, new Vector2(351f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta top line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 101f) * scale + centerPos, new Vector2(126f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta top line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 170f) * scale + centerPos, new Vector2(2f, 137f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 113f) * scale + centerPos, new Vector2(35f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 2.3562f)); // magenta top line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 181f) * scale + centerPos, new Vector2(2f, 113f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta left line
         }
 
         public void DrawSpritesTabsPower(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
-            Color transparentNeonAzure = new Color(0, 255, 255, 20);
-            Color tranparentMagenta = new Color(64, 0, 64, 20);
-            Color tranparentBlue = new Color(0, 0, 255, 20);
-            Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -120f) * scale + centerPos, new Vector2(500f, 240f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -240f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // top line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 0f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // bottom line
 
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -120f) * scale + centerPos, new Vector2(500f, 240f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // right line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // left line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -240f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // top line
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 0f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // bottom line
-
-            DrawStatusBar(frame, new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)tankCapacityPercent / 100f, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+            DrawStatusBar(frame, new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)tankCapacityPercent / 100f, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
 
             if (hEngMaxOutput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, hEngCurrentOutput / hEngMaxOutput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(frame, new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, hEngCurrentOutput / hEngMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (reactorsMaxOutput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, reactorsCurrentOutput / reactorsMaxOutput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(frame, new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, reactorsCurrentOutput / reactorsMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (battsMaxStoredPower != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentStoredPower / battsMaxStoredPower, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(frame, new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentStoredPower / battsMaxStoredPower, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (battsMaxOutput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentOutput / battsMaxOutput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(frame, new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentOutput / battsMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (terminalMaxRequiredInput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, terminalCurrentInput / terminalMaxRequiredInput, tranparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(frame, new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, terminalCurrentInput / terminalMaxRequiredInput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
         }
 
@@ -933,7 +927,7 @@ namespace IngameScript {
             public readonly RectangleF col1_3;
             public readonly RectangleF col2_3;
             public readonly RectangleF viewport;
-            public int trianglesCount = 0;
+            public int animationCount = 0;
 
             public MyPanel(IMyTextSurface _surface, string _subTypeId) {
                 subTypeId = _subTypeId;
@@ -956,7 +950,7 @@ namespace IngameScript {
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = "";
                 surface.BackgroundColor = Color.Black;
-                surface.FontColor = new Color(0, 100, 0);
+                surface.FontColor = Color.Green;
             }
         }
 
