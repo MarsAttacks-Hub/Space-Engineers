@@ -602,6 +602,7 @@ namespace IngameScript {
                 data5.Clear();
 
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+                DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center);//TODO
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
@@ -679,7 +680,7 @@ namespace IngameScript {
                 data5.Clear();
 
                 MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center);
+                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center);//TODO
                 foreach (var sprite in sprites) {
                     frame.Add(sprite);
                 }
@@ -777,11 +778,43 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
             frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
             frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, new Color(0, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // blue base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, new Color(0, 0, 128, 20), null, TextAlignment.CENTER, 0f)); // dark blue base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 51f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
+        }
+
+        public void DrawSpritesTabsComponentsAmmo(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+            Color tranparentBrightMagenta = new Color(128, 0, 128, 20);
+            Color tranparentDarkBlue = new Color(0, 0, 128, 20);
+            Color tranparentBlue = new Color(0, 0, 255, 20);
+            Color tranparentMagenta = new Color(64, 0, 64, 20);
+
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -64f) * scale + centerPos, new Vector2(500f, 286f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 91f) * scale + centerPos, new Vector2(350f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue bottom corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 91f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 1.5708f)); // blue bottom triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -219f) * scale + centerPos, new Vector2(275f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue top corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -219f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentDarkBlue, null, TextAlignment.CENTER, 4.7124f)); // blue top triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -52f) * scale + centerPos, new Vector2(2f, 311f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -77f) * scale + centerPos, new Vector2(2f, 310f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 103f) * scale + centerPos, new Vector2(351f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 79f) * scale + centerPos, new Vector2(126f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 90f) * scale + centerPos, new Vector2(35f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 2.3562f)); // blue bottom line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -207f) * scale + centerPos, new Vector2(200f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue top line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, -232f) * scale + centerPos, new Vector2(277f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 0f)); // blue top line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -220f) * scale + centerPos, new Vector2(36f, 2f) * scale, tranparentBlue, null, TextAlignment.CENTER, 2.3736f)); // blue top line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 181f) * scale + centerPos, new Vector2(500f, 112f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 113f) * scale + centerPos, new Vector2(123f, 24f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta top corne
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(114f, 113f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // magenta top triangle
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(187f, 225f) * scale + centerPos, new Vector2(123f, 24f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta bottom corner
+            frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(113f, 225f) * scale + centerPos, new Vector2(25f, 25f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 4.7124f)); // magenta top triangleCopy
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta bottom line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 125f) * scale + centerPos, new Vector2(351f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta top line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(188f, 101f) * scale + centerPos, new Vector2(126f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta top line b
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 170f) * scale + centerPos, new Vector2(2f, 137f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(112f, 113f) * scale + centerPos, new Vector2(35f, 2f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 2.3562f)); // magenta top line c
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 181f) * scale + centerPos, new Vector2(2f, 113f) * scale, tranparentBrightMagenta, null, TextAlignment.CENTER, 0f)); // magenta left line
         }
 
         void GetBlocks() {
@@ -792,7 +825,7 @@ namespace IngameScript {
             List<IMyTextSurface> surfaces = new List<IMyTextSurface>();
             List<IMyTextPanel> panels = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Navigator"));
-            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }
+            foreach (IMyTextPanel panel in panels) { surfaces.Add(panel as IMyTextSurface); }//TODO panel.BlockDefinition.SubtypeId
             foreach (var surface in surfaces) {
                 NAVIGATOR.Add(new MyPanel(surface, false));
             }
