@@ -80,6 +80,8 @@ namespace IngameScript {
         public List<MyPanel> OREINGOTS = new List<MyPanel>();
         public List<MyPanel> COMPONENTSAMMO = new List<MyPanel>();
 
+        IMyTextPanel LCDBEAUTIFY;
+
         readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
         IEnumerator<bool> stateMachine;
@@ -92,6 +94,15 @@ namespace IngameScript {
         public StringBuilder data4 = new StringBuilder("");
         public StringBuilder data5 = new StringBuilder("");
 
+        public List<Vector2> reactorsOutputs = new List<Vector2>();
+        public List<Vector2> hEngOutputs = new List<Vector2>();
+        public List<Vector2> tankCapacityOutputs = new List<Vector2>();
+        public List<Vector2> battsCurrentStoredPowers = new List<Vector2>();
+        public List<Vector2> batteriesOutputs = new List<Vector2>();
+        public List<Vector2> terminalOutputs = new List<Vector2>();
+        public List<Vector2> randomPositions1 = new List<Vector2>();
+        public List<Vector2> randomPositions2 = new List<Vector2>();
+
         Color transparentBlue = new Color(0, 0, 255, 20);
         Color transparentDarkBlue = new Color(0, 0, 128, 20);
         Color transparentNeonAzure = new Color(0, 255, 255, 20);
@@ -103,6 +114,9 @@ namespace IngameScript {
         Color azure = new Color(0, 100, 100);
         Color deepPurple = new Color(64, 0, 128, 20);
         Color deepBlue = new Color(0, 0, 64, 20);
+        Color transparentGreen = new Color(0, 255, 0, 20);
+
+        public Random random = new Random();
 
         Program() {
             Runtime.UpdateFrequency |= UpdateFrequency.Update10;
@@ -114,6 +128,22 @@ namespace IngameScript {
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[LOGGER]");
             //BROADCASTLISTENER.SetMessageCallback();
             Me.GetSurface(0).BackgroundColor = logger ? purple : Color.Black;
+            if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = beautifyLog ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (beautifyLog) {
+                randomPositions1.Add(new Vector2(-240f, 225f));
+                randomPositions1.Add(new Vector2(-120f, 225f));
+                randomPositions1.Add(new Vector2(0f, 225f));
+                randomPositions1.Add(new Vector2(120f, 225f));
+                randomPositions1.Add(new Vector2(240f, 225f));
+
+                randomPositions2.Add(new Vector2(-240f, 225f));
+                randomPositions2.Add(new Vector2(-180f, 225f));
+                randomPositions2.Add(new Vector2(-60f, 225f));
+                randomPositions2.Add(new Vector2(0f, 225f));
+                randomPositions2.Add(new Vector2(60f, 225f));
+                randomPositions2.Add(new Vector2(180f, 225f));
+                randomPositions2.Add(new Vector2(240f, 225f));
+            }
             stateMachine = RunOverTime();
         }
 
@@ -214,6 +244,7 @@ namespace IngameScript {
                     break;
                 case "ToggleBeautify":
                     beautifyLog = !beautifyLog;
+                    if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = beautifyLog ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                     break;
             }
         }
@@ -415,6 +446,33 @@ namespace IngameScript {
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
                 DrawSpritesTabsJumpRangeFinder(frame, myPanel.viewport.Center, myPanel.minScale);
+
+                float columnSizeMultiplier = 150f * myPanel.minScale / 100f; ;
+                float width = 2f * myPanel.minScale;
+
+                DrawRandomGraph(frame, randomPositions1,
+                    columnSizeMultiplier,
+                    width, transparentNeonAzure, myPanel.minScale, myPanel.viewport.Center);
+
+                DrawRandomGraph(frame, randomPositions2,
+                    columnSizeMultiplier,
+                    width, transparentNeonMagenta, myPanel.minScale, myPanel.viewport.Center);
+
+                randomPositions1.Clear();
+                randomPositions1.Add(new Vector2(-240f, 225f));
+                randomPositions1.Add(new Vector2(-120f, 225f));
+                randomPositions1.Add(new Vector2(0f, 225f));
+                randomPositions1.Add(new Vector2(120f, 225f));
+                randomPositions1.Add(new Vector2(240f, 225f));
+
+                randomPositions2.Clear();
+                randomPositions2.Add(new Vector2(-240f, 225f));
+                randomPositions2.Add(new Vector2(-180f, 225f));
+                randomPositions2.Add(new Vector2(-60f, 225f));
+                randomPositions2.Add(new Vector2(0f, 225f));
+                randomPositions2.Add(new Vector2(60f, 225f));
+                randomPositions2.Add(new Vector2(180f, 225f));
+                randomPositions2.Add(new Vector2(240f, 225f));
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -555,6 +613,60 @@ namespace IngameScript {
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
                 DrawSpritesTabsPower(frame, myPanel.viewport.Center, myPanel.minScale);
+
+                Vector2 removePos = new Vector2(-240f, -230f) * myPanel.minScale + myPanel.viewport.Center;
+                Vector2 startPos = new Vector2(240f, 230f) * myPanel.minScale + myPanel.viewport.Center;
+                Vector2 movementPos = new Vector2(-5f, 0f) * myPanel.minScale;
+                float columnSizeMultiplier = 200f * myPanel.minScale / 100f; ;
+                float width = 2f * myPanel.minScale;
+
+                tankCapacityOutputs = DrawMovingGraph(frame, tankCapacityOutputs,
+                    movementPos,
+                    removePos.X,
+                    startPos,
+                    columnSizeMultiplier,
+                    (float)tankCapacityPercent,
+                    width, transparentGreen);
+
+                hEngOutputs = DrawMovingGraph(frame, hEngOutputs,
+                    movementPos,
+                    removePos.X,
+                    startPos,
+                    columnSizeMultiplier,
+                    hEngCurrentOutput / hEngMaxOutput * 100f,
+                    width, deepPurple);
+
+                reactorsOutputs = DrawMovingGraph(frame, reactorsOutputs,
+                    movementPos,
+                    removePos.X,
+                    startPos,
+                    columnSizeMultiplier,
+                    reactorsCurrentOutput / reactorsMaxOutput * 100f,
+                    width, transparentBlue);
+
+                battsCurrentStoredPowers = DrawMovingGraph(frame, battsCurrentStoredPowers,
+                    movementPos,
+                    removePos.X,
+                    startPos,
+                    columnSizeMultiplier,
+                    battsCurrentStoredPower / battsMaxStoredPower * 100f,
+                    width, transparentMagenta);
+
+                batteriesOutputs = DrawMovingGraph(frame, batteriesOutputs,
+                    movementPos,
+                    removePos.X,
+                    startPos,
+                    columnSizeMultiplier,
+                    battsCurrentOutput / battsMaxOutput * 100f,
+                    width, transparentNeonMagenta);
+
+                terminalOutputs = DrawMovingGraph(frame, terminalOutputs,
+                    movementPos,
+                    removePos.X,
+                    startPos,
+                    columnSizeMultiplier,
+                    terminalCurrentInput / terminalMaxRequiredInput * 100f,
+                    width, transparentNeonAzure);
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -809,6 +921,12 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -240f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // top line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 0f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // bottom line
 
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 130f) * scale + centerPos, new Vector2(500f, 240f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 130f) * scale + centerPos, new Vector2(2f, 240f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 130f) * scale + centerPos, new Vector2(2f, 240f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // right line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 10f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // top line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 250f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // bottom line
+
             DrawStatusBar(frame, new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)tankCapacityPercent / 100f, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
 
             if (hEngMaxOutput != 0f) {
@@ -848,6 +966,12 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-150f, -63f) * scale + centerPos, new Vector2(200f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple top line a
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -15f) * scale + centerPos, new Vector2(2f, 145f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // purple right line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -75f) * scale + centerPos, new Vector2(36f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
+
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 148f) * scale + centerPos, new Vector2(500f, 170f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, 148f) * scale + centerPos, new Vector2(2f, 170f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 148f) * scale + centerPos, new Vector2(2f, 170f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue left line
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 63f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line a
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 233f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line a
         }
 
         public void DrawSpritesTabsPainter(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
@@ -896,6 +1020,59 @@ namespace IngameScript {
             var barSprite = MySprite.CreateSprite("SquareSimple", barPosition, barSize);
             barSprite.Color = barColor;
             frame.Add(barSprite);
+        }
+
+        List<Vector2> DrawMovingGraph(MySpriteDrawFrame frame, List<Vector2> positions, Vector2 movementValue, float removeValue, Vector2 startPosition, float multiplier, float inputValue, float width, Color color) {
+            for (int i = 0; i < positions.Count; i++) {
+                positions[i] = positions[i] + movementValue;
+            }
+
+            List<Vector2> positionsCopy = new List<Vector2>();
+            foreach (Vector2 pos in positions) {
+                if (pos.X > removeValue) {
+                    positionsCopy.Add(pos);
+                }
+            }
+            positions = positionsCopy;
+
+            float columnSize = inputValue * multiplier;
+            Vector2 position = new Vector2(startPosition.X, startPosition.Y - columnSize);
+            positions.Add(position);
+
+            for (int i = 0; i < positions.Count - 1; i++) {
+                DrawLine(frame, positions[i], positions[i + 1], width, color);
+            }
+            return positions;
+        }
+
+        void DrawRandomGraph(MySpriteDrawFrame frame, List<Vector2> positions, float multiplier, float width, Color color, float scale, Vector2 center) {
+            for (int i = 0; i < positions.Count; i++) {
+                float rand = random.Next(0, 101);
+                float columnSize = rand * multiplier;
+                Vector2 pos = new Vector2(positions[i].X * scale, (positions[i].Y - columnSize) * scale) + center;
+                positions[i] = pos;
+            }
+
+            for (int i = 0; i < positions.Count - 1; i++) {
+                DrawLine(frame, positions[i], positions[i + 1], width, color);
+            }
+        }
+
+        void DrawLine(MySpriteDrawFrame frame, Vector2 point1, Vector2 point2, float width, Color color) {
+            Vector2 position = 0.5f * (point1 + point2);
+            Vector2 diff = point1 - point2;
+            float length = diff.Length();
+            if (length > 0)
+                diff /= length;
+
+            Vector2 size = new Vector2(length, width);
+            float angle = (float)Math.Acos(Vector2.Dot(diff, Vector2.UnitX));
+            angle *= Math.Sign(Vector2.Dot(diff, Vector2.UnitY));
+
+            MySprite sprite = MySprite.CreateSprite("SquareSimple", position, size);
+            sprite.RotationOrScale = angle;
+            sprite.Color = color;
+            frame.Add(sprite);
         }
 
         void GetBlocks() {
@@ -961,6 +1138,8 @@ namespace IngameScript {
                 COMPONENTSAMMO.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
             }
             panels.Clear();
+
+            LCDBEAUTIFY = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Beautify Logs") as IMyTextPanel;
         }
 
         public class MyPanel {
@@ -974,6 +1153,8 @@ namespace IngameScript {
             public readonly RectangleF col1_3;
             public readonly RectangleF col2_3;
             public readonly RectangleF viewport;
+            //public readonly RectangleF topHalf;
+            //public readonly RectangleF bottomHalf;
             public int animationCount = 0;
 
             public MyPanel(IMyTextSurface _surface, string _subTypeId) {
@@ -994,12 +1175,18 @@ namespace IngameScript {
 
                 viewport = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, surface.SurfaceSize);
 
+                //Vector2 posHalf = new Vector2(0, viewport.Size.Y / 2);
+                //Vector2 sizeHalf = new Vector2(viewport.Size.X, viewport.Size.Y / 2);
+                //topHalf = new RectangleF(viewport.Center - posHalf, sizeHalf);
+                //bottomHalf = new RectangleF(viewport.Center + posHalf, sizeHalf);
+
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = "";
                 surface.BackgroundColor = Color.Black;
                 surface.FontColor = Color.Magenta;
             }
         }
+
 
     }
 }

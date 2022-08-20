@@ -1177,7 +1177,7 @@ namespace IngameScript {
             }
             panels.Clear();*/
             List<IMySensorBlock> sensors = new List<IMySensorBlock>();
-            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(sensors, block => block.CustomName.Contains("[CRX] Sensor"));
+            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(sensors, block => block.CustomName.Contains("[CRX] Sensor Obstacles"));
             foreach (IMySensorBlock sensor in sensors) {
                 sensor.BackExtend = 0.1f;
                 sensor.BottomExtend = 0.1f;
