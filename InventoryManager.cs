@@ -23,7 +23,37 @@ namespace IngameScript {
     partial class Program : MyGridProgram {
 
         //INVENTORY MANAGER
-        readonly Dictionary<MyDefinitionId, MyTuple<string, double>> componentsDefBpQuota = new Dictionary<MyDefinitionId, MyTuple<string, double>>() {
+        bool togglePB = true;//enable/disable PB
+        bool logger = true;//enable/disable logging
+
+        double cargoPercentage = 0;
+        int ticks = 0;
+        int productionTicks = 0;
+        int messageTicks = 0;
+
+        public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
+        public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
+        public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> CONNECTORSINVENTORIES = new List<IMyInventory>();
+        public List<IMyRefinery> REFINERIES = new List<IMyRefinery>();
+        public List<IMyInventory> REFINERIESINVENTORIES = new List<IMyInventory>();
+        public List<IMyAssembler> ASSEMBLERS = new List<IMyAssembler>();
+        public List<IMyInventory> ASSAULTTURRETSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> LAUNCHERSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> RAILGUNSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> SMALLRAILGUNSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> ARTILLERYINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> ASSAULTINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> AUTOCANNONSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> REACTORSINVENTORIES = new List<IMyInventory>();
+        public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
+
+        IMyTextPanel LCDUPDATEQUOTA;
+
+        readonly MyIni myIni = new MyIni();
+
+        public Dictionary<MyDefinitionId, MyTuple<string, double>> componentsDefBpQuota = new Dictionary<MyDefinitionId, MyTuple<string, double>>() {
             { MyItemType.MakeAmmo("Missile200mm"),              MyTuple.Create("Missile200mm",                  5d) },
             { MyItemType.MakeAmmo("NATO_25x184mm"),             MyTuple.Create("NATO_25x184mmMagazine",         5d) },
             { MyItemType.MakeAmmo("AutocannonClip"),            MyTuple.Create("AutocannonClip",                5d) },
@@ -54,32 +84,6 @@ namespace IngameScript {
             { MyItemType.MakeComponent("Superconductor"),       MyTuple.Create("Superconductor",                5d) },
             { MyItemType.MakeComponent("Thrust"),               MyTuple.Create("ThrustComponent",               5d) }
         };
-
-        bool togglePB = true;//enable/disable PB
-        bool logger = true;//enable/disable logging
-
-        double cargoPercentage = 0;
-        int ticks = 0;
-        int productionTicks = 0;
-        int messageTicks = 0;
-
-        public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
-        public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
-        public List<IMyInventory> CARGOINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> CONNECTORSINVENTORIES = new List<IMyInventory>();
-        public List<IMyRefinery> REFINERIES = new List<IMyRefinery>();
-        public List<IMyInventory> REFINERIESINVENTORIES = new List<IMyInventory>();
-        public List<IMyAssembler> ASSEMBLERS = new List<IMyAssembler>();
-        public List<IMyInventory> ASSAULTTURRETSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> GATLINGSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> LAUNCHERSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> RAILGUNSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> SMALLRAILGUNSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> ARTILLERYINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> ASSAULTINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> AUTOCANNONSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> REACTORSINVENTORIES = new List<IMyInventory>();
-        public List<IMyInventory> GASINVENTORIES = new List<IMyInventory>();
 
         public Dictionary<MyDefinitionId, double> oreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
             {MyItemType.MakeOre("Cobalt"),0d},
@@ -281,7 +285,7 @@ namespace IngameScript {
 
                 if (!string.IsNullOrEmpty(argument)) {
                     ProcessArgument(argument);
-                    if (!togglePB) { return; }
+                    if (!togglePB) { return; } else if (argument == "UpdateQuota") { return; }
                 }
 
                 if (ticks == 1) {
@@ -380,6 +384,9 @@ namespace IngameScript {
                     break;
                 case "LoggerOff":
                     logger = false;
+                    break;
+                case "UpdateQuota":
+                    UpdateQuota();
                     break;
             }
         }
@@ -705,6 +712,129 @@ namespace IngameScript {
             return firstCargoDistance.CompareTo(secondCargoDistance);
         }
 
+        void UpdateQuota() {
+            MyIniParseResult result;
+            myIni.TryParse(LCDUPDATEQUOTA.CustomData, "QuotaSettings", out result);
+            if (!string.IsNullOrEmpty(myIni.Get("QuotaSettings", "cockpitOverviewSurface").ToString())) {
+                MyTuple<string, double> res;
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("Missile200mm"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Missile200mm").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("Missile200mm")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("NATO_25x184mm"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "NATO_25x184mm").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("NATO_25x184mm")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("AutocannonClip"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "AutocannonClip").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("AutocannonClip")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("LargeCalibreAmmo"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "LargeCalibreAmmo").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("LargeCalibreAmmo")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("MediumCalibreAmmo"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "MediumCalibreAmmo").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("MediumCalibreAmmo")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("LargeRailgunAmmo"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "LargeRailgunAmmo").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("LargeRailgunAmmo")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeAmmo("SmallRailgunAmmo"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "SmallRailgunAmmo").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeAmmo("SmallRailgunAmmo")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("BulletproofGlass"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "BulletproofGlass").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("BulletproofGlass")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Canvas"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Canvas").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Canvas")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Computer"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Computer").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Computer")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Construction"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Construction").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Construction")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Detector"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Detector").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Detector")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Display"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Display").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Display")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Explosives"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Explosives").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Explosives")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Girder"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Girder").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Girder")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("GravityGenerator"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "GravityGenerator").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("GravityGenerator")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("InteriorPlate"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "InteriorPlate").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("InteriorPlate")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("LargeTube"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "LargeTube").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("LargeTube")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Medical"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Medical").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Medical")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("MetalGrid"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "MetalGrid").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("MetalGrid")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Motor"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Motor").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Motor")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("PowerCell"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "PowerCell").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("PowerCell")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("RadioCommunication"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "RadioCommunication").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("RadioCommunication")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Reactor"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Reactor").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Reactor")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("SmallTube"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "SmallTube").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("SmallTube")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("SolarCell"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "SolarCell").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("SolarCell")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("SteelPlate"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "SteelPlate").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("SteelPlate")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Superconductor"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Superconductor").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Superconductor")] = res;
+
+                componentsDefBpQuota.TryGetValue(MyItemType.MakeComponent("Thrust"), out res);
+                res.Item2 = myIni.Get("QuotaSettings", "Thrust").ToInt32();
+                componentsDefBpQuota[MyItemType.MakeComponent("Thrust")] = res;
+            }
+        }
+
         void GetBlocks() {
             REFINERIES.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyRefinery>(REFINERIES, block => block.CustomName.Contains("[CRX] Refinery"));
@@ -771,6 +901,7 @@ namespace IngameScript {
             INVENTORIES.Clear();
             INVENTORIES.AddRange(blocksWithInventory.SelectMany(block => Enumerable.Range(0, block.InventoryCount).Select(block.GetInventory)));
             blocksWithInventory.Clear();
+            LCDUPDATEQUOTA = GridTerminalSystem.GetBlockWithName("[CRX] LCD Update Quota") as IMyTextPanel;
         }
 
         void ResetOreDict() {
