@@ -28,6 +28,7 @@ namespace IngameScript {
         bool navigator = false;
         bool power = false;
         bool inventory = false;
+        bool painter = false;
 
         string timeRemaining;
         int maxJump;
@@ -196,9 +197,8 @@ namespace IngameScript {
                 if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
-                    //DEBUG.ReadText(debugLog, true);
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
-                    DEBUG.WriteText(debugLog);
+                    DEBUG.WriteText(debugLog, false);
                 }
                 Runtime.UpdateFrequency = UpdateFrequency.None;
             }
@@ -216,9 +216,12 @@ namespace IngameScript {
                 navigator = false;
             }
 
-            foreach (MyPanel myPanel in PAINTER) {
-                LogPainter(myPanel);
-                yield return true;
+            if (painter) {
+                foreach (MyPanel myPanel in PAINTER) {
+                    LogPainter(myPanel);
+                    yield return true;
+                }
+                painter = false;
             }
 
             if (power) {
@@ -373,6 +376,8 @@ namespace IngameScript {
                             missilesLog.Add(tuple);
                         }
                     }
+
+                    painter = true;
                 }
                 //POWERMANAGER
                 else if (igcMessage.Data is MyTuple<
@@ -494,14 +499,14 @@ namespace IngameScript {
                 + $"{currentJump:###,###,###} ({totJumpPercent:0.#}%)\n"
                 + $"{maxJump:###,###,###}\n");
 
+            data2.Append($"\n"
+            + $"{rangeFinderName}\n");
             if (!Vector3D.IsZero(rangeFinderPosition)) {
-                data2.Append($"\n"
-                + $"{rangeFinderName}\n"
-                + $"{(int)rangeFinderDistance}\n"
+                data2.Append($"{(int)rangeFinderDistance}\n"
                 + $"{(int)rangeFinderDiameter}\n"
                 + $"{rangeFinderPosition.X:0.#},{rangeFinderPosition.Y:0.#},{rangeFinderPosition.Z:0.#}");
             } else {
-                data2.Append($"\n\n\n\n");
+                data2.Append($"\n\n");
             }
 
             data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
@@ -589,6 +594,10 @@ namespace IngameScript {
                 + $"\n");
             }
 
+            data.Append($"\n");
+            data2.Append($"\n");
+            data3.Append($"\n");
+            data4.Append($"\n");
             data5.Append($"\n\n\n\nMISSILES\n");
             foreach (MyTuple<string, string, string, string, string> log in missilesLog) {//toTarget=Item1,speed=Item2,command=command,status=status,type=type\n
                 data.Append($"\n");
@@ -759,6 +768,8 @@ namespace IngameScript {
 
                 data.Clear();
                 data2.Clear();
+                data3.Clear();
+                data4.Clear();
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);

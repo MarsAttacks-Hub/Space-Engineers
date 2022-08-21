@@ -383,6 +383,14 @@ namespace IngameScript {
                     MyTuple.Create(99, false, false, false, false)
                 );
                 IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
+            } else {
+                var tuple = MyTuple.Create(
+                        MyTuple.Create("", Vector3D.Zero, Vector3D.Zero),
+                        "",
+                        MyTuple.Create(weaponType, readyToFire, creative, autoFire),
+                        MyTuple.Create(99, false, false, false, false)
+                    );
+                IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
             }
         }
 

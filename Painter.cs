@@ -802,10 +802,16 @@ namespace IngameScript {
         void SendBroadcastLogMessage() {
             if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                 StringBuilder missileLog = new StringBuilder("");
+                int count = 1;
                 foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
-                    missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");//(info)"command=" + command + ",status=" + status + ",type=" + type;
+                    //(info)"command=" + command + ",status=" + status + ",type=" + type;
+                    if (count == missilesInfo.Count) {
+                        missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3);
+                    } else {
+                        missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");
+                    }
+                    count++;
                 }
-
                 Vector3D targetVelocity = targetInfo.Velocity;
                 var tuple = MyTuple.Create(
                     MyTuple.Create(targetInfo.Name, targetInfo.Position, targetVelocity),
@@ -814,21 +820,28 @@ namespace IngameScript {
                     MyTuple.Create(selectedPayLoad, autoMissiles, autoSwitchGuns, sequenceWeapons, missilesLoaded)
                 );
                 IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
-            } /*else {
+            } else {
+                StringBuilder missileLog = new StringBuilder("");
                 if (missilesInfo.Count > 0) {
-                    StringBuilder missileLog = new StringBuilder("");
+                    int count = 1;
                     foreach (KeyValuePair<long, MyTuple<double, double, string>> inf in missilesInfo) {
-                        missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");
+                        //(info)"command=" + command + ",status=" + status + ",type=" + type;
+                        if (count == missilesInfo.Count) {
+                            missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3);
+                        } else {
+                            missileLog.Append("toTarget=" + inf.Value.Item1.ToString("0.0") + ",speed=" + inf.Value.Item2.ToString("0.0") + "," + inf.Value.Item3 + "\n");
+                        }
+                        count++;
                     }
-                    var tuple = MyTuple.Create(
+                }
+                var tuple = MyTuple.Create(
                         MyTuple.Create("", Vector3D.Zero, Vector3D.Zero),
                         missileLog.ToString(),
                         MyTuple.Create(weaponType, readyToFire, creative, autoFire),
                         MyTuple.Create(selectedPayLoad, autoMissiles, autoSwitchGuns, sequenceWeapons, missilesLoaded)
                     );
-                    IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
-                }
-            }*/
+                IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
+            }
         }
 
         void RemoveLostMissiles() {
