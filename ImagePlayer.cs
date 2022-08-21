@@ -21,22 +21,50 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
 
+        //IMAGE PLAYER
         readonly int frameWidth = 178;
         readonly int frameHeight = 178;
+
+        int beerFrame = 72;
+        int dock1Frame = 18;
+        int dock2Frame = 16;
+        int dock3Frame = 14;
+        int dock4Frame = 12;
+        int hangar1Frame = 8;
+
+        double neonShopTime = 0d;
+        double neonBeerTime = 0d;
+        double neonChinaTime = 0d;
+        double corpsTime = 0d;
+        double commercialTime = 0d;
+        double hubsTime = 0d;
+        double hangarTime = 0d;
+        double docks1Time = 0d;
+        double docks2Time = 0d;
+        double docks3Time = 0d;
+        double docks4Time = 0d;
+        double dangerTime = 0d;
 
         public Gif gif;
         public Random random = new Random();
         IEnumerator<bool> stateMachine;
 
-        public List<IMyTextPanel> NEON = new List<IMyTextPanel>();
-        //public List<IMyTextPanel> COMMERCIAL = new List<IMyTextPanel>();
-        //public List<IMyTextPanel> WARNS = new List<IMyTextPanel>();
-        //public List<IMyTextPanel> CORPS = new List<IMyTextPanel>();
-        //public List<IMyTextPanel> HUBS = new List<IMyTextPanel>();
-        //public List<IMyTextPanel> STATIC = new List<IMyTextPanel>();
+        public List<IMyTextPanel> NEONSHOP = new List<IMyTextPanel>();
+        public List<IMyTextPanel> NEONBEER = new List<IMyTextPanel>();
+        public List<IMyTextPanel> NEONCHINA = new List<IMyTextPanel>();
+        public List<IMyTextPanel> CORPS = new List<IMyTextPanel>();
+        public List<IMyTextPanel> COMMERCIAL = new List<IMyTextPanel>();
+        public List<IMyTextPanel> HUBS = new List<IMyTextPanel>();
+        public List<IMyTextPanel> HANGARS = new List<IMyTextPanel>();
+        public List<IMyTextPanel> DOCKS1 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> DOCKS2 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> DOCKS3 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> DOCKS4 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> DANGER = new List<IMyTextPanel>();
+        public List<IMyTextPanel> STATIC = new List<IMyTextPanel>();
 
         public Program() {
-            Runtime.UpdateFrequency |= UpdateFrequency.Update100; //Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency |= UpdateFrequency.Update10;
             GetBlocks();
             Setup();
         }
@@ -47,14 +75,28 @@ namespace IngameScript {
             if (Storage[0] != (char)'|') {
                 Storage = gif.Serialize();
             }
+            foreach (IMyTextPanel panel in STATIC) {
+                panel.WriteText(new String(gif.frames[7]), false);
+            }
+            /*
+            IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
+            if (DEBUG != null) {
+                DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                DEBUG.FontSize = 0.1f;
+                DEBUG.Font = "Monospace";
+                DEBUG.TextPadding = 0f;
+                DEBUG.WriteText(new String(gif.frames[0]), false);
+            }
+            */
             stateMachine = RunOverTime();
         }
 
-        public void Main(UpdateType updateType) {
+        public void Main(string arg, UpdateType updateType) {
             try {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
+                Echo($"frames:{gif.frames.Count}");
 
-                if ((updateType & UpdateType.Update100) == UpdateType.Update100) {
+                if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
                     RunStateMachine();
                 }
             } catch (Exception e) {
@@ -70,18 +112,158 @@ namespace IngameScript {
         }
 
         public IEnumerator<bool> RunOverTime() {
-            foreach (IMyTextPanel panel in NEON) {
-                PlayNeon(panel);
-                yield return true;
+            double lastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+
+            if (NEONSHOP.Count > 0) {
+                if (neonShopTime > 2d) {
+                    neonShopTime = 0;
+                    foreach (IMyTextPanel panel in NEONSHOP) {
+                        PlayNeonShop(panel);
+                    }
+                    yield return true;
+                } else {
+                    neonShopTime += lastRun;
+                }
             }
 
+            if (NEONBEER.Count > 0) {
+                if (neonBeerTime > 2d) {
+                    neonBeerTime = 0;
+                    foreach (IMyTextPanel panel in NEONBEER) {
+                        PlayNeonBeer(panel);
+                    }
+                    yield return true;
+                } else {
+                    neonBeerTime += lastRun;
+                }
+            }
+
+            if (NEONCHINA.Count > 0) {
+                if (neonChinaTime > 2d) {
+                    neonChinaTime = 0;
+                    foreach (IMyTextPanel panel in NEONCHINA) {
+                        PlayNeonChina(panel);
+                    }
+                    yield return true;
+                } else {
+                    neonChinaTime += lastRun;
+                }
+            }
+
+            if (COMMERCIAL.Count > 0) {
+                if (commercialTime > 2d) {
+                    commercialTime = 0;
+                    foreach (IMyTextPanel panel in COMMERCIAL) {
+                        PlayCommercials(panel);
+                    }
+                    yield return true;
+                } else {
+                    commercialTime += lastRun;
+                }
+            }
+
+            if (CORPS.Count > 0) {
+                if (corpsTime > 3d) {
+                    corpsTime = 0;
+                    foreach (IMyTextPanel panel in CORPS) {
+                        PlayCorps(panel);
+                    }
+                    yield return true;
+                } else {
+                    corpsTime += lastRun;
+                }
+            }
+
+            if (HUBS.Count > 0) {
+                if (hubsTime > 2d) {
+                    hubsTime = 0;
+                    foreach (IMyTextPanel panel in HUBS) {
+                        PlayHubs(panel);
+                    }
+                    yield return true;
+                } else {
+                    hubsTime += lastRun;
+                }
+            }
+
+            if (HANGARS.Count > 0) {
+                if (hangarTime > 3d) {
+                    hangarTime = 0;
+                    foreach (IMyTextPanel panel in HANGARS) {
+                        PlayHangar(panel);
+                    }
+                    yield return true;
+                } else {
+                    hangarTime += lastRun;
+                }
+            }
+
+            if (DOCKS1.Count > 0) {
+                if (docks1Time > 5d) {
+                    docks1Time = 0;
+                    foreach (IMyTextPanel panel in DOCKS1) {
+                        PlayDock1(panel);
+                    }
+                    yield return true;
+                } else {
+                    docks1Time += lastRun;
+                }
+            }
+
+            if (DOCKS2.Count > 0) {
+                if (docks2Time > 5d) {
+                    docks2Time = 0;
+                    foreach (IMyTextPanel panel in DOCKS2) {
+                        PlayDock2(panel);
+                    }
+                    yield return true;
+                } else {
+                    docks2Time += lastRun;
+                }
+            }
+
+            if (DOCKS3.Count > 0) {
+                if (docks3Time > 5d) {
+                    docks3Time = 0;
+                    foreach (IMyTextPanel panel in DOCKS3) {
+                        PlayDock3(panel);
+                    }
+                    yield return true;
+                } else {
+                    docks3Time += lastRun;
+                }
+            }
+
+            if (DOCKS4.Count > 0) {
+                if (docks4Time > 5d) {
+                    docks4Time = 0;
+                    foreach (IMyTextPanel panel in DOCKS4) {
+                        PlayDock4(panel);
+                    }
+                    yield return true;
+                } else {
+                    docks4Time += lastRun;
+                }
+            }
+
+            if (DANGER.Count > 0) {
+                if (dangerTime > 3d) {
+                    dangerTime = 0;
+                    foreach (IMyTextPanel panel in DANGER) {
+                        PlayDanger(panel);
+                    }
+                    yield return true;
+                } else {
+                    dangerTime += lastRun;
+                }
+            }
         }
 
         public void RunStateMachine() {
             if (stateMachine != null) {
                 bool hasMoreSteps = stateMachine.MoveNext();
                 if (hasMoreSteps) {
-                    Runtime.UpdateFrequency |= UpdateFrequency.Update100;
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
                 } else {
                     Echo($"Dispose");
 
@@ -91,20 +273,183 @@ namespace IngameScript {
             }
         }
 
-        void PlayNeon(IMyTextPanel myPanel) {
-            int rndmFrame = random.Next(68, 71);
+        void PlayNeonShop(IMyTextPanel myPanel) {
+            int rndmFrame = random.Next(68, 71);//TODO
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 
+        void PlayNeonBeer(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[beerFrame]), false);
+            beerFrame = beerFrame >= 73 ? 72 : beerFrame + 1;
+        }
+
+        void PlayNeonChina(IMyTextPanel myPanel) {
+            int rndmFrame = random.Next(74, gif.frames.Count);//TODO
+            myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
+        }
+
+        void PlayCorps(IMyTextPanel myPanel) {
+            int rndmFrame = random.Next(35, 47);//TODO
+            myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
+        }
+
+        void PlayCommercials(IMyTextPanel myPanel) {
+            int rndmFrame = random.Next(48, 66);//TODO
+            myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
+        }
+
+        void PlayHubs(IMyTextPanel myPanel) {
+            int rndmFrame = random.Next(20, 34);//TODO
+            myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
+        }
+
+        void PlayDock1(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[dock1Frame]), false);
+            dock1Frame = dock1Frame >= 19 ? 18 : dock1Frame + 1;
+        }
+
+        void PlayDock2(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[dock2Frame]), false);
+            dock2Frame = dock2Frame >= 17 ? 16 : dock2Frame + 1;
+        }
+
+        void PlayDock3(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[dock3Frame]), false);
+            dock3Frame = dock3Frame >= 15 ? 14 : dock3Frame + 1;
+        }
+
+        void PlayDock4(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[dock4Frame]), false);
+            dock4Frame = dock4Frame >= 13 ? 12 : dock4Frame + 1;
+        }
+
+        void PlayHangar(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[hangar1Frame]), false);
+            hangar1Frame = hangar1Frame >= 9 ? 8 : hangar1Frame + 1;
+        }
+
+        void PlayDanger(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[hangar1Frame]), false);
+            hangar1Frame = hangar1Frame >= 11 ? 10 : hangar1Frame + 1;
+        }
+
         void GetBlocks() {
-            NEON.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(NEON, block => block.CustomName.Contains("[CRX] LCD Image Player Neon"));
-            foreach (IMyTextPanel panel in NEON) {
+            NEONSHOP.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(NEONSHOP, block => block.CustomName.Contains("[CRX] LCD Player Neon Shop"));
+            foreach (IMyTextPanel panel in NEONSHOP) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
-                panel.Font = "Monospace";//myPanel.SetValue<long>("Font", 1147350002);
+                panel.Font = "Monospace";
                 panel.TextPadding = 0f;
             }
 
+            NEONBEER.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(NEONBEER, block => block.CustomName.Contains("[CRX] LCD Player Neon Beer"));
+            foreach (IMyTextPanel panel in NEONBEER) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            NEONCHINA.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(NEONCHINA, block => block.CustomName.Contains("[CRX] LCD Player Neon China"));
+            foreach (IMyTextPanel panel in NEONCHINA) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            CORPS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(CORPS, block => block.CustomName.Contains("[CRX] LCD Player Corps"));
+            foreach (IMyTextPanel panel in CORPS) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            COMMERCIAL.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(COMMERCIAL, block => block.CustomName.Contains("[CRX] LCD Player Commercial"));
+            foreach (IMyTextPanel panel in COMMERCIAL) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            HUBS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(HUBS, block => block.CustomName.Contains("[CRX] LCD Player Hubs"));
+            foreach (IMyTextPanel panel in HUBS) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            HANGARS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(HANGARS, block => block.CustomName.Contains("[CRX] LCD Player Hangars"));
+            foreach (IMyTextPanel panel in HANGARS) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            DOCKS1.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS1, block => block.CustomName.Contains("[CRX] LCD Player Docks A"));
+            foreach (IMyTextPanel panel in DOCKS1) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            DOCKS2.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS2, block => block.CustomName.Contains("[CRX] LCD Player Docks B"));
+            foreach (IMyTextPanel panel in DOCKS2) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            DOCKS3.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS3, block => block.CustomName.Contains("[CRX] LCD Player Docks C"));
+            foreach (IMyTextPanel panel in DOCKS3) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            DOCKS4.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS4, block => block.CustomName.Contains("[CRX] LCD Player Docks D"));
+            foreach (IMyTextPanel panel in DOCKS4) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            DANGER.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DANGER, block => block.CustomName.Contains("[CRX] LCD Player Danger"));
+            foreach (IMyTextPanel panel in DANGER) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
+
+            STATIC.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(STATIC, block => block.CustomName.Contains("[CRX] LCD Player Static"));
+            foreach (IMyTextPanel panel in STATIC) {
+                panel.ContentType = ContentType.TEXT_AND_IMAGE;
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";
+                panel.TextPadding = 0f;
+            }
         }
 
         public class Decoder {
