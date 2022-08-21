@@ -377,8 +377,10 @@ namespace IngameScript {
             if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                 Vector3D targetVelocity = targetInfo.Velocity;
                 var tuple = MyTuple.Create(
-                    MyTuple.Create(targetInfo.Name, targetInfo.HitPosition.Value, targetInfo.Position, targetVelocity),
-                    ""
+                    MyTuple.Create(targetInfo.Name, targetInfo.Position, targetVelocity),
+                    "",
+                    MyTuple.Create(weaponType, readyToFire, creative, autoFire),
+                    MyTuple.Create(99, false, false, false, false)
                 );
                 IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
             }
@@ -408,7 +410,9 @@ namespace IngameScript {
             }
             var tuple = MyTuple.Create(
                 MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
-                MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter)
+                MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter),
+                MyTuple.Create(magneticDrive, idleThrusters, sunAlign, false, false, false),
+                MyTuple.Create(false, false, false, false, false, false)
                 );
             IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }

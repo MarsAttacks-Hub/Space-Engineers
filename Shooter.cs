@@ -278,6 +278,9 @@ namespace IngameScript {
             MyTuple<string, bool> tuple = MyTuple.Create(variable, readyToFire);
             IGC.SendBroadcastMessage("[PAINTER]", tuple, TransmissionDistance.ConnectedConstructs);
             IGC.SendBroadcastMessage("[MULTI]", tuple, TransmissionDistance.ConnectedConstructs);
+
+            MyTuple<int, bool, bool, bool, bool> aTuple = MyTuple.Create(selectedDrop, readyJolt, toggleJolt, readyDecoy, toggleDecoy);
+            IGC.SendBroadcastMessage("[LOGGER]", aTuple, TransmissionDistance.ConnectedConstructs);
         }
 
         bool CheckProjectors(List<IMyProjector> projectors, List<IMyShipWelder> welders) {

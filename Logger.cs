@@ -41,7 +41,6 @@ namespace IngameScript {
         double rangeFinderDiameter;
 
         string targetName;
-        //Vector3D targetHitPosition;
         Vector3D targetPosition;
         Vector3D targetVelocity;
         double targetDistance;
@@ -53,19 +52,14 @@ namespace IngameScript {
         float battsCurrentInput;
         float battsCurrentOutput;
         float battsMaxOutput;
-        //int batteriesCount;
         float battsCurrentStoredPower;
         float battsMaxStoredPower;
         float reactorsCurrentOutput;
         float reactorsMaxOutput;
-        //int reactorsCount;
         float hEngCurrentOutput;
         float hEngMaxOutput;
-        //int hEnginesCount;
         float solarMaxOutput;
-        //int solarsCount;
         float turbineMaxOutput;
-        //int turbinesCount;
         double tankCapacityPercent;
 
         double cargoPercentage;
@@ -74,11 +68,43 @@ namespace IngameScript {
         Dictionary<string, string> ingotsLogDict = new Dictionary<string, string>();
         Dictionary<string, string> componentsLogDict = new Dictionary<string, string>();
 
+        int weaponType = 0;
+        bool readyToFire = true;
+
+        int selectedPayLoad = 0;
+        bool missilesLoaded = true;
+
+        int selectedDrop = 0;
+        bool toggleDecoy = false;
+        bool readyDecoy = true;
+        bool readyJolt = true;
+        bool toggleJolt = false;
+
+        bool autoMissiles = false;
+        bool autoSwitchGuns = false;
+        bool sequenceWeapons = false;
+        bool creative = false;
+        bool autoFire = false;
+
+        bool magneticDrive = false;
+        bool idleThrusters = false;
+        bool sunAlign = false;
+        bool safetyDampeners = false;
+        bool useGyrosToStabilize = false;
+        bool autoCombat = false;
+        bool obstaclesAvoidance = false;
+        bool collisionDetection = false;
+        bool enemyEvasion = false;
+        bool keepAltitude = false;
+        bool moddedSensor = false;
+        bool closeRangeCombat = false;
+
         public List<MyPanel> POWER = new List<MyPanel>();
         public List<MyPanel> NAVIGATOR = new List<MyPanel>();
         public List<MyPanel> PAINTER = new List<MyPanel>();
         public List<MyPanel> OREINGOTS = new List<MyPanel>();
         public List<MyPanel> COMPONENTSAMMO = new List<MyPanel>();
+        public List<MyPanel> OVERVIEW = new List<MyPanel>();
 
         IMyTextPanel LCDBEAUTIFY;
 
@@ -139,7 +165,6 @@ namespace IngameScript {
                 randomPositions2.Add(new Vector2(-240f, 225f));
                 randomPositions2.Add(new Vector2(-180f, 225f));
                 randomPositions2.Add(new Vector2(-60f, 225f));
-                randomPositions2.Add(new Vector2(0f, 225f));
                 randomPositions2.Add(new Vector2(60f, 225f));
                 randomPositions2.Add(new Vector2(180f, 225f));
                 randomPositions2.Add(new Vector2(240f, 225f));
@@ -215,6 +240,11 @@ namespace IngameScript {
                 }
                 inventory = false;
             }
+
+            foreach (MyPanel myPanel in OVERVIEW) {
+                LogOverview(myPanel);
+                yield return true;
+            }
         }
 
         public void RunStateMachine() {
@@ -257,11 +287,15 @@ namespace IngameScript {
                 //NAVIGATOR
                 if (igcMessage.Data is MyTuple<
                     MyTuple<string, int, int, double, double, double>,
-                    MyTuple<Vector3D, string, double, double>
+                    MyTuple<Vector3D, string, double, double>,
+                    MyTuple<bool, bool, bool, bool, bool, bool>,
+                    MyTuple<bool, bool, bool, bool, bool, bool>
                 >) {
                     var data = (MyTuple<
                         MyTuple<string, int, int, double, double, double>,
-                        MyTuple<Vector3D, string, double, double>
+                        MyTuple<Vector3D, string, double, double>,
+                        MyTuple<bool, bool, bool, bool, bool, bool>,
+                        MyTuple<bool, bool, bool, bool, bool, bool>
                     >)igcMessage.Data;
 
                     timeRemaining = data.Item1.Item1;
@@ -276,23 +310,51 @@ namespace IngameScript {
                     rangeFinderDistance = data.Item2.Item3;
                     rangeFinderDiameter = data.Item2.Item4;
 
+                    magneticDrive = data.Item3.Item1;
+                    idleThrusters = data.Item3.Item2;
+                    sunAlign = data.Item3.Item3;
+                    safetyDampeners = data.Item3.Item4;
+                    useGyrosToStabilize = data.Item3.Item5;
+                    autoCombat = data.Item3.Item6;
+
+                    obstaclesAvoidance = data.Item4.Item1;
+                    collisionDetection = data.Item4.Item2;
+                    enemyEvasion = data.Item4.Item3;
+                    keepAltitude = data.Item4.Item4;
+                    moddedSensor = data.Item4.Item5;
+                    closeRangeCombat = data.Item4.Item6;
+
                     navigator = true;
                 }
                 //PAINTER
                 else if (igcMessage.Data is MyTuple<
-                    MyTuple<string, Vector3D, Vector3D, Vector3D>,
-                    string
+                    MyTuple<string, Vector3D, Vector3D>,
+                    string,
+                    MyTuple<int, bool, bool, bool>,
+                    MyTuple<int, bool, bool, bool, bool>
                 >) {
                     var data = (MyTuple<
-                        MyTuple<string, Vector3D, Vector3D, Vector3D>,
-                        string
+                        MyTuple<string, Vector3D, Vector3D>,
+                        string,
+                        MyTuple<int, bool, bool, bool>,
+                        MyTuple<int, bool, bool, bool, bool>
                     >)igcMessage.Data;
 
                     targetName = data.Item1.Item1;
-                    //targetHitPosition = data.Item1.Item2;
-                    targetPosition = data.Item1.Item3;
-                    targetVelocity = data.Item1.Item4;
+                    targetPosition = data.Item1.Item2;
+                    targetVelocity = data.Item1.Item3;
                     targetDistance = Vector3D.Distance(targetPosition, Me.CubeGrid.WorldVolume.Center);
+
+                    weaponType = data.Item3.Item1;
+                    readyToFire = data.Item3.Item2;
+                    creative = data.Item3.Item3;
+                    autoFire = data.Item3.Item4;
+
+                    selectedPayLoad = data.Item4.Item1;
+                    autoMissiles = data.Item4.Item2;
+                    autoSwitchGuns = data.Item4.Item3;
+                    sequenceWeapons = data.Item4.Item4;
+                    missilesLoaded = data.Item4.Item5;
 
                     missilesLog.Clear();
                     if (!string.IsNullOrEmpty(data.Item2)) {
@@ -315,40 +377,40 @@ namespace IngameScript {
                 //POWERMANAGER
                 else if (igcMessage.Data is MyTuple<
                     MyTuple<string, float, float>,
-                    MyTuple<float, float, float, int, float, float>,
-                    MyTuple<float, float, int>,
-                    MyTuple<float, float, int>,
-                    MyTuple<float, int, float, int>,
+                    MyTuple<float, float, float, float, float>,
+                    MyTuple<float, float>,
+                    MyTuple<float, float>,
+                    MyTuple<float, float>,
                     double
                 >) {
                     var data = (MyTuple<
                         MyTuple<string, float, float>,
-                        MyTuple<float, float, float, int, float, float>,
-                        MyTuple<float, float, int>,
-                        MyTuple<float, float, int>,
-                        MyTuple<float, int, float, int>,
+                        MyTuple<float, float, float, float, float>,
+                        MyTuple<float, float>,
+                        MyTuple<float, float>,
+                        MyTuple<float, float>,
                         double
                     >)igcMessage.Data;
 
                     powerStatus = data.Item1.Item1;
                     terminalCurrentInput = data.Item1.Item2;
                     terminalMaxRequiredInput = data.Item1.Item3;
+
                     battsCurrentInput = data.Item2.Item1;
                     battsCurrentOutput = data.Item2.Item2;
                     battsMaxOutput = data.Item2.Item3;
-                    //batteriesCount = data.Item2.Item4;
-                    battsCurrentStoredPower = data.Item2.Item5;
-                    battsMaxStoredPower = data.Item2.Item6;
+                    battsCurrentStoredPower = data.Item2.Item4;
+                    battsMaxStoredPower = data.Item2.Item5;
+
                     reactorsCurrentOutput = data.Item3.Item1;
                     reactorsMaxOutput = data.Item3.Item2;
-                    //reactorsCount = data.Item3.Item3;
+
                     hEngCurrentOutput = data.Item4.Item1;
                     hEngMaxOutput = data.Item4.Item2;
-                    //hEnginesCount = data.Item4.Item3;
+
                     solarMaxOutput = data.Item5.Item1;
-                    //solarsCount = data.Item5.Item2;
-                    turbineMaxOutput = data.Item5.Item3;
-                    //turbinesCount = data.Item5.Item4;
+                    turbineMaxOutput = data.Item5.Item2;
+
                     tankCapacityPercent = data.Item6;
 
                     power = true;
@@ -388,6 +450,16 @@ namespace IngameScript {
                     }
 
                     inventory = true;
+                }
+                //SHOOTER
+                else if (igcMessage.Data is MyTuple<int, bool, bool, bool, bool>) {
+                    var data = (MyTuple<int, bool, bool, bool, bool>)igcMessage.Data;
+
+                    selectedDrop = data.Item1;
+                    readyJolt = data.Item2;
+                    toggleJolt = data.Item3;
+                    readyDecoy = data.Item4;
+                    toggleDecoy = data.Item5;
                 }
             }
         }
@@ -447,7 +519,7 @@ namespace IngameScript {
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
                 DrawSpritesTabsJumpRangeFinder(frame, myPanel.viewport.Center, myPanel.minScale);
 
-                float columnSizeMultiplier = 150f * myPanel.minScale / 100f; ;
+                float columnSizeMultiplier = 150f * myPanel.minScale / 100f;
                 float width = 2f * myPanel.minScale;
 
                 DrawRandomGraph(frame, randomPositions1,
@@ -469,7 +541,6 @@ namespace IngameScript {
                 randomPositions2.Add(new Vector2(-240f, 225f));
                 randomPositions2.Add(new Vector2(-180f, 225f));
                 randomPositions2.Add(new Vector2(-60f, 225f));
-                randomPositions2.Add(new Vector2(0f, 225f));
                 randomPositions2.Add(new Vector2(60f, 225f));
                 randomPositions2.Add(new Vector2(180f, 225f));
                 randomPositions2.Add(new Vector2(240f, 225f));
@@ -617,7 +688,7 @@ namespace IngameScript {
                 Vector2 removePos = new Vector2(-240f, -230f) * myPanel.minScale + myPanel.viewport.Center;
                 Vector2 startPos = new Vector2(240f, 230f) * myPanel.minScale + myPanel.viewport.Center;
                 Vector2 movementPos = new Vector2(-5f, 0f) * myPanel.minScale;
-                float columnSizeMultiplier = 200f * myPanel.minScale / 100f; ;
+                float columnSizeMultiplier = 200f * myPanel.minScale / 100f;
                 float width = 2f * myPanel.minScale;
 
                 tankCapacityOutputs = DrawMovingGraph(frame, tankCapacityOutputs,
@@ -667,6 +738,27 @@ namespace IngameScript {
                     columnSizeMultiplier,
                     terminalCurrentInput / terminalMaxRequiredInput * 100f,
                     width, transparentNeonAzure);
+
+            } else if (myPanel.subTypeId == "SmallCockpitPanel") {
+                string uranium;
+                ingotsLogDict.TryGetValue("Uranium", out uranium);
+
+                string ice;
+                oreLogDict.TryGetValue("Ice", out ice);
+
+                data.Append("\n\n\n\n\n\n\n\nUranium: ");
+                data2.Append($"\n\n\n\n\n\n\n\n{uranium:0.#}");
+                data3.Append("\n\n\n\n\n\n\n\nIce: ");
+                data4.Append($"\n\n\n\n\n\n\n\n{ice:0.#}");
+
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+
+                data.Clear();
+                data2.Clear();
             }
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
@@ -836,6 +928,262 @@ namespace IngameScript {
                     myPanel.animationCount = 0;
                 }
             }
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
+        }
+
+        void LogOverview(MyPanel myPanel) {
+            Echo($"LogOverview");
+
+            float orizontalMargin = 20f * myPanel.minScale;
+            float verticalMargin = 30f * myPanel.minScale;
+
+            string gun;
+            switch (weaponType) {
+                case 0: gun = "Jolt"; break;
+                case 1: gun = "Rockets"; break;
+                case 2: gun = "Gatlings"; break;
+                case 3: gun = "Autocannon"; break;
+                case 4: gun = "Assault"; break;
+                case 5: gun = "Artillery"; break;
+                case 6: gun = "Railgun"; break;
+                case 7: gun = "Small Rail"; break;
+                default: gun = "None"; break;
+            }
+            if (readyToFire) {
+                data.Append($"{gun}\n"); data2.Append("\n");
+            } else {
+                data2.Append($"{gun}\n"); data.Append("\n");
+            }
+
+            string drop;
+            switch (selectedDrop) {
+                case 0: drop = "Decoy"; break;
+                case 1: drop = "Bomb"; break;
+                default: drop = "None"; break;
+            }
+            if (readyDecoy) {
+                if (toggleDecoy) {
+                    data.Append($"{drop} TOG\n"); data2.Append("\n");
+                } else {
+                    data.Append($"{drop}\n"); data2.Append("\n");
+                }
+            } else {
+                if (toggleDecoy) {
+                    data2.Append($"{drop} TOG\n"); data.Append("\n");
+                } else {
+                    data2.Append($"{drop}\n"); data.Append("\n");
+                }
+            }
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+                data.ToString(), "Default", myPanel.minScale, magenta));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+                data2.ToString(), "Default", myPanel.minScale, purple));
+
+            data.Clear();
+            data2.Clear();
+
+            data.Append($"\n\n");
+            data2.Append("\n\n");
+
+            if (autoFire) {
+                data.Append("A-Fire\n"); data2.Append("\n");
+            } else {
+                data2.Append("A-Fire\n"); data.Append("\n");
+            }
+            if (autoSwitchGuns) {
+                data.Append("A-Switch\n"); data2.Append("\n");
+            } else {
+                data2.Append("A-Switch\n"); data.Append("\n");
+            }
+            if (sequenceWeapons) {
+                data.Append("Sequencer\n"); data2.Append("\n");
+            } else {
+                data2.Append("Sequencer\n"); data.Append("\n");
+            }
+            if (autoMissiles) {
+                data.Append("A-Missiles\n"); data2.Append("\n");
+            } else {
+                data2.Append("A-Missiles\n"); data.Append("\n");
+            }
+            if (creative) {
+                data.Append("Creative\n"); data2.Append("\n");
+            } else {
+                data2.Append("Creative\n"); data.Append("\n");
+            }
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+                data.ToString(), "Default", myPanel.minScale, azure));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+                data2.ToString(), "Default", myPanel.minScale, purple));
+
+            data.Clear();
+            data2.Clear();
+
+            string payLoad;
+            switch (selectedPayLoad) {
+                case 0: payLoad = "Missiles"; break;
+                case 1: payLoad = "Drones"; break;
+                default: payLoad = "None"; break;
+            }
+            if (missilesLoaded) {
+                data.Append($"{payLoad}\n"); data2.Append("\n");
+            } else {
+                data2.Append($"{payLoad}\n"); data.Append("\n");
+            }
+
+            if (readyJolt) {
+                if (toggleJolt) {
+                    data.Append("Jolt TOG\n"); data2.Append("\n");
+                } else {
+                    data.Append("Jolt\n"); data2.Append("\n");
+                }
+            } else {
+                if (toggleJolt) {
+                    data2.Append("Jolt TOG\n"); data.Append("\n");
+                } else {
+                    data2.Append("Jolt\n"); data.Append("\n");
+                }
+            }
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+                data.ToString(), "Default", myPanel.minScale, magenta));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+                data2.ToString(), "Default", myPanel.minScale, purple));
+
+            data.Clear();
+            data2.Clear();
+
+            data.Append($"\n\n");
+            data2.Append("\n\n");
+
+            if (autoCombat) {
+                data.Append("A-Combat\n"); data2.Append("\n");
+            } else {
+                data2.Append("A-Combat\n"); data.Append("\n");
+            }
+            if (enemyEvasion) {
+                data.Append("Evasion\n"); data2.Append("\n");
+            } else {
+                data2.Append("Evasion\n"); data.Append("\n");
+            }
+            if (collisionDetection) {
+                data.Append("Collision\n"); data2.Append("\n");
+            } else {
+                data2.Append("Collision\n"); data.Append("\n");
+            }
+            if (obstaclesAvoidance) {
+                data.Append("Obstacles\n"); data2.Append("\n");
+            } else {
+                data2.Append("Obstacles\n"); data.Append("\n");
+            }
+            if (closeRangeCombat) {
+                data.Append("CloseRange\n"); data2.Append("\n");
+            } else {
+                data2.Append("CloseRange\n"); data.Append("\n");
+            }
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+                data.ToString(), "Default", myPanel.minScale, azure));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+                data2.ToString(), "Default", myPanel.minScale, purple));
+
+            data.Clear();
+            data2.Clear();
+
+
+            if (magneticDrive) {
+                data.Append("Magnetic\n"); data2.Append("\n");
+            } else {
+                data2.Append("Magnetic\n"); data.Append("\n");
+            }
+            if (useGyrosToStabilize) {
+                data.Append("Stabilizer\n"); data2.Append("\n");
+            } else {
+                data2.Append("Stabilizer\n"); data.Append("\n");
+            }
+            if (idleThrusters) {
+                data.Append("Thrusters\n"); data2.Append("\n");
+            } else {
+                data2.Append("Thrusters\n"); data.Append("\n");
+            }
+            if (safetyDampeners) {
+                data.Append("Dampeners\n"); data2.Append("\n");
+            } else {
+                data2.Append("Dampeners\n"); data.Append("\n");
+            }
+            if (keepAltitude) {
+                data.Append("Altitude\n"); data2.Append("\n");
+            } else {
+                data2.Append("Altitude\n"); data.Append("\n");
+            }
+            if (moddedSensor) {
+                data.Append("Sensors\n"); data2.Append("\n");
+            } else {
+                data2.Append("Sensors\n"); data.Append("\n");
+            }
+            if (sunAlign) {
+                data.Append("SunAlign\n"); data2.Append("\n");
+            } else {
+                data2.Append("SunAlign\n"); data.Append("\n");
+            }
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_3.X + myPanel.col3_3.Width + orizontalMargin, myPanel.col3_3.Y + verticalMargin),
+                data.ToString(), "Default", myPanel.minScale, azure));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_3.X + myPanel.col3_3.Width + orizontalMargin, myPanel.col3_3.Y + verticalMargin),
+                data2.ToString(), "Default", myPanel.minScale, purple));
+
+            data.Clear();
+            data2.Clear();
+
+            data.Append("\n\n\n\n\n\n\n");
+            data2.Append("\n\n\n\n\n\n\n");
+            data3.Append("\n\n\n\n\n\n\n");
+            data4.Append("\n\n\n\n\n\n\n");
+
+            bool alternate = true;
+            foreach (var log in ammoLogDict) {
+                if (alternate) {
+                    data.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "").Replace("mm", "")}: \n");
+                    alternate = false;
+                } else {
+                    data3.Append($"{log.Key.Replace("Ammo", "").Replace("Clip", "").Replace("mm", "")}: \n");
+                    alternate = true;
+                }
+            }
+            alternate = true;
+            foreach (var log in ammoLogDict) {
+                if (alternate) {
+                    data2.Append($"{log.Value}\n");
+                    alternate = false;
+                } else {
+                    data4.Append($"{log.Value}\n");
+                    alternate = true;
+                }
+            }
+
+            orizontalMargin = 75f * myPanel.minScale;
+            verticalMargin = 50f * myPanel.minScale;
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + orizontalMargin, myPanel.col1_4.Y + verticalMargin),
+                data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + orizontalMargin, myPanel.col2_4.Y + verticalMargin),
+                data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + orizontalMargin, myPanel.col3_4.Y + verticalMargin),
+                data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + orizontalMargin, myPanel.col4_4.Y + verticalMargin),
+                data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+
+            data.Clear();
+            data2.Clear();
+            data3.Clear();
+            data4.Clear();
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             foreach (var sprite in sprites) {
                 frame.Add(sprite);
             }
@@ -1090,7 +1438,7 @@ namespace IngameScript {
                 myIni.TryParse(cockpit.CustomData, "RangeFinderSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToString())) {
                     int cockpitRangeFinderSurface = myIni.Get("RangeFinderSettings", "cockpitRangeFinderSurface").ToInt32();
-                    NAVIGATOR.Add(new MyPanel(cockpit.GetSurface(cockpitRangeFinderSurface), "SmallLCDPanel"));//TODO 1
+                    NAVIGATOR.Add(new MyPanel(cockpit.GetSurface(cockpitRangeFinderSurface), "SmallCockpitPanel"));// 1
                 }
             }
             panels.Clear();
@@ -1105,7 +1453,7 @@ namespace IngameScript {
                 myIni.TryParse(cockpit.CustomData, "MissilesSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("MissilesSettings", "cockpitTargetSurface").ToString())) {
                     int cockpitTargetSurface = myIni.Get("MissilesSettings", "cockpitTargetSurface").ToInt32();
-                    PAINTER.Add(new MyPanel(cockpit.GetSurface(cockpitTargetSurface), "SmallLCDPanel"));//TODO 0
+                    PAINTER.Add(new MyPanel(cockpit.GetSurface(cockpitTargetSurface), "SmallCockpitPanel"));// 0
                 }
             }
             panels.Clear();
@@ -1120,7 +1468,7 @@ namespace IngameScript {
                 myIni.TryParse(cockpit.CustomData, "ManagerSettings", out result);
                 if (!string.IsNullOrEmpty(myIni.Get("ManagerSettings", "cockpitPowerSurface").ToString())) {
                     int cockpitPowerSurface = myIni.Get("ManagerSettings", "cockpitPowerSurface").ToInt32();
-                    POWER.Add(new MyPanel(cockpit.GetSurface(cockpitPowerSurface), "SmallLCDPanel"));//TODO 2
+                    POWER.Add(new MyPanel(cockpit.GetSurface(cockpitPowerSurface), "SmallCockpitPanel"));// 2
                 }
             }
             panels.Clear();
@@ -1139,6 +1487,21 @@ namespace IngameScript {
             }
             panels.Clear();
 
+            OVERVIEW.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD Overview"));
+            foreach (IMyTextPanel panel in panels) {
+                OVERVIEW.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
+            }
+            foreach (IMyCockpit cockpit in cockpits) {
+                MyIniParseResult result;
+                myIni.TryParse(cockpit.CustomData, "OverviewSettings", out result);
+                if (!string.IsNullOrEmpty(myIni.Get("OverviewSettings", "cockpitOverviewSurface").ToString())) {
+                    int cockpitOverviewSurface = myIni.Get("OverviewSettings", "cockpitOverviewSurface").ToInt32();
+                    OVERVIEW.Add(new MyPanel(cockpit.GetSurface(cockpitOverviewSurface), "SmallCockpitPanel"));// 3
+                }
+            }
+            panels.Clear();
+
             LCDBEAUTIFY = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Beautify Logs") as IMyTextPanel;
         }
 
@@ -1152,6 +1515,7 @@ namespace IngameScript {
             public readonly RectangleF col4_4;
             public readonly RectangleF col1_3;
             public readonly RectangleF col2_3;
+            public readonly RectangleF col3_3;
             public readonly RectangleF viewport;
             //public readonly RectangleF topHalf;
             //public readonly RectangleF bottomHalf;
@@ -1162,7 +1526,7 @@ namespace IngameScript {
                 surface = _surface;
                 Vector2 scale = _surface.SurfaceSize / 512f;
                 minScale = Math.Min(scale.X, scale.Y);
-                if (_subTypeId == "SmallLCDPanel") {//TODO cockpit panel
+                if (_subTypeId == "SmallCockpitPanel") {//cockpit panel
                     minScale += 0.2f;
                 }
                 col1_4 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 4f, new Vector2(surface.SurfaceSize.X / 4f, surface.SurfaceSize.Y));
@@ -1172,6 +1536,7 @@ namespace IngameScript {
 
                 col1_3 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 3f, new Vector2(surface.SurfaceSize.X / 3f, surface.SurfaceSize.Y));
                 col2_3 = new RectangleF(col1_3.X + (surface.SurfaceSize.X / 3f), col1_3.Y, col1_3.Width, col1_3.Height);
+                col3_3 = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 3f, new Vector2(surface.SurfaceSize.X / 3f * 2f, surface.SurfaceSize.Y));
 
                 viewport = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, surface.SurfaceSize);
 

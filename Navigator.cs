@@ -451,7 +451,9 @@ namespace IngameScript {
             }
             var tuple = MyTuple.Create(
                 MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
-                MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter)
+                MyTuple.Create(rangeFinderPosition, !string.IsNullOrEmpty(rangeFinderName) ? rangeFinderName : selectedPlanet, rangeFinderDistance, rangeFinderDiameter),
+                MyTuple.Create(magneticDrive, idleThrusters, sunAlign, safetyDampeners, useGyrosToStabilize, autoCombat),
+                MyTuple.Create(obstaclesAvoidance, collisionDetection, enemyEvasion, keepAltitude, moddedSensor, closeRangeCombat)
                 );
             IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }

@@ -334,10 +334,10 @@ namespace IngameScript {
         void SendBroadcastMessage() {
             var tuple = MyTuple.Create(
                 MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput),
-                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, BATTERIES.Count, battsCurrentStoredPower, battsMaxStoredPower),
-                MyTuple.Create(reactorsCurrentOutput, reactorsMaxOutput, REACTORS.Count),
-                MyTuple.Create(hEngCurrentOutput, hEngMaxOutput, HENGINES.Count),
-                MyTuple.Create(solarMaxOutput, SOLARS.Count, turbineMaxOutput, TURBINES.Count),
+                MyTuple.Create(battsCurrentInput, battsCurrentOutput, battsMaxOutput, battsCurrentStoredPower, battsMaxStoredPower),
+                MyTuple.Create(reactorsCurrentOutput, reactorsMaxOutput),
+                MyTuple.Create(hEngCurrentOutput, hEngMaxOutput),
+                MyTuple.Create(solarMaxOutput, turbineMaxOutput),
                 tankCapacityPercent
                 );
             IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
