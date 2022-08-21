@@ -21,372 +21,105 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
 
-        int frameWidth = 178;
-        int frameHeight = 178;
-
-        string[] lcdCommercialsNames = new string[] { "[MGNT] LCD Living Room 1", "[MGNT] LCD Living Room 2", "[MGNT] LCD Store Room 1" };
-        string[] lcdNeonNames = new string[] { "[MGNT] LCD Store Room 4", "[MGNT] LCD Store Room 2", "[MGNT] LCD Store Room 3", "[MGNT] LCD Store Room 5" };
-        string[] lcdWarnsNames = new string[] { "[MGNT] LCD Dock BL 1", "[MGNT] LCD Dock BR 1", "[MGNT] LCD Dock FL 1", "[MGNT] LCD Dock FR 1", "[MGNT] LCD Front Hangar 1", "[MGNT] LCD Back Hangar 1" };
-        string[] lcdCorpsNames = new string[] { "[MGNT] LCD Dock BL 2", "[MGNT] LCD Dock BR 2", "[MGNT] LCD Dock FL 2", "[MGNT] LCD Dock FR 2" };
-        string[] lcdHubsNames = new string[] { "[MGNT] LCD Med Room 1", "[MGNT] LCD Med Room 2", "[MGNT] LCD Med Room 3", "[MGNT] LCD Med Room 4", "[MGNT] LCD Front Bridge 5", "[MGNT] LCD Front Bridge 6" };
-        string[] lcdStaticNames = new string[] { "[MGNT] LCD Magneto 1", "[MGNT] LCD Magneto 2", "[MGNT] LCD Magneto 3", "[MGNT] LCD Magneto 4", "[MGNT] LCD Engine Room 1", "[MGNT] LCD Front Hangar 2", "[MGNT] LCD Back Hangar 2" };
-
-        bool loop = true;
-
-        List<int> frames = new List<int> { }; // customize which frames play.  Ex: List<int> frames = new List<int>{1,3,5,7};
-        int frameSkip = 0; // skips every frameSkip frames to increase performance.
-        int throttle = 1000; // Set this lower to prevent complexity errors.  Set it higher to decrease loading times. 
-
-        int wait = 20;
-        int ticker = 0;
-        public int frame = 0;
-        public bool running = true;
-        public long lastFrame = 0;
-        public int delay = 0;
-        public bool first = true;
-        public bool isStatic = true;
-
-        int bl1Frame = 18;
-        int br1Frame = 16;
-        int fl1Frame = 14;
-        int fr1Frame = 12;
-        int backHangarFrame = 8;
-        int frontHangarFrame = 8;
-        int beerFrame = 72;
-        int engineRoomFrame = 10;
+        readonly int frameWidth = 178;
+        readonly int frameHeight = 178;
 
         public Gif gif;
-        Random random = new Random();
+        public Random random = new Random();
+        IEnumerator<bool> stateMachine;
 
-        public List<IMyTextPanel> screensCommercials = new List<IMyTextPanel>();
-        public List<IMyTextPanel> screensNeon = new List<IMyTextPanel>();
-        public List<IMyTextPanel> screensWarns = new List<IMyTextPanel>();
-        public List<IMyTextPanel> screensCorps = new List<IMyTextPanel>();
-        public List<IMyTextPanel> screensHubs = new List<IMyTextPanel>();
-        public List<IMyTextPanel> screensStatic = new List<IMyTextPanel>();
+        public List<IMyTextPanel> NEON = new List<IMyTextPanel>();
+        //public List<IMyTextPanel> COMMERCIAL = new List<IMyTextPanel>();
+        //public List<IMyTextPanel> WARNS = new List<IMyTextPanel>();
+        //public List<IMyTextPanel> CORPS = new List<IMyTextPanel>();
+        //public List<IMyTextPanel> HUBS = new List<IMyTextPanel>();
+        //public List<IMyTextPanel> STATIC = new List<IMyTextPanel>();
 
         public Program() {
-            //Me.CustomData = Storage;
-            //--------------------------------------
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;//Update100 doesn't work
-            //--------------------------------------
-            foreach (string lcdName in lcdCommercialsNames) {
-                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                GridTerminalSystem.SearchBlocksOfName(lcdName, blocks);
-                if (blocks.Count > 0) {
-                    foreach (IMyTextPanel screen in blocks) {
-                        if (screen.CustomName != lcdName) { continue; }
-                        float fontSize = 0.1f;
-                        screen.SetValue("FontSize", fontSize);
-                        screen.SetValue<long>("Font", 1147350002);
-                        screen.SetValue<Single>("TextPaddingSlider", 0);
-                        screensCommercials.Add(screen);
-                    }
-                } else {
-                    throw new Exception("LCD named \"" + lcdName + "\" not found.");
-                }
-            }
-            foreach (string lcdName in lcdWarnsNames) {
-                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                GridTerminalSystem.SearchBlocksOfName(lcdName, blocks);
-                if (blocks.Count > 0) {
-                    foreach (IMyTextPanel screen in blocks) {
-                        if (screen.CustomName != lcdName) { continue; }
-                        float fontSize = 0.1f;
-                        screen.SetValue("FontSize", fontSize);
-                        screen.SetValue<long>("Font", 1147350002);
-                        screen.SetValue<Single>("TextPaddingSlider", 0);
-                        screensWarns.Add(screen);
-                    }
-                } else {
-                    throw new Exception("LCD named \"" + lcdName + "\" not found.");
-                }
-            }
-            foreach (string lcdName in lcdCorpsNames) {
-                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                GridTerminalSystem.SearchBlocksOfName(lcdName, blocks);
-                if (blocks.Count > 0) {
-                    foreach (IMyTextPanel screen in blocks) {
-                        if (screen.CustomName != lcdName) { continue; }
-                        float fontSize = 0.1f;
-                        screen.SetValue("FontSize", fontSize);
-                        screen.SetValue<long>("Font", 1147350002);
-                        screen.SetValue<Single>("TextPaddingSlider", 0);
-                        screensCorps.Add(screen);
-                    }
-                } else {
-                    throw new Exception("LCD named \"" + lcdName + "\" not found.");
-                }
-            }
-            foreach (string lcdName in lcdHubsNames) {
-                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                GridTerminalSystem.SearchBlocksOfName(lcdName, blocks);
-                if (blocks.Count > 0) {
-                    foreach (IMyTextPanel screen in blocks) {
-                        if (screen.CustomName != lcdName) { continue; }
-                        float fontSize = 0.1f;
-                        screen.SetValue("FontSize", fontSize);
-                        screen.SetValue<long>("Font", 1147350002);
-                        screen.SetValue<Single>("TextPaddingSlider", 0);
-                        screensHubs.Add(screen);
-                    }
-                } else {
-                    throw new Exception("LCD named \"" + lcdName + "\" not found.");
-                }
-            }
-            foreach (string lcdName in lcdNeonNames) {
-                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                GridTerminalSystem.SearchBlocksOfName(lcdName, blocks);
-                if (blocks.Count > 0) {
-                    foreach (IMyTextPanel screen in blocks) {
-                        if (screen.CustomName != lcdName) { continue; }
-                        float fontSize = 0.1f;
-                        screen.SetValue("FontSize", fontSize);
-                        screen.SetValue<long>("Font", 1147350002);
-                        screen.SetValue<Single>("TextPaddingSlider", 0);
-                        screensNeon.Add(screen);
-                    }
-                } else {
-                    throw new Exception("LCD named \"" + lcdName + "\" not found.");
-                }
-            }
-            foreach (string lcdName in lcdStaticNames) {
-                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                GridTerminalSystem.SearchBlocksOfName(lcdName, blocks);
-                if (blocks.Count > 0) {
-                    foreach (IMyTextPanel screen in blocks) {
-                        if (screen.CustomName != lcdName) { continue; }
-                        float fontSize = 0.1f;
-                        screen.SetValue("FontSize", fontSize);
-                        screen.SetValue<long>("Font", 1147350002);
-                        screen.SetValue<Single>("TextPaddingSlider", 0);
-                        screensStatic.Add(screen);
-                    }
-                } else {
-                    throw new Exception("LCD named \"" + lcdName + "\" not found.");
-                }
-            }
-            //--------------------------------------
-            gif = new Gif(frameWidth, frameHeight, Storage);
+            Runtime.UpdateFrequency |= UpdateFrequency.Update100; //Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            GetBlocks();
+            Setup();
         }
 
-        void Main(string args) {
-            Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
-            if (args.IndexOf("frames") == 0) {
-                loop = false;
-                frame = 0;
-                frames.Clear();
-                string[] frameNumbers = args.Split(' ');
-                foreach (string number in frameNumbers) {
-                    if (number != "frames") {
-                        if (number == "loop") {
-                            frames.Add(-1);
-                        } else {
-                            frames.Add(Int32.Parse(number));
-                        }
-                    }
+        void Setup() {
+            GetBlocks();
+            gif = new Gif(frameWidth, frameHeight, Storage);
+            if (Storage[0] != (char)'|') {
+                Storage = gif.Serialize();
+            }
+            stateMachine = RunOverTime();
+        }
+
+        public void Main(UpdateType updateType) {
+            try {
+                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
+
+                if ((updateType & UpdateType.Update100) == UpdateType.Update100) {
+                    RunStateMachine();
                 }
+            } catch (Exception e) {
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
+                if (DEBUG != null) {
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    StringBuilder debugLog = new StringBuilder("");
+                    debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
+                    DEBUG.WriteText(debugLog, false);
+                }
+                Runtime.UpdateFrequency = UpdateFrequency.None;
+            }
+        }
+
+        public IEnumerator<bool> RunOverTime() {
+            foreach (IMyTextPanel panel in NEON) {
+                PlayNeon(panel);
+                yield return true;
             }
 
-            if (running) {
-                int count = 0;
-                while (count++ < throttle && !first) {
-                    try {
-                        if (!gif.step()) {
-                            if (Storage[0] != (char)'|') {
-                                Storage = gif.serialize();
-                                Echo(gif.frames.Count + " Frames loaded from GIF.");
-                            } else {
-                                Echo(gif.frames.Count + " Frames loaded from cache.");
-                            }
-                            running = false;
-                            break;
-                        }
-                    } catch (Exception e) {
-                        Echo($"Exception: {e}\n---");
-                        throw;
-                    }
-                }
-                first = false;
-                return;
-            }
-            int currentFrame = frame;
-            if (frames.Count > 0) {
-                if (frame >= frames.Count) {
-                    if (loop) frame = 0;
-                    else frame = frames.Count - 1;
-                }
-                if (frames[frame] == -1) // loop
-                {
-                    frames.RemoveRange(0, frame + 1);
-                    frame = 0;
-                    loop = true;
-                }
-                currentFrame = frames[frame];
-            }
+        }
 
-            long now = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-            if (now - lastFrame >= delay * 10) {
-                bool draw = false;
-                if (lastFrame > 0 && ((now - lastFrame) - (delay * 10) < 100)) {
-                    lastFrame = now - ((now - lastFrame) - (delay * 10));
-                    draw = true;
+        public void RunStateMachine() {
+            if (stateMachine != null) {
+                bool hasMoreSteps = stateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update100;
                 } else {
-                    if (lastFrame == 0) {
-                        draw = true;
-                    }
-                    lastFrame = now;
+                    Echo($"Dispose");
+
+                    stateMachine.Dispose();
+                    stateMachine = RunOverTime();//stateMachine = null;
                 }
-                if (draw && (frameSkip == 0 || (frame % frameSkip != 0))) {
-                    //-------------------------------
-                    Echo(ticker + "\n");
-                    Echo(gif.frames.Count + "\n");
-
-                    if (ticker == 0) {
-                        foreach (IMyTextPanel giscreen in screensWarns) {
-                            if (giscreen.CustomName.Equals("[MGNT] LCD Dock BL 1")) {
-                                giscreen.WriteText(new String(gif.frames[bl1Frame]), false);
-                                if (bl1Frame >= 19) {
-                                    bl1Frame = 18;
-                                } else {
-                                    bl1Frame++;
-                                }
-                            } else if (giscreen.CustomName.Equals("[MGNT] LCD Dock BR 1")) {
-                                giscreen.WriteText(new String(gif.frames[br1Frame]), false);
-                                if (br1Frame >= 17) {
-                                    br1Frame = 16;
-                                } else {
-                                    br1Frame++;
-                                }
-                            } else if (giscreen.CustomName.Equals("[MGNT] LCD Dock FL 1")) {
-                                giscreen.WriteText(new String(gif.frames[fl1Frame]), false);
-                                if (fl1Frame >= 15) {
-                                    fl1Frame = 14;
-                                } else {
-                                    fl1Frame++;
-                                }
-                            } else if (giscreen.CustomName.Equals("[MGNT] LCD Dock FR 1")) {
-                                giscreen.WriteText(new String(gif.frames[fr1Frame]), false);
-                                if (fr1Frame >= 13) {
-                                    fr1Frame = 12;
-                                } else {
-                                    fr1Frame++;
-                                }
-                            } else if (giscreen.CustomName.Equals("[MGNT] LCD Front Hangar 1")) {
-                                giscreen.WriteText(new String(gif.frames[frontHangarFrame]), false);
-                                if (frontHangarFrame >= 9) {
-                                    frontHangarFrame = 8;
-                                } else {
-                                    frontHangarFrame++;
-                                }
-                            } else if (giscreen.CustomName.Equals("[MGNT] LCD Back Hangar 1")) {
-                                giscreen.WriteText(new String(gif.frames[backHangarFrame]), false);
-                                if (backHangarFrame >= 9) {
-                                    backHangarFrame = 8;
-                                } else {
-                                    backHangarFrame++;
-                                }
-                            }
-                            /*else if (giscreen.CustomName.Equals("[MGNT] LCD Engine Room 2"))
-                            {
-                                giscreen.WriteText(new String(gif.frames[4]), false);
-                                if (engineRoomFrame >= 11)
-                                {
-                                    engineRoomFrame = 10;
-                                }
-                                else
-                                {
-                                    engineRoomFrame++;
-                                }
-                            }*/
-                        }
-                        foreach (IMyTextPanel giscreen in screensCorps) {
-                            int rndmFrame = random.Next(35, 47);
-                            giscreen.WriteText(new String(gif.frames[rndmFrame]), false);
-                        }
-                        foreach (IMyTextPanel giscreen in screensCommercials) {
-                            int rndmFrame = random.Next(48, 66);
-                            giscreen.WriteText(new String(gif.frames[rndmFrame]), false);
-                        }
-                        foreach (IMyTextPanel giscreen in screensNeon) {
-                            if (giscreen.CustomName.Equals("[MGNT] LCD Store Room 4")) {
-                                int rndmFrame = random.Next(68, 71);
-                                giscreen.WriteText(new String(gif.frames[rndmFrame]), false);
-                            } else if (giscreen.CustomName.Equals("[MGNT] LCD Store Room 5")) {
-                                giscreen.WriteText(new String(gif.frames[beerFrame]), false);
-                                if (beerFrame >= 73) {
-                                    beerFrame = 72;
-                                } else {
-                                    beerFrame++;
-                                }
-                            } else {
-                                int rndmFrame = random.Next(74, gif.frames.Count);
-                                giscreen.WriteText(new String(gif.frames[rndmFrame]), false);
-                            }
-
-                        }
-                        foreach (IMyTextPanel giscreen in screensHubs) {
-                            int rndmFrame = random.Next(20, 34);
-                            giscreen.WriteText(new String(gif.frames[rndmFrame]), false);
-                        }
-                        if (isStatic) {
-                            foreach (IMyTextPanel giscreen in screensStatic) {
-
-                                if (giscreen.CustomName.Equals("[MGNT] LCD Front Hangar 2")) {
-                                    giscreen.WriteText(new String(gif.frames[7]), false);
-                                } else if (giscreen.CustomName.Equals("[MGNT] LCD Back Hangar 2")) {
-                                    giscreen.WriteText(new String(gif.frames[7]), false);
-                                }
-
-                                /* if (giscreen.CustomName.Equals("[MGNT] LCD Magneto 1"))
-                                 {
-                                     giscreen.WriteText(new String(gif.frames[0]), false);
-                                 }
-                                 else if (giscreen.CustomName.Equals("[MGNT] LCD Magneto 2"))
-                                 {
-                                     giscreen.WriteText(new String(gif.frames[1]), false);
-                                 }
-                                 else if (giscreen.CustomName.Equals("[MGNT] LCD Magneto 3"))
-                                 {
-                                     giscreen.WriteText(new String(gif.frames[2]), false);
-                                 }
-                                 else if (giscreen.CustomName.Equals("[MGNT] LCD Magneto 4"))
-                                 {
-                                     giscreen.WriteText(new String(gif.frames[3]), false);
-                                 }
-                                 else if (giscreen.CustomName.Equals("[MGNT] LCD Engine Room 1"))
-                                 {
-                                     giscreen.WriteText(new String(gif.frames[4]), false);
-                                 }*/
-                            }
-                            isStatic = false;
-                        }
-                    }
-                    ticker++;
-                    if (ticker >= wait) {
-                        ticker = 0;
-                    }
-                    //-------------------------------
-                }
-                delay = gif.delays[currentFrame % gif.frames.Count];
-                if (delay < 3) delay = 10; // this is how most browsers handle 0
-                frame++;
             }
+        }
+
+        void PlayNeon(IMyTextPanel myPanel) {
+            int rndmFrame = random.Next(68, 71);
+            myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
+        }
+
+        void GetBlocks() {
+            NEON.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(NEON, block => block.CustomName.Contains("[CRX] LCD Image Player Neon"));
+            foreach (IMyTextPanel panel in NEON) {
+                panel.FontSize = 0.1f;
+                panel.Font = "Monospace";//myPanel.SetValue<long>("Font", 1147350002);
+                panel.TextPadding = 0f;
+            }
+
         }
 
         public class Decoder {
-            int MaxStackSize = 8192;
-            int width = 0;
-            int height = 0;
+            readonly int maxStackSize = 8192;
+            //readonly int width = 0;
+            //readonly int height = 0;
 
-            int dataSize = 0;
+            readonly int dataSize = 0;
 
-            int NullCode = -1;
-            int pixelCount = 0;
+            readonly int nullCode = -1;
+            readonly int pixelCount = 0;
             public byte[] pixels;
             int codeSize;
-            int clearFlag;
-            int endFlag;
+            readonly int clearFlag;
+            readonly int endFlag;
             int available;
 
             int code;
@@ -394,12 +127,12 @@ namespace IngameScript {
             int code_mask;
             int bits;
 
-            int[] prefix;
-            int[] suffix;
-            int[] pixelStack;
+            readonly int[] prefix;
+            readonly int[] suffix;
+            readonly int[] pixelStack;
 
             int top;
-            int count;
+            //int count;
             int bi;
             int i;
 
@@ -407,15 +140,15 @@ namespace IngameScript {
             int first;
             int inCode;
 
-            byte[] buffer;
+            readonly byte[] buffer;
 
             public Decoder(int width, int height, byte[] buffer, int minCodeSize) {
                 this.buffer = buffer;
-                this.width = width;
-                this.height = height;
+                //this.width = width;
+                //this.height = height;
                 this.dataSize = minCodeSize;
 
-                this.NullCode = -1;
+                this.nullCode = -1;
                 this.pixelCount = width * height;
                 this.pixels = new byte[pixelCount];
                 this.codeSize = dataSize + 1;
@@ -423,23 +156,23 @@ namespace IngameScript {
                 this.endFlag = clearFlag + 1;
                 this.available = endFlag + 1;
 
-                this.code = NullCode;
-                this.old_code = NullCode;
+                this.code = nullCode;
+                this.old_code = nullCode;
                 this.code_mask = (1 << codeSize) - 1;
                 this.bits = 0;
 
-                this.prefix = new int[MaxStackSize];
-                this.suffix = new int[MaxStackSize];
-                this.pixelStack = new int[MaxStackSize + 1];
+                this.prefix = new int[maxStackSize];
+                this.suffix = new int[maxStackSize];
+                this.pixelStack = new int[maxStackSize + 1];
 
                 this.top = 0;
-                this.count = buffer.Length;
+                //this.count = buffer.Length;
                 this.bi = 0;
                 this.i = 0;
 
                 this.data = 0;
                 this.first = 0;
-                this.inCode = NullCode;
+                this.inCode = nullCode;
 
                 for (code = 0; code < clearFlag; code++) {
                     prefix[code] = 0;
@@ -447,7 +180,7 @@ namespace IngameScript {
                 }
             }
 
-            public bool decode() {
+            public bool Decode() {
                 if (i < pixelCount) {
                     if (top == 0) {
                         if (bits < codeSize) {
@@ -465,7 +198,7 @@ namespace IngameScript {
                             data += buffer[bi] << bits;
                             bits += 8;
                             bi++;
-                            count--;
+                            //count--;
                             return true;
                         }
                         code = data & code_mask;
@@ -479,10 +212,10 @@ namespace IngameScript {
                             codeSize = dataSize + 1;
                             code_mask = (1 << codeSize) - 1;
                             available = clearFlag + 2;
-                            old_code = NullCode;
+                            old_code = nullCode;
                             return true;
                         }
-                        if (old_code == NullCode) {
+                        if (old_code == nullCode) {
                             pixelStack[top++] = suffix[code];
                             old_code = code;
                             first = code;
@@ -498,14 +231,14 @@ namespace IngameScript {
                             code = prefix[code];
                         }
                         first = suffix[code];
-                        if (available > MaxStackSize) {
+                        if (available > maxStackSize) {
                             return false;
                         }
                         pixelStack[top++] = suffix[code];
                         prefix[available] = old_code;
                         suffix[available] = first;
                         available++;
-                        if (available == code_mask + 1 && available < MaxStackSize) {
+                        if (available == code_mask + 1 && available < maxStackSize) {
                             codeSize++;
                             code_mask = (1 << codeSize) - 1;
                         }
@@ -527,16 +260,16 @@ namespace IngameScript {
             public int width;
             public int height;
 
-            public int LCDwidth = 175;
-            public int LCDheight = 175;
+            int LCDwidth = 175;
+            int LCDheight = 175;
 
-            int globalColorTableSize;
-            byte[][] globalColorTable;
+            readonly int globalColorTableSize;
+            readonly byte[][] globalColorTable;
             int localColorTableSize;
             byte[][] localColorTable;
-            byte[] data;
+            readonly byte[] data;
             long counter = 0;
-            byte backgroundColor;
+            readonly byte backgroundColor;
             //    bool gce = false; 
             int lzwMinimumCodeSize;
             byte[] lzwData;
@@ -545,7 +278,7 @@ namespace IngameScript {
             //    long decodeBit = 0; 
             byte[] output;
             int top, left, w, h;
-            bool interlaceFlag;
+            //bool interlaceFlag;
             int x, y;
             int transparent = 0;
             bool is_transparent = false;
@@ -557,7 +290,7 @@ namespace IngameScript {
             public List<char[]> frames = new List<char[]>();
             public List<int> delays = new List<int>();
 
-            bool createFrame() {
+            bool CreateFrame() {
                 byte[] color = localColorTable[backgroundColor];
 
                 float scale = 1;
@@ -602,7 +335,7 @@ namespace IngameScript {
                     y++;
                     if (y > (LCDheight - 1)) {
                         frames.Add(frame);
-                        step = mainLoop;
+                        step = MainLoop;
                         y = 0;
                         return true;
                     }
@@ -611,8 +344,8 @@ namespace IngameScript {
                 return true;
             }
 
-            bool decode() {
-                if (this.decoder.decode()) {
+            bool Decode() {
+                if (this.decoder.Decode()) {
                     return true;
                 } else {
                     this.output = this.decoder.pixels;
@@ -625,18 +358,18 @@ namespace IngameScript {
                     frame = new char[(LCDwidth + 1) * LCDheight];
                     Array.Copy(last, frame, frame.Length);
 
-                    step = createFrame;
+                    step = CreateFrame;
                     return true;
                 }
             }
 
-            bool decodeStart() {
+            bool DecodeStart() {
                 this.decoder = new Decoder(w, h, lzwData, lzwMinimumCodeSize);
-                step = decode;
+                step = Decode;
                 return true;
             }
 
-            bool getLzwData() {
+            bool GetLzwData() {
                 int len = data[counter++];
                 for (int i = 0; i < len; i++) {
                     lzwData[lzwDataIndex++] = data[counter++];
@@ -644,19 +377,19 @@ namespace IngameScript {
 
                 if (data[counter] == 00) {
                     counter++;
-                    step = decodeStart;
+                    step = DecodeStart;
                 }
                 return true;
             }
 
-            bool extensionLoop() {
+            bool ExtensionLoop() {
                 counter += data[counter++];
                 if (data[counter++] == 0x00)
-                    step = mainLoop;
+                    step = MainLoop;
                 return true;
             }
 
-            bool mainLoop() {
+            bool MainLoop() {
                 if (counter > data.Length)
                     return false;
 
@@ -690,7 +423,7 @@ namespace IngameScript {
                                 counter++; // Block Terminator (0x00) 
                                 break;
                             default:
-                                step = extensionLoop;
+                                step = ExtensionLoop;
                                 return true;
                         }
                         break;
@@ -701,7 +434,7 @@ namespace IngameScript {
                         w = data[counter++] | (data[counter++] << 8);
                         h = data[counter++] | (data[counter++] << 8);
                         bool localColorTableFlag = (data[counter] & 0x80) > 0;
-                        interlaceFlag = (data[counter] & 0x40) > 0;
+                        //interlaceFlag = (data[counter] & 0x40) > 0;
                         bool sortFlag = (data[counter] & 0x20) > 0;
                         localColorTableSize = (int)Math.Pow(2, (((data[counter] & 0x07)) + 1));
                         counter++; // skip packed field used above    
@@ -724,7 +457,7 @@ namespace IngameScript {
                         lzwMinimumCodeSize = data[counter++];
                         lzwData = new byte[w * h];
                         lzwDataIndex = 0;
-                        step = getLzwData;
+                        step = GetLzwData;
                         break;
                     case 0x3b: // trailer    
                                //        Console.WriteLine ("trailer found!");    
@@ -733,7 +466,7 @@ namespace IngameScript {
                 return true;
             }
 
-            public string serialize() {
+            public string Serialize() {
                 string o = "";
 
                 o += (char)'|';
@@ -767,7 +500,7 @@ namespace IngameScript {
                 return o;
             }
 
-            void unserialize(string s) {
+            void Unserialize(string s) {
                 var parts = s.Split((char)'|');
 
                 this.LCDwidth = Int32.Parse(parts[1]);
@@ -786,7 +519,7 @@ namespace IngameScript {
 
             public Gif(int fwidth, int fheight, string base64) {
                 if (base64[0] == '|') {
-                    this.unserialize(base64);
+                    this.Unserialize(base64);
                     this.step = delegate () { return false; };
                     return;
                 }
@@ -836,9 +569,10 @@ namespace IngameScript {
                         globalColorTable[i][2] = data[counter++];
                     }
                 }
-                step = mainLoop;
+                step = MainLoop;
             }
         }
+
 
 
     }
