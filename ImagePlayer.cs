@@ -26,10 +26,10 @@ namespace IngameScript {
         readonly int frameHeight = 178;
 
         int beerFrame = 72;
-        int dock1Frame = 18;
-        int dock2Frame = 16;
-        int dock3Frame = 14;
-        int dock4Frame = 12;
+        int warn1Frame = 18;
+        int warn2Frame = 16;
+        int warn3Frame = 14;
+        int warn4Frame = 12;
         int hangar1Frame = 8;
 
         double neonShopTime = 0d;
@@ -39,10 +39,10 @@ namespace IngameScript {
         double commercialTime = 0d;
         double hubsTime = 0d;
         double hangarTime = 0d;
-        double docks1Time = 0d;
-        double docks2Time = 0d;
-        double docks3Time = 0d;
-        double docks4Time = 0d;
+        double warn1Time = 0d;
+        double warn2Time = 0d;
+        double warn3Time = 0d;
+        double warn4Time = 0d;
         double dangerTime = 0d;
 
         public Gif gif;
@@ -56,10 +56,10 @@ namespace IngameScript {
         public List<IMyTextPanel> COMMERCIAL = new List<IMyTextPanel>();
         public List<IMyTextPanel> HUBS = new List<IMyTextPanel>();
         public List<IMyTextPanel> HANGARS = new List<IMyTextPanel>();
-        public List<IMyTextPanel> DOCKS1 = new List<IMyTextPanel>();
-        public List<IMyTextPanel> DOCKS2 = new List<IMyTextPanel>();
-        public List<IMyTextPanel> DOCKS3 = new List<IMyTextPanel>();
-        public List<IMyTextPanel> DOCKS4 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> WARN1 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> WARN2 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> WARN3 = new List<IMyTextPanel>();
+        public List<IMyTextPanel> WARN4 = new List<IMyTextPanel>();
         public List<IMyTextPanel> DANGER = new List<IMyTextPanel>();
         public List<IMyTextPanel> STATIC = new List<IMyTextPanel>();
 
@@ -198,51 +198,51 @@ namespace IngameScript {
                 }
             }
 
-            if (DOCKS1.Count > 0) {
-                if (docks1Time > 5d) {
-                    docks1Time = 0;
-                    foreach (IMyTextPanel panel in DOCKS1) {
-                        PlayDock1(panel);
+            if (WARN1.Count > 0) {
+                if (warn1Time > 5d) {
+                    warn1Time = 0;
+                    foreach (IMyTextPanel panel in WARN1) {
+                        PlayWarn1(panel);
                     }
                     yield return true;
                 } else {
-                    docks1Time += lastRun;
+                    warn1Time += lastRun;
                 }
             }
 
-            if (DOCKS2.Count > 0) {
-                if (docks2Time > 5d) {
-                    docks2Time = 0;
-                    foreach (IMyTextPanel panel in DOCKS2) {
-                        PlayDock2(panel);
+            if (WARN2.Count > 0) {
+                if (warn2Time > 5d) {
+                    warn2Time = 0;
+                    foreach (IMyTextPanel panel in WARN2) {
+                        PlayWarn2(panel);
                     }
                     yield return true;
                 } else {
-                    docks2Time += lastRun;
+                    warn2Time += lastRun;
                 }
             }
 
-            if (DOCKS3.Count > 0) {
-                if (docks3Time > 5d) {
-                    docks3Time = 0;
-                    foreach (IMyTextPanel panel in DOCKS3) {
-                        PlayDock3(panel);
+            if (WARN3.Count > 0) {
+                if (warn3Time > 5d) {
+                    warn3Time = 0;
+                    foreach (IMyTextPanel panel in WARN3) {
+                        PlayWarn3(panel);
                     }
                     yield return true;
                 } else {
-                    docks3Time += lastRun;
+                    warn3Time += lastRun;
                 }
             }
 
-            if (DOCKS4.Count > 0) {
-                if (docks4Time > 5d) {
-                    docks4Time = 0;
-                    foreach (IMyTextPanel panel in DOCKS4) {
-                        PlayDock4(panel);
+            if (WARN4.Count > 0) {
+                if (warn4Time > 5d) {
+                    warn4Time = 0;
+                    foreach (IMyTextPanel panel in WARN4) {
+                        PlayWarn4(panel);
                     }
                     yield return true;
                 } else {
-                    docks4Time += lastRun;
+                    warn4Time += lastRun;
                 }
             }
 
@@ -303,24 +303,24 @@ namespace IngameScript {
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 
-        void PlayDock1(IMyTextPanel myPanel) {
-            myPanel.WriteText(new String(gif.frames[dock1Frame]), false);
-            dock1Frame = dock1Frame >= 19 ? 18 : dock1Frame + 1;
+        void PlayWarn1(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[warn1Frame]), false);
+            warn1Frame = warn1Frame >= 19 ? 18 : warn1Frame + 1;
         }
 
-        void PlayDock2(IMyTextPanel myPanel) {
-            myPanel.WriteText(new String(gif.frames[dock2Frame]), false);
-            dock2Frame = dock2Frame >= 17 ? 16 : dock2Frame + 1;
+        void PlayWarn2(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[warn2Frame]), false);
+            warn2Frame = warn2Frame >= 17 ? 16 : warn2Frame + 1;
         }
 
-        void PlayDock3(IMyTextPanel myPanel) {
-            myPanel.WriteText(new String(gif.frames[dock3Frame]), false);
-            dock3Frame = dock3Frame >= 15 ? 14 : dock3Frame + 1;
+        void PlayWarn3(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[warn3Frame]), false);
+            warn3Frame = warn3Frame >= 15 ? 14 : warn3Frame + 1;
         }
 
-        void PlayDock4(IMyTextPanel myPanel) {
-            myPanel.WriteText(new String(gif.frames[dock4Frame]), false);
-            dock4Frame = dock4Frame >= 13 ? 12 : dock4Frame + 1;
+        void PlayWarn4(IMyTextPanel myPanel) {
+            myPanel.WriteText(new String(gif.frames[warn4Frame]), false);
+            warn4Frame = warn4Frame >= 13 ? 12 : warn4Frame + 1;
         }
 
         void PlayHangar(IMyTextPanel myPanel) {
@@ -397,36 +397,36 @@ namespace IngameScript {
                 panel.TextPadding = 0f;
             }
 
-            DOCKS1.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS1, block => block.CustomName.Contains("[CRX] LCD Player Docks A"));
-            foreach (IMyTextPanel panel in DOCKS1) {
+            WARN1.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN1, block => block.CustomName.Contains("[CRX] LCD Player Warns A"));
+            foreach (IMyTextPanel panel in WARN1) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
                 panel.Font = "Monospace";
                 panel.TextPadding = 0f;
             }
 
-            DOCKS2.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS2, block => block.CustomName.Contains("[CRX] LCD Player Docks B"));
-            foreach (IMyTextPanel panel in DOCKS2) {
+            WARN2.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN2, block => block.CustomName.Contains("[CRX] LCD Player Warns B"));
+            foreach (IMyTextPanel panel in WARN2) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
                 panel.Font = "Monospace";
                 panel.TextPadding = 0f;
             }
 
-            DOCKS3.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS3, block => block.CustomName.Contains("[CRX] LCD Player Docks C"));
-            foreach (IMyTextPanel panel in DOCKS3) {
+            WARN3.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN3, block => block.CustomName.Contains("[CRX] LCD Player Warns C"));
+            foreach (IMyTextPanel panel in WARN3) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
                 panel.Font = "Monospace";
                 panel.TextPadding = 0f;
             }
 
-            DOCKS4.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(DOCKS4, block => block.CustomName.Contains("[CRX] LCD Player Docks D"));
-            foreach (IMyTextPanel panel in DOCKS4) {
+            WARN4.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN4, block => block.CustomName.Contains("[CRX] LCD Player Warns D"));
+            foreach (IMyTextPanel panel in WARN4) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
                 panel.Font = "Monospace";
