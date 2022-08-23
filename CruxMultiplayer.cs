@@ -25,6 +25,7 @@ namespace IngameScript {
         //MULTI
         bool creative = true;//define if is playing creative mode or not
         bool magneticDrive = true;//enable/disable magnetic drive
+        bool safetyDampeners = true;//enable/disable safety dampeners, valid only if magneticDrive is false
         bool autoFire = true;//enable/disable automatic fire
         bool idleThrusters = false;//enable/disable thrusters
         bool togglePB = true;//enable/disable PB
@@ -50,6 +51,7 @@ namespace IngameScript {
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
         bool smallRailgunsCanShoot = true;
+        bool safetyDampenersOnce = false;
         bool sunAlignOnce = true;
         bool unlockSunAlignOnce = true;
         bool toggleThrustersOnce = false;
@@ -84,6 +86,7 @@ namespace IngameScript {
         int missedScan = 0;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
+        int safetyDampenersCount = 0;
         int checkGunsCount;
         int sendMessageCount = 0;
         string rangeFinderName = "";
@@ -140,6 +143,7 @@ namespace IngameScript {
         IMyTextPanel LCDIDLETHRUSTERS;
         IMyTextPanel LCDAUTOFIRE;
         IMyTextPanel LCDCREATIVE;
+        IMyTextPanel LCDSAFETYDAMPENERS;
 
         PID yawController;
         PID pitchController;
@@ -147,6 +151,7 @@ namespace IngameScript {
 
         MyDetectedEntityInfo targetInfo;
         readonly Random random = new Random();
+        Matrix mtrx;
         Vector3D rangeFinderPosition;
         Vector3D landPosition;
         public IMyBroadcastListener BROADCASTLISTENER;
@@ -169,12 +174,14 @@ namespace IngameScript {
             InitPIDControllers();
             SetGunsDelay();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[MULTI]");
+            CONTROLLER.Orientation.GetMatrix(out mtrx);
             foreach (IMyCameraBlock cam in LIDARS) { cam.EnableRaycast = true; }
             if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(0, 0, 50) : new Color(0, 0, 0); }
             if (LCDCREATIVE != null) { LCDCREATIVE.BackgroundColor = creative ? new Color(0, 0, 50) : new Color(0, 0, 0); }
+            if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
         }
 
@@ -223,6 +230,14 @@ namespace IngameScript {
                 ManagePIDControllers(isTargetEmpty);
 
                 ManageMagneticDrive(needControl, isAutopiloted, idleThrusters, gravity, myVelocity);
+
+                if (safetyDampeners) {
+                    if (safetyDampenersCount == 50) {
+                        SafetyDampeners(needControl, mySpeed);
+                        safetyDampenersCount = 0;
+                    }
+                    safetyDampenersCount++;
+                }
 
                 ManageWaypoints(isTargetEmpty);
 
@@ -310,6 +325,11 @@ namespace IngameScript {
                 case "ToggleMagneticDrive":
                     magneticDrive = !magneticDrive;
                     if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    break;
+                case "ToggleSafetyDampeners":
+                    safetyDampeners = !safetyDampeners;
+                    if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    configChanged = true;
                     break;
                 case "ToggleIdleThrusters":
                     idleThrusters = !idleThrusters;
@@ -419,7 +439,7 @@ namespace IngameScript {
             var tuple = MyTuple.Create(
                 MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
                 MyTuple.Create(rangeFinderPosition, rangeFinderName, rangeFinderDistance, rangeFinderDiameter),
-                MyTuple.Create(magneticDrive, idleThrusters, sunAlign, false, false, false),
+                MyTuple.Create(magneticDrive, idleThrusters, sunAlign, safetyDampeners, false, false),
                 MyTuple.Create(false, false, false, false, false, false)
                 );
             IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
@@ -429,8 +449,9 @@ namespace IngameScript {
             if (magneticDrive && needControl) {
                 Vector3D dir = Vector3D.Zero;
                 if (initMagneticDriveOnce) {
+                    CONTROLLER.DampenersOverride = true;
                     foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    //sunAlign = false;
+                    //sunAlign = false;//TODO
                     initMagneticDriveOnce = false;
                 }
 
@@ -443,9 +464,8 @@ namespace IngameScript {
                         foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                         initAutoMagneticDriveOnce = true;
                     }
-                    Matrix mtrx;
-                    dir = MagneticDrive(out mtrx);
-                    dir = MagneticDampeners(dir, myVelocity, gravity, mtrx);
+                    dir = MagneticDrive();
+                    dir = MagneticDampeners(dir, myVelocity, gravity);
                     IdleThrusters(dir, idleThrusters);
                 }
 
@@ -497,9 +517,8 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3D MagneticDrive(out Matrix mtrx) {
+        Vector3D MagneticDrive() {
             Vector3D direction = CONTROLLER.MoveIndicator;
-            CONTROLLER.Orientation.GetMatrix(out mtrx);
             direction = Vector3D.Transform(direction, mtrx);
             if (!Vector3D.IsZero(direction)) {
                 direction = Vector3D.Normalize(direction);//direction /= direction.Length();
@@ -507,7 +526,7 @@ namespace IngameScript {
             return direction;
         }
 
-        Vector3D MagneticDampeners(Vector3D direction, Vector3D myVelocity, Vector3D gravity, MatrixD mtrx) {
+        Vector3D MagneticDampeners(Vector3D direction, Vector3D myVelocity, Vector3D gravity) {
             if (Vector3D.IsZero(gravity) && !CONTROLLER.DampenersOverride && direction.LengthSquared() == 0f) {
                 return Vector3D.Zero;
             }
@@ -1050,7 +1069,7 @@ namespace IngameScript {
             MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);//TODO
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    landPosition = TARGET.HitPosition.Value - Vector3D.Normalize(-gravity) * 50d;
+                    landPosition = Vector3D.Normalize(Vector3D.Normalize(-gravity) - TARGET.HitPosition.Value) * 50d;
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(landPosition, "landPosition");
                     REMOTE.SetAutoPilotEnabled(true);
@@ -1118,6 +1137,26 @@ namespace IngameScript {
                 }
                 ApplyGyroOverride(pitchController.Control(pitch), yawController.Control(yaw), 0d, GYROS, SOLAR.WorldMatrix);
                 prevSunPower = power;
+            }
+        }
+
+        void SafetyDampeners(bool needControl, double mySpeed) {
+            if (!needControl) {
+                if (mySpeed > 0.05d) {
+                    if (safetyDampenersOnce) {
+                        CONTROLLER.DampenersOverride = true;
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
+                        safetyDampenersOnce = false;
+                    }
+                } else {
+                    if (!safetyDampenersOnce) {
+                        CONTROLLER.DampenersOverride = false;
+                        if (idleThrusters) {
+                            foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
+                        }
+                        safetyDampenersOnce = true;
+                    }
+                }
             }
         }
 
@@ -1308,6 +1347,7 @@ namespace IngameScript {
             LCDMAGNETICDRIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Magnetic Drive") as IMyTextPanel;
             LCDAUTOFIRE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Auto Fire") as IMyTextPanel;
             LCDCREATIVE = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Creative") as IMyTextPanel;
+            LCDSAFETYDAMPENERS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Safety Dampeners") as IMyTextPanel;
         }
 
         public class Gun {

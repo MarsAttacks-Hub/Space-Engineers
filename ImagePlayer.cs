@@ -25,6 +25,19 @@ namespace IngameScript {
         readonly int frameWidth = 178;
         readonly int frameHeight = 178;
 
+        readonly int debugFrame = 0;
+        readonly bool debug = false;
+
+        readonly double neonShopTimeDelay = 3d;
+        readonly double neonBeerTimeDelay = 2d;
+        readonly double neonChinaTimeDelay = 3d;
+        readonly double corpsTimeDelay = 5d;
+        readonly double commercialTimeDelay = 3d;
+        readonly double hubsTimeDelay = 5d;
+        readonly double hangarTimeDelay = 3d;
+        readonly double warnTimeDelay = 5d;
+        readonly double dangerTimeDelay = 3d;
+
         int beerFrame = 72;
         int warn1Frame = 18;
         int warn2Frame = 16;
@@ -78,16 +91,16 @@ namespace IngameScript {
             foreach (IMyTextPanel panel in STATIC) {
                 panel.WriteText(new String(gif.frames[7]), false);
             }
-            /*
-            IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
-            if (DEBUG != null) {
-                DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
-                DEBUG.FontSize = 0.1f;
-                DEBUG.Font = "Monospace";
-                DEBUG.TextPadding = 0f;
-                DEBUG.WriteText(new String(gif.frames[0]), false);
+            if (debug) {
+                IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
+                if (DEBUG != null) {
+                    DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
+                    DEBUG.FontSize = 0.1f;
+                    DEBUG.Font = "Monospace";
+                    DEBUG.TextPadding = 0f;
+                    DEBUG.WriteText(new String(gif.frames[debugFrame]), false);
+                }
             }
-            */
             stateMachine = RunOverTime();
         }
 
@@ -115,7 +128,7 @@ namespace IngameScript {
             double lastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
             if (NEONSHOP.Count > 0) {
-                if (neonShopTime > 2d) {
+                if (neonShopTime > neonShopTimeDelay) {
                     neonShopTime = 0;
                     foreach (IMyTextPanel panel in NEONSHOP) {
                         PlayNeonShop(panel);
@@ -127,7 +140,7 @@ namespace IngameScript {
             }
 
             if (NEONBEER.Count > 0) {
-                if (neonBeerTime > 2d) {
+                if (neonBeerTime > neonBeerTimeDelay) {
                     neonBeerTime = 0;
                     foreach (IMyTextPanel panel in NEONBEER) {
                         PlayNeonBeer(panel);
@@ -139,7 +152,7 @@ namespace IngameScript {
             }
 
             if (NEONCHINA.Count > 0) {
-                if (neonChinaTime > 2d) {
+                if (neonChinaTime > neonChinaTimeDelay) {
                     neonChinaTime = 0;
                     foreach (IMyTextPanel panel in NEONCHINA) {
                         PlayNeonChina(panel);
@@ -151,7 +164,7 @@ namespace IngameScript {
             }
 
             if (COMMERCIAL.Count > 0) {
-                if (commercialTime > 2d) {
+                if (commercialTime > commercialTimeDelay) {
                     commercialTime = 0;
                     foreach (IMyTextPanel panel in COMMERCIAL) {
                         PlayCommercials(panel);
@@ -163,7 +176,7 @@ namespace IngameScript {
             }
 
             if (CORPS.Count > 0) {
-                if (corpsTime > 3d) {
+                if (corpsTime > corpsTimeDelay) {
                     corpsTime = 0;
                     foreach (IMyTextPanel panel in CORPS) {
                         PlayCorps(panel);
@@ -175,7 +188,7 @@ namespace IngameScript {
             }
 
             if (HUBS.Count > 0) {
-                if (hubsTime > 2d) {
+                if (hubsTime > hubsTimeDelay) {
                     hubsTime = 0;
                     foreach (IMyTextPanel panel in HUBS) {
                         PlayHubs(panel);
@@ -187,7 +200,7 @@ namespace IngameScript {
             }
 
             if (HANGARS.Count > 0) {
-                if (hangarTime > 3d) {
+                if (hangarTime > hangarTimeDelay) {
                     hangarTime = 0;
                     foreach (IMyTextPanel panel in HANGARS) {
                         PlayHangar(panel);
@@ -199,7 +212,7 @@ namespace IngameScript {
             }
 
             if (WARN1.Count > 0) {
-                if (warn1Time > 5d) {
+                if (warn1Time > warnTimeDelay) {
                     warn1Time = 0;
                     foreach (IMyTextPanel panel in WARN1) {
                         PlayWarn1(panel);
@@ -211,7 +224,7 @@ namespace IngameScript {
             }
 
             if (WARN2.Count > 0) {
-                if (warn2Time > 5d) {
+                if (warn2Time > warnTimeDelay) {
                     warn2Time = 0;
                     foreach (IMyTextPanel panel in WARN2) {
                         PlayWarn2(panel);
@@ -223,7 +236,7 @@ namespace IngameScript {
             }
 
             if (WARN3.Count > 0) {
-                if (warn3Time > 5d) {
+                if (warn3Time > warnTimeDelay) {
                     warn3Time = 0;
                     foreach (IMyTextPanel panel in WARN3) {
                         PlayWarn3(panel);
@@ -235,7 +248,7 @@ namespace IngameScript {
             }
 
             if (WARN4.Count > 0) {
-                if (warn4Time > 5d) {
+                if (warn4Time > warnTimeDelay) {
                     warn4Time = 0;
                     foreach (IMyTextPanel panel in WARN4) {
                         PlayWarn4(panel);
@@ -247,7 +260,7 @@ namespace IngameScript {
             }
 
             if (DANGER.Count > 0) {
-                if (dangerTime > 3d) {
+                if (dangerTime > dangerTimeDelay) {
                     dangerTime = 0;
                     foreach (IMyTextPanel panel in DANGER) {
                         PlayDanger(panel);
@@ -362,7 +375,7 @@ namespace IngameScript {
             }
 
             CORPS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(CORPS, block => block.CustomName.Contains("[CRX] LCD Player Corps"));
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(CORPS, block => block.CustomName.Contains("[CRX] LCD Player Corp"));
             foreach (IMyTextPanel panel in CORPS) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
@@ -398,7 +411,7 @@ namespace IngameScript {
             }
 
             WARN1.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN1, block => block.CustomName.Contains("[CRX] LCD Player Warns A"));
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN1, block => block.CustomName.Contains("[CRX] LCD Player Warn A"));
             foreach (IMyTextPanel panel in WARN1) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
@@ -407,7 +420,7 @@ namespace IngameScript {
             }
 
             WARN2.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN2, block => block.CustomName.Contains("[CRX] LCD Player Warns B"));
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN2, block => block.CustomName.Contains("[CRX] LCD Player Warn B"));
             foreach (IMyTextPanel panel in WARN2) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
@@ -416,7 +429,7 @@ namespace IngameScript {
             }
 
             WARN3.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN3, block => block.CustomName.Contains("[CRX] LCD Player Warns C"));
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN3, block => block.CustomName.Contains("[CRX] LCD Player Warn C"));
             foreach (IMyTextPanel panel in WARN3) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;
@@ -425,7 +438,7 @@ namespace IngameScript {
             }
 
             WARN4.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN4, block => block.CustomName.Contains("[CRX] LCD Player Warns D"));
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(WARN4, block => block.CustomName.Contains("[CRX] LCD Player Warn D"));
             foreach (IMyTextPanel panel in WARN4) {
                 panel.ContentType = ContentType.TEXT_AND_IMAGE;
                 panel.FontSize = 0.1f;

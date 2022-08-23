@@ -77,7 +77,7 @@ namespace IngameScript {
         int collisionCheckDelay = 10;
         int checkAllTicksCount = 0;
         int turretsDetectionCount = 5;
-        int tickCount = 0;
+        int safetyDampenersCount = 0;
         int randomCount = 50;
         int collisionCheckCount = 0;
         int keepAltitudeCount = 0;
@@ -150,6 +150,7 @@ namespace IngameScript {
         IMyBroadcastListener BROADCASTLISTENER;
         MyDetectedEntityInfo targetInfo;
         public List<MyDetectedEntityInfo> targetsInfo = new List<MyDetectedEntityInfo>();
+        Matrix mtrx;
         MatrixD targOrientation = new MatrixD();
         Vector3D rangeFinderPosition = Vector3D.Zero;
         Vector3D returnPosition = Vector3D.Zero;
@@ -200,6 +201,7 @@ namespace IngameScript {
             foreach (IMyCameraBlock cam in LIDARSRIGHT) { cam.EnableRaycast = true; }
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
+            CONTROLLER.Orientation.GetMatrix(out mtrx);
             if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
@@ -264,6 +266,14 @@ namespace IngameScript {
                 GyroStabilize(targFound, aimTarget, isAutoPiloted, gravity, mySpeed, isTargetEmpty);
 
                 ManageMagneticDrive(needControl, isUnderControl, isAutoPiloted, targFound, idleThrusters, keepAltitude, gravity, myVelocity, mySpeed);
+
+                if (safetyDampeners) {
+                    if (safetyDampenersCount == 50) {
+                        SafetyDampeners(needControl, mySpeed);
+                        safetyDampenersCount = 0;
+                    }
+                    safetyDampenersCount++;
+                }
 
                 if (logger) {
                     if (sendMessageCount >= 10) {
@@ -621,9 +631,8 @@ namespace IngameScript {
                                 CONTROLLER.DampenersOverride = true;
                                 initRandomMagneticDriveOnce = true;
                             }
-                            Matrix mtrx;
-                            dir = MagneticDrive(out mtrx);
-                            dir = MagneticDampeners(dir, myVelocity, gravity, mtrx);
+                            dir = MagneticDrive();
+                            dir = MagneticDampeners(dir, myVelocity, gravity);
                             Vector3D dirNew = KeepAltitude(isUnderControl, idleThrusters, keepAltitude, gravity, altitude);
                             dir = MergeDirectionValues(dir, dirNew);
                         }
@@ -695,13 +704,6 @@ namespace IngameScript {
                     IdleMagneticDrive(idleThrusters);
                     initMagneticDriveOnce = true;
                 }
-                if (tickCount == 50) {
-                    if (safetyDampeners) {
-                        SafetyDampeners(IsPiloted(true), mySpeed);
-                    }
-                    tickCount = 0;
-                }
-                tickCount++;
             }
         }
 
@@ -743,9 +745,9 @@ namespace IngameScript {
             return dir;
         }
 
-        Vector3D MagneticDrive(out Matrix mtrx) {
+        Vector3D MagneticDrive() {
             Vector3D direction = CONTROLLER.MoveIndicator;
-            CONTROLLER.Orientation.GetMatrix(out mtrx);
+            //CONTROLLER.Orientation.GetMatrix(out mtrx);
             direction = Vector3D.Transform(direction, mtrx);
             if (!Vector3D.IsZero(direction)) {
                 direction = Vector3D.Normalize(direction);//direction /= direction.Length();
@@ -753,7 +755,7 @@ namespace IngameScript {
             return direction;
         }
 
-        Vector3D MagneticDampeners(Vector3D direction, Vector3D myVelocity, Vector3D gravity, MatrixD mtrx) {
+        Vector3D MagneticDampeners(Vector3D direction, Vector3D myVelocity, Vector3D gravity) {
             if (Vector3D.IsZero(gravity) && !CONTROLLER.DampenersOverride && direction.LengthSquared() == 0d) {
                 return Vector3D.Zero;
             }
@@ -1206,29 +1208,35 @@ namespace IngameScript {
 
         void SafetyDampeners(bool isUnderControl, double mySpeed) {
             if (!isUnderControl) {
-                IMyShipController cntrllr = null;
-                if (CONTROLLER.CanControlShip) {
-                    cntrllr = CONTROLLER;
-                } else if (REMOTE.CanControlShip) {
-                    cntrllr = REMOTE;
-                }
-                if (cntrllr != null) {
-                    if (mySpeed > 0.1d) {
+                if (mySpeed > 0.1d) {
+                    if (safetyDampenersOnce) {
+                        CONTROLLER.DampenersOverride = true;
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                        cntrllr.DampenersOverride = true;
-                    } else {
-                        if (!safetyDampenersOnce) {
-                            if (idleThrusters) {
-                                foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
-                            }
-                            safetyDampenersOnce = true;
+                        safetyDampenersOnce = false;
+                    }
+                } else {
+                    if (!safetyDampenersOnce) {
+                        if (idleThrusters) {
+                            foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                         }
+                        safetyDampenersOnce = true;
                     }
                 }
             } else {
-                if (safetyDampenersOnce) {
-                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    safetyDampenersOnce = false;
+                if (mySpeed > 0.05d) {
+                    if (safetyDampenersOnce) {
+                        CONTROLLER.DampenersOverride = true;
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
+                        safetyDampenersOnce = false;
+                    }
+                } else {
+                    if (!safetyDampenersOnce) {
+                        CONTROLLER.DampenersOverride = false;
+                        if (idleThrusters) {
+                            foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
+                        }
+                        safetyDampenersOnce = true;
+                    }
                 }
             }
         }
@@ -1356,7 +1364,7 @@ namespace IngameScript {
             MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);//TODO
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    landPosition = TARGET.HitPosition.Value - Vector3D.Normalize(-gravity) * 50d;
+                    landPosition = Vector3D.Normalize(Vector3D.Normalize(-gravity) - TARGET.HitPosition.Value) * 50d;
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(landPosition, "landPosition");
                     REMOTE.SetAutoPilotEnabled(true);
@@ -1649,11 +1657,7 @@ namespace IngameScript {
                     obstaclesAvoidance = false;
                     collisionDetection = false;
                     enemyEvasion = false;
-                    idleThrusters = false;
-                    safetyDampeners = true;
                 }
-                if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-                if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 if (LCDAUTOCOMBAT != null) { LCDAUTOCOMBAT.BackgroundColor = autoCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
                 if (LCDOBSTACLES != null) { LCDOBSTACLES.BackgroundColor = obstaclesAvoidance ? new Color(25, 0, 100) : new Color(0, 0, 0); }
