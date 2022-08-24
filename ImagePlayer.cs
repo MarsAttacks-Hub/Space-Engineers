@@ -287,7 +287,7 @@ namespace IngameScript {
         }
 
         void PlayNeonShop(IMyTextPanel myPanel) {
-            int rndmFrame = random.Next(68, 71);//TODO
+            int rndmFrame = random.Next(68, 72);
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 
@@ -297,22 +297,22 @@ namespace IngameScript {
         }
 
         void PlayNeonChina(IMyTextPanel myPanel) {
-            int rndmFrame = random.Next(74, gif.frames.Count);//TODO
+            int rndmFrame = random.Next(74, gif.frames.Count);
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 
         void PlayCorps(IMyTextPanel myPanel) {
-            int rndmFrame = random.Next(35, 47);//TODO
+            int rndmFrame = random.Next(35, 48);
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 
         void PlayCommercials(IMyTextPanel myPanel) {
-            int rndmFrame = random.Next(48, 66);//TODO
+            int rndmFrame = random.Next(48, 67);
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 
         void PlayHubs(IMyTextPanel myPanel) {
-            int rndmFrame = random.Next(20, 34);//TODO
+            int rndmFrame = random.Next(20, 35);
             myPanel.WriteText(new String(gif.frames[rndmFrame]), false);
         }
 

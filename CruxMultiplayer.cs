@@ -25,7 +25,7 @@ namespace IngameScript {
         //MULTI
         bool creative = true;//define if is playing creative mode or not
         bool magneticDrive = true;//enable/disable magnetic drive
-        bool safetyDampeners = true;//enable/disable safety dampeners, valid only if magneticDrive is false
+        bool safetyDampeners = true;//enable/disable safety dampeners
         bool autoFire = true;//enable/disable automatic fire
         bool idleThrusters = false;//enable/disable thrusters
         bool togglePB = true;//enable/disable PB
@@ -54,7 +54,7 @@ namespace IngameScript {
         bool safetyDampenersOnce = false;
         bool sunAlignOnce = true;
         bool unlockSunAlignOnce = true;
-        bool toggleThrustersOnce = false;
+        bool controlThrustersOnce = false;
         bool updateOnce = true;
         bool initMagneticDriveOnce = true;
         bool initAutoMagneticDriveOnce = true;
@@ -86,7 +86,8 @@ namespace IngameScript {
         int missedScan = 0;
         int sunAlignmentStep = 0;
         int selectedSunAlignmentStep;
-        int safetyDampenersCount = 0;
+        int manageThrustersCount = 0;
+        int manageDampenersCount = 0;
         int checkGunsCount;
         int sendMessageCount = 0;
         string rangeFinderName = "";
@@ -204,13 +205,14 @@ namespace IngameScript {
                 }
 
                 Vector3D myVelocity = CONTROLLER.GetShipVelocities().LinearVelocity;
+                double mySpeed = myVelocity.Length();
 
                 bool targetFound = TurretsDetection(targetInfo.IsEmpty());
                 bool isTargetEmpty = targetInfo.IsEmpty();
 
                 bool isAutopiloted = REMOTE.IsAutoPilotEnabled;
                 bool needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || isAutopiloted
-                    || !Vector3D.IsZero(gravity) || myVelocity.Length() > 2d || !isTargetEmpty;
+                    || !Vector3D.IsZero(gravity) || mySpeed > 2d || !isTargetEmpty;
                 SendBroadcastControllerMessage(needControl);
 
                 if (!needControl && sunAlign && Vector3D.IsZero(gravity) && isTargetEmpty) {
@@ -229,15 +231,11 @@ namespace IngameScript {
 
                 ManagePIDControllers(isTargetEmpty);
 
-                ManageMagneticDrive(needControl, isAutopiloted, idleThrusters, gravity, myVelocity);
+                ManageThrusters(mySpeed, isAutopiloted);
 
-                if (safetyDampeners) {
-                    if (safetyDampenersCount == 50) {
-                        SafetyDampeners(needControl, mySpeed);
-                        safetyDampenersCount = 0;
-                    }
-                    safetyDampenersCount++;
-                }
+                ManageMagneticDrive(needControl, isAutopiloted, gravity, myVelocity);
+
+                ManageDampeners(mySpeed, isAutopiloted);
 
                 ManageWaypoints(isTargetEmpty);
 
@@ -329,14 +327,17 @@ namespace IngameScript {
                 case "ToggleSafetyDampeners":
                     safetyDampeners = !safetyDampeners;
                     if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-                    configChanged = true;
                     break;
                 case "ToggleIdleThrusters":
                     idleThrusters = !idleThrusters;
                     if (idleThrusters) {
+                        //REMOTE.ControlThrusters = false;
+                        //CONTROLLER.ControlThrusters = false;
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                         if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(25, 0, 100); }
                     } else {
+                        //REMOTE.ControlThrusters = true;
+                        //CONTROLLER.ControlThrusters = true;
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
                         if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = new Color(0, 0, 0); }
                     }
@@ -445,47 +446,35 @@ namespace IngameScript {
             IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
 
-        void ManageMagneticDrive(bool needControl, bool isAutoPiloted, bool idleThrusters, Vector3D gravity, Vector3D myVelocity) {
+        void ManageMagneticDrive(bool needControl, bool isAutoPiloted, Vector3D gravity, Vector3D myVelocity) {
             if (magneticDrive && needControl) {
                 Vector3D dir = Vector3D.Zero;
-                if (initMagneticDriveOnce) {
-                    CONTROLLER.DampenersOverride = true;
-                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    //sunAlign = false;//TODO
-                    initMagneticDriveOnce = false;
-                }
+                initMagneticDriveOnce = false;
 
                 SyncRotors();
 
                 if (isAutoPiloted) {
                     dir = AutoMagneticDrive(dir);
                 } else {
-                    if (!initAutoMagneticDriveOnce) {
-                        foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
-                        initAutoMagneticDriveOnce = true;
-                    }
+                    initAutoMagneticDriveOnce = true;
                     dir = MagneticDrive();
                     dir = MagneticDampeners(dir, myVelocity, gravity);
-                    IdleThrusters(dir, idleThrusters);
                 }
 
                 SetPower(dir);
 
             } else {
                 if (!initMagneticDriveOnce) {
-                    IdleMagneticDrive(idleThrusters);
+                    IdleMagneticDrive();
                     initMagneticDriveOnce = true;
                 }
             }
         }
 
-        void IdleMagneticDrive(bool idleThrusters) {
+        void IdleMagneticDrive() {
             SetPower(Vector3D.Zero);
             foreach (IMyMotorStator block in ROTORS) { block.TargetVelocityRPM = 0f; }
             foreach (IMyMotorStator block in ROTORSINV) { block.TargetVelocityRPM = 0f; }
-            if (idleThrusters) {
-                foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
-            }
         }
 
         IMyThrust InitAutopilotMagneticDrive(List<IMyThrust> thrusters) {
@@ -537,20 +526,6 @@ namespace IngameScript {
             if (Math.Abs(vel.Y) < 2d) { vel.Y = 0d; }
             if (Math.Abs(vel.Z) < 2d) { vel.Z = 0d; }
             return vel;
-        }
-
-        void IdleThrusters(Vector3D direction, bool idleThrusters) {
-            if (!Vector3D.IsZero(direction)) {
-                if (!toggleThrustersOnce && idleThrusters) {
-                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
-                    toggleThrustersOnce = true;
-                }
-            } else {
-                if (toggleThrustersOnce) {
-                    foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                    toggleThrustersOnce = false;
-                }
-            }
         }
 
         void SetPower(Vector3D pow) {
@@ -1140,24 +1115,74 @@ namespace IngameScript {
             }
         }
 
-        void SafetyDampeners(bool needControl, double mySpeed) {
-            if (!needControl) {
-                if (mySpeed > 0.05d) {
-                    if (safetyDampenersOnce) {
-                        CONTROLLER.DampenersOverride = true;
+        void ManageThrusters(double mySpeed, bool isAutoPiloted) {
+            if (manageThrustersCount >= 10) {
+                if (magneticDrive && !isAutoPiloted && idleThrusters) {
+                    controlThrustersOnce = false;
+                    if (mySpeed <= 0.1d) {
+                        //if (REMOTE.ControlThrusters) { REMOTE.ControlThrusters = false; }
+                        //if (CONTROLLER.ControlThrusters) { CONTROLLER.ControlThrusters = false; }
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
+                    } else if (mySpeed > 0.1d && mySpeed < 10d) {
+                        //if (!REMOTE.ControlThrusters) { REMOTE.ControlThrusters = true; }
+                        //if (!CONTROLLER.ControlThrusters) { CONTROLLER.ControlThrusters = true; }
                         foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
-                        safetyDampenersOnce = false;
+                    } else {
+                        //if (REMOTE.ControlThrusters) { REMOTE.ControlThrusters = false; }
+                        //if (CONTROLLER.ControlThrusters) { CONTROLLER.ControlThrusters = false; }
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
                     }
                 } else {
-                    if (!safetyDampenersOnce) {
-                        CONTROLLER.DampenersOverride = false;
-                        if (idleThrusters) {
-                            foreach (IMyThrust block in THRUSTERS) { block.Enabled = false; }
-                        }
-                        safetyDampenersOnce = true;
+                    if (!controlThrustersOnce) {
+                        //REMOTE.ControlThrusters = true;
+                        //CONTROLLER.ControlThrusters = true;
+                        foreach (IMyThrust block in THRUSTERS) { block.Enabled = true; }
+                        controlThrustersOnce = true;
                     }
                 }
+                manageThrustersCount = 0;
             }
+            manageThrustersCount++;
+        }
+
+        void ManageDampeners(double mySpeed, bool isAutoPiloted) {
+            if (manageDampenersCount >= 10) {
+                if (isAutoPiloted) {
+                    if (!REMOTE.DampenersOverride) {
+                        REMOTE.DampenersOverride = true;
+                    }
+                    if (!CONTROLLER.DampenersOverride) {
+                        CONTROLLER.DampenersOverride = true;
+                    }
+                } else {
+                    if (safetyDampeners) {
+                        safetyDampenersOnce = false;
+                        if (mySpeed <= 0.1d) {
+                            if (REMOTE.DampenersOverride) {
+                                REMOTE.DampenersOverride = false;
+                            }
+                            if (CONTROLLER.DampenersOverride) {
+                                CONTROLLER.DampenersOverride = false;
+                            }
+                        } else {
+                            if (!REMOTE.DampenersOverride) {
+                                REMOTE.DampenersOverride = true;
+                            }
+                            if (!CONTROLLER.DampenersOverride) {
+                                CONTROLLER.DampenersOverride = true;
+                            }
+                        }
+                    } else {
+                        if (!safetyDampenersOnce) {
+                            REMOTE.DampenersOverride = true;
+                            CONTROLLER.DampenersOverride = true;
+                            safetyDampenersOnce = true;
+                        }
+                    }
+                }
+                manageDampenersCount = 0;
+            }
+            manageDampenersCount++;
         }
 
         void ManageWaypoints(bool isTargetEmpty) {
