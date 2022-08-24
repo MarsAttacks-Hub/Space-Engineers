@@ -223,7 +223,7 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 Debug.RemoveDraw();
-                
+
                 GetBroadcastMessages();
 
                 Vector3D gravity = CONTROLLER.GetNaturalGravity();
@@ -284,7 +284,6 @@ namespace IngameScript {
                 if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
-                    //DEBUG.ReadText(debugLog, true);
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
@@ -435,7 +434,6 @@ namespace IngameScript {
             MyTuple<string, bool> tuple = MyTuple.Create("isControlled", isControlled);
             IGC.SendBroadcastMessage("[POWERMANAGER]", tuple, TransmissionDistance.ConnectedConstructs);
         }
-
 
         void SendBroadcastLogMessage() {
             if (logger) {
@@ -1073,7 +1071,12 @@ namespace IngameScript {
                     Vector3D escapeDirection = Vector3D.Normalize(REMOTE.CubeGrid.WorldVolume.Center - enemyDirectionPosition);//toward my center
                     escapeDirection = Vector3D.TransformNormal(escapeDirection, MatrixD.Transpose(REMOTE.WorldMatrix));
 
+                    //------------------------------------
+                    Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
+                    Vector3D position = REMOTE.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
+                    Debug.DrawLine(REMOTE.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
                     Debug.PrintHUD($"CheckCollisions: {escapeDirection.X},{escapeDirection.Y},{escapeDirection.Z}");
+                    //------------------------------------
 
                     return escapeDirection;//TODO multiply by value?
                 } else {
@@ -1086,7 +1089,7 @@ namespace IngameScript {
 
         Vector3D EvadeEnemy(MatrixD targOrientation, Vector3D targVel, Vector3D targPos, Vector3D myPosition, Vector3D myVelocity, Vector3D gravity, bool targetFound) {
             if (targetFound) {
-                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(CONTROLLER.WorldMatrix.Backward);
+                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(CONTROLLER.WorldMatrix.Backward);//TODO it still backward if the target is at my back?
                 Base6Directions.Direction perpendicular = Base6Directions.GetPerpendicular(enemyForward);
                 Vector3D enemyForwardVec = targOrientation.GetDirectionVector(enemyForward);
                 Vector3D enemyPerpendicularVec = targOrientation.GetDirectionVector(perpendicular);
@@ -1107,11 +1110,27 @@ namespace IngameScript {
                     return Vector3D.Zero;
                 }
                 double angle = AngleBetween(enemyForwardVec, enemyAim) * rad2deg;
+
+                //---------------------------------------------------------------------------
+                Vector3D position = targPos + (enemyForwardVec * 2000d);
+                Debug.DrawLine(targPos, position, Color.Orange, thickness: 2f, onTop: true);
+
+                Vector3D normalizedVec = Vector3D.Normalize(enemyAim);
+                position = targPos + (normalizedVec * 2000d);
+                Debug.DrawLine(targPos, position, Color.Magenta, thickness: 2f, onTop: true);
+                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
+                //---------------------------------------------------------------------------
+
                 if (angle < (4500d / distance)) {
                     Vector3D evadeDirection = Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - (targPos + (enemyForwardVec * distance)));//toward my center
                     evadeDirection = Vector3D.TransformNormal(evadeDirection, MatrixD.Transpose(CONTROLLER.WorldMatrix));
 
+                    //---------------------------------------------------------------------------
+                    Debug.DrawPoint(targPos + (enemyForwardVec * distance), Color.Green, 4f, onTop: true);
+                    Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center, Color.Yellow, 4f, onTop: true);
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, targPos + (enemyForwardVec * distance), Color.Purple, thickness: 1f, onTop: true);
                     Debug.PrintHUD($"EvadeEnemy: {evadeDirection.X},{evadeDirection.Y},{evadeDirection.Z}");
+                    //---------------------------------------------------------------------------
 
                     return evadeDirection;//TODO multiply by value?
                 }
@@ -1204,6 +1223,14 @@ namespace IngameScript {
                     break;
             }
             stopDistance += 1000d;//TODO
+
+            //----------------------------------
+            Vector3D stop = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
+            Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
+            Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
+            Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Orange, 5f, onTop: true);
+            //----------------------------------
+
             MyDetectedEntityInfo entityInfo = lidar.Raycast(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance));
             stopDir = Vector3D.Zero;
             if (!entityInfo.IsEmpty()) {

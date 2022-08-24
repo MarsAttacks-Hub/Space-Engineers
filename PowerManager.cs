@@ -115,7 +115,6 @@ namespace IngameScript {
                 if (DEBUG != null) {
                     DEBUG.ContentType = ContentType.TEXT_AND_IMAGE;
                     StringBuilder debugLog = new StringBuilder("");
-                    //DEBUG.ReadText(debugLog, true);
                     debugLog.Append("\n" + e.Message + "\n").Append(e.Source + "\n").Append(e.TargetSite + "\n").Append(e.StackTrace + "\n");
                     DEBUG.WriteText(debugLog);
                 }
