@@ -299,6 +299,8 @@ namespace IngameScript {
                         RangeFinder();
                     } else {
                         Land(gravity);
+                        idleThrusters = true;
+                        safetyDampeners = true;
                     }
                     sendMessageCount = 10;
                     break;
@@ -500,8 +502,7 @@ namespace IngameScript {
                         }
                         mouseYaw = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
                     } else {
-                        //Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Forward, gravity));//left vector
-                        Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Right, gravity));//forward vector//TODO
+                        Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Forward, gravity));//left vector
                         GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                         if (mousePitch != 0d) {
                             mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
@@ -1118,7 +1119,7 @@ namespace IngameScript {
                 Vector3D normalizedVec = Vector3D.Normalize(enemyAim);
                 position = targPos + (normalizedVec * 2000d);
                 Debug.DrawLine(targPos, position, Color.Magenta, thickness: 2f, onTop: true);
-                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.00}, safety:{4500d / distance:0.00}");
+                Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.##}, safety:{4500d / distance:0.##}");
                 //---------------------------------------------------------------------------
 
                 if (angle < (4500d / distance)) {
@@ -1226,7 +1227,7 @@ namespace IngameScript {
 
             //----------------------------------
             Vector3D stop = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
-            Debug.PrintHUD($"stopDistance:{stopDistance:0.00}");
+            Debug.PrintHUD($"stopDistance:{stopDistance:0.##}");
             Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
             Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Orange, 5f, onTop: true);
             //----------------------------------
@@ -1274,7 +1275,7 @@ namespace IngameScript {
                 }
                 if (altitude > 60d) {
                     if (keepAltitudeCount >= 50) {
-                        if (Vector3D.Distance(hoverPosition, CONTROLLER.CubeGrid.WorldVolume.Center) > 300d) {
+                        if (!Vector3D.IsZero(hoverPosition) && Vector3D.Distance(hoverPosition, CONTROLLER.CubeGrid.WorldVolume.Center) > 300d) {
                             REMOTE.ClearWaypoints();
                             REMOTE.AddWaypoint(hoverPosition, "hoverPosition");
                             REMOTE.SetAutoPilotEnabled(true);
@@ -1302,7 +1303,6 @@ namespace IngameScript {
                 if (!keepAltitudeOnce) {
                     keepAltitudeOnce = true;
                     altitudeToKeep = 0d;
-                    //hoverPosition = Vector3D.Zero;
                 }
             }
             return dir;
@@ -1357,6 +1357,7 @@ namespace IngameScript {
                         REMOTE.ClearWaypoints();
                         REMOTE.SetAutoPilotEnabled(false);
                         hoverPosition = Vector3D.Zero;
+                        keepAltitudeOnce = true;
                     }
                 }
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(landPosition)) {
@@ -1453,7 +1454,7 @@ namespace IngameScript {
             MyDetectedEntityInfo TARGET = lidar.Raycast(raycastDistance);
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    landPosition = Vector3D.Normalize(Vector3D.Normalize(-gravity) - TARGET.HitPosition.Value) * 50d;
+                    landPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(-gravity) * 30d);//TODO
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(landPosition, "landPosition");
                     REMOTE.SetAutoPilotEnabled(true);

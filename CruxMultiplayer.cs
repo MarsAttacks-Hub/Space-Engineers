@@ -312,6 +312,8 @@ namespace IngameScript {
                         RangeFinder();
                     } else {
                         Land(gravity);
+                        idleThrusters = true;
+                        safetyDampeners = true;
                     }
                     sendMessageCount = 10;
                     break;
@@ -1040,10 +1042,11 @@ namespace IngameScript {
         void Land(Vector3D gravity) {
             IMyCameraBlock lidar = GetCameraWithMaxRange(LIDARS);
             if (lidar == null) { return; }
-            MyDetectedEntityInfo TARGET = lidar.Raycast(lidar.AvailableScanRange);//TODO
+            double raycastDistance = lidar.AvailableScanRange < 5000d ? lidar.AvailableScanRange : 5000d;
+            MyDetectedEntityInfo TARGET = lidar.Raycast(raycastDistance);
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
-                    landPosition = Vector3D.Normalize(Vector3D.Normalize(-gravity) - TARGET.HitPosition.Value) * 50d;
+                    landPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(-gravity) * 30d);//TODO
                     REMOTE.ClearWaypoints();
                     REMOTE.AddWaypoint(landPosition, "landPosition");
                     REMOTE.SetAutoPilotEnabled(true);
