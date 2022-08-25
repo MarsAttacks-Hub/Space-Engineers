@@ -21,7 +21,7 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
-        //add other missile guidances
+        //add missile beam ride guidance
         //HOMING MISSILE
         readonly string antennaName = "A [M]1";
         readonly string missilePrefix = "[M]1";

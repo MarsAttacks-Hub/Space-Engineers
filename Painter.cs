@@ -21,7 +21,7 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //TODO
-        //make LoadMissiles() universal
+        //check speed and roll be4 detaching the decoy or launch the missile
         //PAINTER
         readonly int missilesCount = 2;
         bool creative = true;//define if is playing creative mode or not

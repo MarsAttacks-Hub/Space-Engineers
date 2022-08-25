@@ -20,8 +20,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO
-        //check speed and roll be4 detaching the decoy
+        
         //SHOOTER
         int launchDelay = 25;
         int selectedDrop = 0;//0 decoys - 1 bombs
@@ -199,9 +198,9 @@ namespace IngameScript {
                     foreach (IMyShipMergeBlock merge in MERGESDECOY) { merge.Enabled = true; }
                     if (selectedDrop == 1) {
                         if (toggleDecoy) {
-                            SendBroadcastMessage(true);
                             launchOnce = false;
                         }
+                        SendBroadcastMessage(true);
                         readyDecoy = false;
                         launchTick = -1;
                     }
@@ -211,9 +210,9 @@ namespace IngameScript {
                     if (ready) {
                         foreach (IMyShipWelder block in WELDERSDECOY) { block.Enabled = false; }
                         if (toggleDecoy) {
-                            SendBroadcastMessage(true);
                             launchOnce = false;
                         }
+                        SendBroadcastMessage(true);
                         readyDecoy = false;
                         launchTick = -1;
                     }
@@ -261,8 +260,8 @@ namespace IngameScript {
                 } else if (fireTick >= 260) {
                     if (toggleJolt) {
                         firing = false;
-                        SendBroadcastMessage(true);
                     }
+                    SendBroadcastMessage(true);
                     readyJolt = false;
                     fireTick = -1;
                 }
@@ -278,7 +277,7 @@ namespace IngameScript {
             IGC.SendBroadcastMessage("[PAINTER]", tuple, TransmissionDistance.ConnectedConstructs);
             IGC.SendBroadcastMessage("[MULTI]", tuple, TransmissionDistance.ConnectedConstructs);
 
-            MyTuple<int, bool, bool, bool, bool> aTuple = MyTuple.Create(selectedDrop, readyJolt, toggleJolt, readyDecoy, toggleDecoy);
+            MyTuple<int, bool, bool, bool, bool> aTuple = MyTuple.Create(selectedDrop, readyJolt, !toggleJolt, readyDecoy, !toggleDecoy);
             IGC.SendBroadcastMessage("[LOGGER]", aTuple, TransmissionDistance.ConnectedConstructs);
         }
 

@@ -21,7 +21,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO
+
         //NAVIGATOR
         DebugAPI Debug;
 
@@ -243,9 +243,9 @@ namespace IngameScript {
                 bool isAutoPiloted = REMOTE.IsAutoPilotEnabled;
                 bool isUnderControl = IsPiloted(true);
                 bool needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || isAutoPiloted
-                    || !Vector3D.IsZero(gravity) || mySpeed > 2d || !isTargetEmpty;
+                    || !Vector3D.IsZero(gravity) || mySpeed > 2d || !isTargetEmpty;//TODO test without || !Vector3D.IsZero(gravity) on planets
 
-                SendBroadcastControllerMessage(needControl);
+                SendBroadcastControllerMessage(needControl);//TODO set a delay?
 
                 if (aimTarget) {
                     bool aligned;
