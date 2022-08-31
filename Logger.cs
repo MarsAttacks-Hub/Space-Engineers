@@ -100,14 +100,21 @@ namespace IngameScript {
         bool moddedSensor = false;
         bool closeRangeCombat = false;
 
+        double commercialTime = 0d;
+        readonly double commercialTimeDelay = 1d;
+        int brightnessIndex = 0;
+        readonly int brightnessCount = 3;
+
         public List<MyPanel> POWER = new List<MyPanel>();
         public List<MyPanel> NAVIGATOR = new List<MyPanel>();
         public List<MyPanel> PAINTER = new List<MyPanel>();
         public List<MyPanel> OREINGOTS = new List<MyPanel>();
         public List<MyPanel> COMPONENTSAMMO = new List<MyPanel>();
         public List<MyPanel> OVERVIEW = new List<MyPanel>();
+        public List<MyPanel> COMMERCIALS = new List<MyPanel>();
 
         IMyTextPanel LCDBEAUTIFY;
+        IMyTextPanel LCDBRIGHTNESS;
 
         readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
@@ -133,17 +140,57 @@ namespace IngameScript {
         Color transparentBlue = new Color(0, 0, 255, 20);
         Color transparentDarkBlue = new Color(0, 0, 128, 20);
         Color transparentNeonAzure = new Color(0, 255, 255, 20);
-        Color neonAzure = new Color(0, 255, 255, 255);
         Color transparentMagenta = new Color(64, 0, 64, 20);
         Color transparentNeonMagenta = new Color(128, 0, 128, 20);
-        Color magenta = new Color(100, 0, 100);
-        Color purple = new Color(25, 0, 100);
-        Color azure = new Color(0, 100, 100);
         Color deepPurple = new Color(64, 0, 128, 20);
         Color deepBlue = new Color(0, 0, 64, 20);
         Color transparentGreen = new Color(0, 255, 0, 20);
+        Color magenta = new Color(100, 0, 100);
+        Color purple = new Color(25, 0, 100);
+        Color azure = new Color(0, 100, 100);
 
         public Random random = new Random();
+
+        public List<int> alphaList = new List<int>() { 20, 30, 40, 50 };
+
+        public List<Color> magentaList = new List<Color>() {
+            new Color(100, 0, 100),
+            new Color(150, 0, 150),
+            new Color(200, 0, 200),
+            new Color(255, 0, 255)
+        };
+
+        public List<Color> purpleList = new List<Color>() {
+            new Color(25, 0, 100),
+            new Color(75, 0, 150),
+            new Color(125, 0, 200),
+            new Color(180, 0, 255)
+        };
+
+        public List<Color> azureList = new List<Color>() {
+            new Color(0, 100, 100),
+            new Color(0, 150, 150),
+            new Color(0, 200, 200),
+            new Color(0, 255, 255)
+        };
+
+        public Dictionary<int, string> commercialsDict = new Dictionary<int, string> {
+            {0,"LCD_Frozen_Poster01"},
+            {1,"LCD_Frozen_Poster02"},
+            {2,"LCD_Frozen_Poster03"},
+            {3,"LCD_Frozen_Poster04"},
+            {4,"LCD_Frozen_Poster05"},
+            {5,"LCD_Frozen_Poster06"},
+            {6,"LCD_Frozen_Poster07"},
+            {7,"LCD_HI_Poster1_Square"},
+            {8,"LCD_HI_Poster2_Square"},
+            {9,"LCD_HI_Poster3_Square"},
+            {10,"LCD_SoF_BrightFuture_Square"},
+            {11,"LCD_SoF_CosmicTeam_Square"},
+            {12,"LCD_SoF_Exploration_Square"},
+            {13,"LCD_SoF_SpaceTravel_Square"},
+            {14,"LCD_SoF_ThunderFleet_Square"}
+        };
 
         Program() {
             Runtime.UpdateFrequency |= UpdateFrequency.Update10;
@@ -154,8 +201,10 @@ namespace IngameScript {
             GetBlocks();
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[LOGGER]");
             //BROADCASTLISTENER.SetMessageCallback();
-            Me.GetSurface(0).BackgroundColor = logger ? purple : Color.Black;
-            if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = beautifyLog ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            Me.GetSurface(0).BackgroundColor = logger ? new Color(25, 0, 100) : Color.Black;
+            if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = beautifyLog ? new Color(25, 0, 100) : Color.Black; }
+            if (LCDBRIGHTNESS != null) { LCDBRIGHTNESS.BackgroundColor = new Color(25, 0, 100); }
+
             if (beautifyLog) {
                 randomPositions1.Add(new Vector2(-240f, 225f));
                 randomPositions1.Add(new Vector2(-120f, 225f));
@@ -180,11 +229,15 @@ namespace IngameScript {
                 if (!string.IsNullOrEmpty(arg)) {
                     ProcessArgument(arg);
                     if (!logger) {
+                        if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = Color.Black; }
+                        if (LCDBRIGHTNESS != null) { LCDBRIGHTNESS.BackgroundColor = Color.Black; }
                         Me.GetSurface(0).BackgroundColor = Color.Black;
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                         return;
                     } else {
-                        Me.GetSurface(0).BackgroundColor = purple;
+                        if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = new Color(25, 0, 100); }
+                        if (LCDBRIGHTNESS != null) { LCDBRIGHTNESS.BackgroundColor = new Color(25, 0, 100); }
+                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     }
                 } else {
@@ -205,6 +258,21 @@ namespace IngameScript {
         }
 
         public IEnumerator<bool> RunOverTime() {
+
+            double lastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+
+            if (COMMERCIALS.Count > 0) {
+                if (commercialTime > commercialTimeDelay) {
+                    commercialTime = 0;
+                    foreach (MyPanel panel in COMMERCIALS) {
+                        PlayCommercials(panel);
+                    }
+                    yield return true;
+                } else {
+                    commercialTime += lastRun;
+                }
+            }
+
             GetBroadcastMessages();
             yield return true;
 
@@ -277,7 +345,25 @@ namespace IngameScript {
                     break;
                 case "ToggleBeautify":
                     beautifyLog = !beautifyLog;
-                    if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = beautifyLog ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+                    if (LCDBEAUTIFY != null) { LCDBEAUTIFY.BackgroundColor = beautifyLog ? purple : Color.Black; }
+                    break;
+                case "CycleBrightness":
+                    brightnessIndex++;
+                    if (brightnessIndex > brightnessCount) {
+                        brightnessIndex = 0;
+                    }
+                    LCDBRIGHTNESS.WriteText($"\nCycle Log\nBrightness\nlvl: {brightnessIndex + 1}");
+                    transparentBlue = new Color(0, 0, 255, alphaList.ElementAt(brightnessIndex));
+                    transparentDarkBlue = new Color(0, 0, 128, alphaList.ElementAt(brightnessIndex));
+                    transparentNeonAzure = new Color(0, 255, 255, alphaList.ElementAt(brightnessIndex));
+                    transparentMagenta = new Color(64, 0, 64, alphaList.ElementAt(brightnessIndex));
+                    transparentNeonMagenta = new Color(128, 0, 128, alphaList.ElementAt(brightnessIndex));
+                    deepPurple = new Color(64, 0, 128, alphaList.ElementAt(brightnessIndex));
+                    deepBlue = new Color(0, 0, 64, alphaList.ElementAt(brightnessIndex));
+                    transparentGreen = new Color(0, 255, 0, alphaList.ElementAt(brightnessIndex));
+                    magenta = magentaList.ElementAt(brightnessIndex);
+                    purple = purpleList.ElementAt(brightnessIndex);
+                    azure = azureList.ElementAt(brightnessIndex);
                     break;
             }
         }
@@ -1202,11 +1288,40 @@ namespace IngameScript {
             sprites.Clear();
         }
 
+        void PlayCommercials(MyPanel myPanel) {
+            Echo("PlayCommercials");
+
+            int randomId = random.Next(0, 15);
+            string pictureId;
+            commercialsDict.TryGetValue(randomId, out pictureId);
+
+            sprites.Add(DrawSpritePicture(new Vector2(myPanel.viewport.Center.X - myPanel.viewport.Width / 2, myPanel.viewport.Y + myPanel.viewport.Center.Y), pictureId, "Default", myPanel.minScale));
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+            foreach (var sprite in sprites) {
+                frame.Add(sprite);
+            }
+            frame.Dispose();
+            sprites.Clear();
+        }
+
         MySprite DrawSpriteText(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
             return new MySprite() {
                 Type = SpriteType.TEXT,
                 Data = data,
                 RotationOrScale = scale,
+                Position = pos,
+                FontId = font,
+                Color = color,
+                Alignment = alignment
+            };
+        }
+
+        MySprite DrawSpritePicture(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
+            return new MySprite() {
+                Type = SpriteType.TEXTURE,
+                Data = data,
+                //RotationOrScale = scale,
                 Position = pos,
                 FontId = font,
                 Color = color,
@@ -1230,14 +1345,14 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // inv bar
 
-            DrawStatusBar(frame, new Vector2(90f, -223f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)cargoPercentage / 100f, transparentBlue, neonAzure, TextAlignment.LEFT);
+            DrawStatusBar(frame, new Vector2(90f, -223f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)cargoPercentage / 100f, transparentBlue, azure, TextAlignment.LEFT);
 
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 0 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 1 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 2 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 3 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 4 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
-            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 5 ? neonAzure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 0 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 1 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(195f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 2 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle4
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(175f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 3 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle5
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(155f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 4 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle6
+            frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(135f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 5 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle1
 
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 144f) * scale + centerPos, new Vector2(500f, 184f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // dark blue base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 238f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
@@ -1513,7 +1628,15 @@ namespace IngameScript {
             }
             panels.Clear();
 
+            COMMERCIALS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(panels, block => block.CustomName.Contains("[CRX] LCD SE Commercials"));
+            foreach (IMyTextPanel panel in panels) {
+                COMMERCIALS.Add(new MyPanel(panel as IMyTextSurface, panel.BlockDefinition.SubtypeId));
+            }
+            panels.Clear();
+
             LCDBEAUTIFY = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Beautify Logs") as IMyTextPanel;
+            LCDBRIGHTNESS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Cycle Brightness") as IMyTextPanel;
         }
 
         public class MyPanel {

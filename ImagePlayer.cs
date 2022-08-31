@@ -21,7 +21,7 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
 
-        //IMAGE PLAYER
+        //PLAYER
         readonly int frameWidth = 178;
         readonly int frameHeight = 178;
 
@@ -37,6 +37,10 @@ namespace IngameScript {
         readonly double hangarTimeDelay = 3d;
         readonly double warnTimeDelay = 5d;
         readonly double dangerTimeDelay = 3d;
+        readonly double colorMorphTimeDelay = 1d;
+
+        bool player = true;
+        bool runningLights = true;
 
         int beerFrame = 72;
         int warn1Frame = 18;
@@ -44,12 +48,14 @@ namespace IngameScript {
         int warn3Frame = 14;
         int warn4Frame = 12;
         int hangar1Frame = 8;
+        int colorIndex = 0;
 
         double neonShopTime = 0d;
         double neonBeerTime = 0d;
         double neonChinaTime = 0d;
         double corpsTime = 0d;
         double commercialTime = 0d;
+        double colorMorphTime = 0d;
         double hubsTime = 0d;
         double hangarTime = 0d;
         double warn1Time = 0d;
@@ -76,6 +82,18 @@ namespace IngameScript {
         public List<IMyTextPanel> DANGER = new List<IMyTextPanel>();
         public List<IMyTextPanel> STATIC = new List<IMyTextPanel>();
 
+        public List<IMyLightingBlock> RUNNINGLIGHTS = new List<IMyLightingBlock>();
+
+        IMyTextPanel LCDRUNNINGLIGHTS;
+
+        public List<Color> colors = new List<Color>() {
+            new Color(0, 250, 250), new Color(10, 240, 250), new Color(20, 230, 250), new Color(30, 220, 250), new Color(40, 210, 250), new Color(50, 200, 250),
+            new Color(60, 190, 250), new Color(70, 180, 250), new Color(80, 170, 250), new Color(90, 160, 250), new Color(100, 150, 250),
+            new Color(110, 140, 250), new Color(120, 130, 250), new Color(130, 120, 250), new Color(140, 110, 250), new Color(150, 100, 250),
+            new Color(160, 90, 250), new Color(170, 80, 250), new Color(180, 70, 250), new Color(190, 60, 250), new Color(200, 50, 250),
+            new Color(210, 40, 250), new Color(220, 30, 250), new Color(230, 20, 250), new Color(240, 10, 250), new Color(250, 0, 250)
+        };
+
         public Program() {
             Runtime.UpdateFrequency |= UpdateFrequency.Update10;
             GetBlocks();
@@ -101,6 +119,10 @@ namespace IngameScript {
                     DEBUG.WriteText(new String(gif.frames[debugFrame]), false);
                 }
             }
+            foreach (IMyLightingBlock light in RUNNINGLIGHTS) {
+                light.Color = new Color(0, 250, 250);
+            }
+            if (LCDRUNNINGLIGHTS != null) { LCDRUNNINGLIGHTS.BackgroundColor = runningLights ? new Color(25, 0, 100) : Color.Black; }
             stateMachine = RunOverTime();
         }
 
@@ -109,8 +131,22 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
                 Echo($"frames:{gif.frames.Count}");
 
-                if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
-                    RunStateMachine();
+                if (!string.IsNullOrEmpty(arg)) {
+                    ProcessArgument(arg);
+                    if (!player) {
+                        if (LCDRUNNINGLIGHTS != null) { LCDRUNNINGLIGHTS.BackgroundColor = Color.Black; }
+                        Me.GetSurface(0).BackgroundColor = Color.Black;
+                        Runtime.UpdateFrequency = UpdateFrequency.None;
+                        return;
+                    } else {
+                        if (LCDRUNNINGLIGHTS != null) { LCDRUNNINGLIGHTS.BackgroundColor = runningLights ? new Color(25, 0, 100) : Color.Black; }
+                        Me.GetSurface(0).BackgroundColor = new Color(25, 0, 100);
+                        Runtime.UpdateFrequency = UpdateFrequency.Update10;
+                    }
+                } else {
+                    if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
+                        RunStateMachine();
+                    }
                 }
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
@@ -124,8 +160,51 @@ namespace IngameScript {
             }
         }
 
+        void ProcessArgument(string argument) {
+            switch (argument) {
+                case "ToggleRunningLights":
+                    runningLights = !runningLights;
+                    if (LCDRUNNINGLIGHTS != null) { LCDRUNNINGLIGHTS.BackgroundColor = runningLights ? new Color(25, 0, 100) : Color.Black; }
+                    if (!runningLights) {
+                        foreach (IMyLightingBlock light in RUNNINGLIGHTS) {
+                            light.Color = new Color(0, 250, 250);
+                        }
+                    }
+                    break;
+                case "TogglePlayer":
+                    player = !player;
+                    break;
+                case "PlayerOn":
+                    player = true;
+                    break;
+                case "PlayerOff":
+                    player = false;
+                    break;
+            }
+        }
+
         public IEnumerator<bool> RunOverTime() {
             double lastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+
+            if (runningLights) {
+                if (RUNNINGLIGHTS.Count > 0) {
+                    if (colorMorphTime > colorMorphTimeDelay) {
+                        if (colorIndex >= colors.Count - 1) {
+                            colorIndex = 0;
+                            colors.Reverse();
+                        }
+                        foreach (IMyLightingBlock light in RUNNINGLIGHTS) {
+                            light.Color = colors.ElementAt(colorIndex);
+                        }
+                        yield return true;
+
+                        colorMorphTime = 0d;
+                        colorIndex++;
+                    } else {
+                        colorMorphTime += lastRun;
+                    }
+                }
+            }
 
             if (NEONSHOP.Count > 0) {
                 if (neonShopTime > neonShopTimeDelay) {
@@ -463,6 +542,11 @@ namespace IngameScript {
                 panel.Font = "Monospace";
                 panel.TextPadding = 0f;
             }
+
+            RUNNINGLIGHTS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyLightingBlock>(RUNNINGLIGHTS, block => block.CustomName.Contains("[CRX] Running Lights"));
+
+            LCDRUNNINGLIGHTS = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Running Lights") as IMyTextPanel;
         }
 
         public class Decoder {
