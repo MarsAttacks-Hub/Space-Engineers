@@ -194,7 +194,7 @@ namespace IngameScript {
                             colors.Reverse();
                         }
                         foreach (IMyLightingBlock light in RUNNINGLIGHTS) {
-                            light.Color = colors.ElementAt(colorIndex);
+                            light.Color = colors[colorIndex];
                         }
                         yield return true;
 

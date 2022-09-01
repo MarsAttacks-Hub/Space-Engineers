@@ -353,17 +353,17 @@ namespace IngameScript {
                         brightnessIndex = 0;
                     }
                     LCDBRIGHTNESS.WriteText($"\nCycle Log\nBrightness\nlvl: {brightnessIndex + 1}");
-                    transparentBlue = new Color(0, 0, 255, alphaList.ElementAt(brightnessIndex));
-                    transparentDarkBlue = new Color(0, 0, 128, alphaList.ElementAt(brightnessIndex));
-                    transparentNeonAzure = new Color(0, 255, 255, alphaList.ElementAt(brightnessIndex));
-                    transparentMagenta = new Color(64, 0, 64, alphaList.ElementAt(brightnessIndex));
-                    transparentNeonMagenta = new Color(128, 0, 128, alphaList.ElementAt(brightnessIndex));
-                    deepPurple = new Color(64, 0, 128, alphaList.ElementAt(brightnessIndex));
-                    deepBlue = new Color(0, 0, 64, alphaList.ElementAt(brightnessIndex));
-                    transparentGreen = new Color(0, 255, 0, alphaList.ElementAt(brightnessIndex));
-                    magenta = magentaList.ElementAt(brightnessIndex);
-                    purple = purpleList.ElementAt(brightnessIndex);
-                    azure = azureList.ElementAt(brightnessIndex);
+                    transparentBlue = new Color(0, 0, 255, alphaList[brightnessIndex]);
+                    transparentDarkBlue = new Color(0, 0, 128, alphaList[brightnessIndex]);
+                    transparentNeonAzure = new Color(0, 255, 255, alphaList[brightnessIndex]);
+                    transparentMagenta = new Color(64, 0, 64, alphaList[brightnessIndex]);
+                    transparentNeonMagenta = new Color(128, 0, 128, alphaList[brightnessIndex]);
+                    deepPurple = new Color(64, 0, 128, alphaList[brightnessIndex]);
+                    deepBlue = new Color(0, 0, 64, alphaList[brightnessIndex]);
+                    transparentGreen = new Color(0, 255, 0, alphaList[brightnessIndex]);
+                    magenta = magentaList[brightnessIndex];
+                    purple = purpleList[brightnessIndex];
+                    azure = azureList[brightnessIndex];
                     break;
             }
         }
@@ -458,7 +458,7 @@ namespace IngameScript {
                                 string[] entryArray = entry.Split(b);
                                 values.Add(entryArray[1]);
                             }
-                            var tuple = MyTuple.Create(values.ElementAt(0), values.ElementAt(1), values.ElementAt(2), values.ElementAt(3), values.ElementAt(4));
+                            var tuple = MyTuple.Create(values[0], values[1], values[2], values[3], values[4]);
                             missilesLog.Add(tuple);
                         }
                     }
