@@ -221,18 +221,7 @@ namespace IngameScript {
             if (LCDMODDEDSENSOR != null) { LCDMODDEDSENSOR.BackgroundColor = moddedSensor ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDCLOSECOMBAT != null) { LCDCLOSECOMBAT.BackgroundColor = closeRangeCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            List<MyThrustBlock> thrusterList = new List<MyThrustBlock>();
-            foreach (IMyThrust block in THRUSTERS) {//TODO
-                MatrixD transposed = MatrixD.Transpose(CONTROLLER.WorldMatrix);
-                Vector3D thrustForward = Vector3D.Rotate(block.WorldMatrix.Forward, transposed);
-                Vector3D thrustUp = Vector3D.Rotate(block.WorldMatrix.Up, transposed);
-                //Vector3D thrustForward = Vector3D.TransformNormal(block.WorldMatrix.Forward, transposed);
-                //Vector3D thrustUp = Vector3D.TransformNormal(block.WorldMatrix.Up, transposed);
-                MatrixD thrustLocalMatrix = MatrixD.CreateFromDir(thrustForward, thrustUp);
-                thrusterList.Add(new MyThrustBlock(thrustLocalMatrix, block));//TODO or just Matrix.Transpose(CONTROLLER.WorldMatrix)?
-            }
-            myThrustList = new MyThrustList(MatrixD.Transpose(CONTROLLER.WorldMatrix), thrusterList);
-            thrusterList.Clear();
+            myThrustList = new MyThrustList(THRUSTERS, CONTROLLER.WorldMatrix);
         }
 
         public void Main(string arg) {
@@ -240,6 +229,31 @@ namespace IngameScript {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 Debug.RemoveDraw();
+
+                //----------------------------------
+                /*
+                if (CONTROLLER.GetShipVelocities().LinearVelocity.Length() > 0.3d) {
+                    Vector3D thrustVector = myThrustList.GetThrustVectorByDirection(CONTROLLER.GetShipVelocities().LinearVelocity);
+                    double thrustLength = thrustVector.Length();
+                    thrustVector = Vector3D.Transform(thrustVector, mtrx);
+
+                    Vector3D normalized = Vector3D.Normalize(thrustVector);
+                    Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * thrustLength);
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Cyan, thickness: 2f, onTop: true);
+
+                    Debug.PrintHUD($"thrustLength: {thrustLength:0.##}");
+                }
+                
+                foreach (IMyThrust block in myThrustList.tempThrusters) {
+                    Debug.DrawPoint(block.GetPosition(), Color.Red, 3f, onTop: true);
+
+                    //Vector3D localDirection = Vector3D.TransformNormal(Vector3D.Normalize(block.WorldMatrix.Forward), MatrixD.Transpose(CONTROLLER.WorldMatrix));
+                    //Vector3D position = block.GetPosition() + (localDirection * 20d);
+                    //Debug.DrawLine(block.GetPosition(), position, Color.Magenta, thickness: 1f, onTop: true);
+                }
+                Debug.PrintHUD($"tempThrusters: {myThrustList.tempThrusters.Count}");
+                */
+                //----------------------------------
 
                 GetBroadcastMessages();
 
@@ -296,12 +310,17 @@ namespace IngameScript {
                 ManageThrusters(mySpeed, isAutoPiloted);
 
                 if (magneticDrive) {
-                    initMagneticDriveOnce = false;
                     if (descend) {
                         MagneticDescend(myVelocity, gravity);
                     } else {
                         if (needControl) {
                             ManageMagneticDrive(isUnderControl, isAutoPiloted, gravity, myVelocity, mySpeed);
+                            initMagneticDriveOnce = false;
+                        } else {
+                            if (!initMagneticDriveOnce) {
+                                IdleMagneticDrive();
+                                initMagneticDriveOnce = true;
+                            }
                         }
                     }
                 } else {
@@ -771,7 +790,8 @@ namespace IngameScript {
                         }
                         if (!Vector3D.IsZero(landPosition)) {
                             initlandMagneticDriveOnce = false;
-                            double stopDistance = CalculateStopDistance(myVelocity);
+                            Vector3D stopVector = CalculateStopDistance(myVelocity);
+                            double stopDistance = stopVector.Length();
                             Vector3D landPos = landPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - landPosition) * stopDistance);
                             Vector3D landDir = Vector3D.Normalize(landPos - CONTROLLER.CubeGrid.WorldVolume.Center);
                             landDir = Vector3D.TransformNormal(landDir, MatrixD.Transpose(CONTROLLER.WorldMatrix));
@@ -789,10 +809,14 @@ namespace IngameScript {
                             //----------------------------------
                             Debug.DrawPoint(landPos, Color.Red, 50f, onTop: true);
                             Vector3D normalized = Vector3D.Normalize(landDir);
-                            Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * 2000d);
+                            Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * stopDistance);
                             Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Magenta, thickness: 2f, onTop: true);
                             Debug.PrintHUD($"landDir: {landDir.X:0.##},{landDir.Y:0.##},{landDir.Z:0.##}");
                             Debug.PrintHUD($"landPos: {landPos.X:0.##},{landPos.Y:0.##},{landPos.Z:0.##}");
+
+                            normalized = Vector3D.Normalize(stopVector);
+                            position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * stopDistance);
+                            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Cyan, thickness: 2f, onTop: true);
                             //----------------------------------
 
                         } else {
@@ -833,7 +857,8 @@ namespace IngameScript {
                 }
                 UpdateAcceleration(Runtime.TimeSinceLastRun.TotalSeconds, myVelocity);
                 if (collisionCheckCount >= collisionCheckDelay) {
-                    double stopDistance = CalculateStopDistance(myVelocity);
+                    Vector3D stopVector = CalculateStopDistance(myVelocity);
+                    double stopDistance = stopVector.Length();
                     RaycastStopPosition(stopDistance, myVelocity, mySpeed);
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
@@ -933,10 +958,14 @@ namespace IngameScript {
                         //----------------------------------
                         Debug.DrawPoint(landPos, Color.Red, 50f, onTop: true);
                         Vector3D normalized = Vector3D.Normalize(landDir);
-                        Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * 2000d);
+                        Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * stopDistance);
                         Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Magenta, thickness: 2f, onTop: true);
                         Debug.PrintHUD($"landDir: {landDir.X:0.##},{landDir.Y:0.##},{landDir.Z:0.##}");
                         Debug.PrintHUD($"landPos: {landPos.X:0.##},{landPos.Y:0.##},{landPos.Z:0.##}");
+
+                        normalized = Vector3D.Normalize(stopDirection);
+                        position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * stopDistance);
+                        Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Cyan, thickness: 2f, onTop: true);
                         //----------------------------------
 
                     } else {
@@ -1055,7 +1084,6 @@ namespace IngameScript {
 
         Vector3D CalculateThrustStopVector(double timeStep, Vector3D myVelocity) {
             Vector3D localVelocity = Vector3D.TransformNormal(myVelocity, MatrixD.Transpose(CONTROLLER.WorldMatrix));
-            //Vector3D thrustVector = myThrustList.GetThrustVectorByDirection(localVelocity);//myVelocity
             Vector3D acceleration = (myVelocity - lastVelocity) / timeStep;
             lastVelocity = myVelocity;
             double accel = acceleration.Length();
@@ -1086,8 +1114,9 @@ namespace IngameScript {
         void Descend(Vector3D myVelocity, Vector3D gravity) {
             float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
             double weight = mass * gravity.Length();
-            Vector3D localGravity = Vector3D.TransformNormal(Vector3D.Normalize(gravity), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-            myThrustList.GetThrustVectorByDirection(localGravity);
+            Vector3D descendVector = myThrustList.GetThrustVectorByDirection(-gravity);//TODO descendVector descendLength unused
+            //TODO
+            double descendLength = descendVector.Length();
             weight = (weight / 10d) * 8d;//80% thrust
             double gThrust = weight / myThrustList.tempThrusters.Count;
             foreach (IMyThrust thruster in myThrustList.tempThrusters) {
@@ -1097,10 +1126,16 @@ namespace IngameScript {
             CONTROLLER.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
             if (altitude < 30 && Vector3D.IsZero(myVelocity)) {
                 descend = false;
-                foreach (MyThrustBlock thruster in myThrustList.thrusters) {
-                    thruster.thruster.ThrustOverride = 0f;
+                foreach (IMyThrust thruster in myThrustList.thrusters) {
+                    thruster.ThrustOverride = 0f;
                 }
             }
+
+            //----------------------------------
+            Vector3D normalized = Vector3D.Normalize(descendVector);
+            Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalized * descendLength);
+            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.OrangeRed, thickness: 2f, onTop: true);
+            //----------------------------------
         }
 
         void MagneticDescend(Vector3D myVelocity, Vector3D gravity) {//TODO
@@ -1161,7 +1196,6 @@ namespace IngameScript {
 
         Vector3D MagneticDrive() {
             Vector3D direction = CONTROLLER.MoveIndicator;
-            //CONTROLLER.Orientation.GetMatrix(out mtrx);
             direction = Vector3D.Transform(direction, mtrx);
             if (!Vector3D.IsZero(direction)) {
                 direction = Vector3D.Normalize(direction);//direction /= direction.Length();
@@ -1519,7 +1553,7 @@ namespace IngameScript {
             }
         }
 
-        double CalculateStopDistance(Vector3D myVelocity) {//TODO check direction, accounting that all dirction have same accel/decel
+        Vector3D CalculateStopDistance(Vector3D myVelocity) {//TODO check direction, accounting that all dirction have same accel/decel
             Vector3D localVelocity = Vector3D.TransformNormal(myVelocity, MatrixD.Transpose(CONTROLLER.WorldMatrix));
             Vector3D stopDistanceLocal = Vector3D.Zero;
             for (int i = 0; i < 3; ++i) {//Now we break the current velocity apart component by component
@@ -1529,7 +1563,7 @@ namespace IngameScript {
                     : velocityComponent * velocityComponent / (2d * maxAccel.GetDim(i));
                 stopDistanceLocal.SetDim(i, stopDistComponent);
             }
-            return stopDistanceLocal.Length();//Stop distance is just the magnitude of our result vector now
+            return stopDistanceLocal;//Stop distance is just the magnitude of our result vector now
         }
 
         void RaycastStopPosition(double stopDistance, Vector3D myVelocity, double mySpeed) {
@@ -2319,39 +2353,33 @@ namespace IngameScript {
             }
         }
 
-        public struct MyThrustBlock {
-            public MatrixD localMatrix;
-            public IMyThrust thruster;
-            public MyThrustBlock(MatrixD _localMatrix, IMyThrust _thruster) {
-                localMatrix = _localMatrix;
-                thruster = _thruster;
-            }
-        }
-
         public class MyThrustList {
-            public List<MyThrustBlock> thrusters;
-            public MatrixD transposedReferenceWorldMatrix;
-            public List<IMyThrust> tempThrusters = null;
+            public List<IMyThrust> thrusters;
+            public List<IMyThrust> tempThrusters = new List<IMyThrust>();
+            MatrixD referenceMatrix;
 
-            public MyThrustList(MatrixD _transposedReferenceWorldMatrix, List<MyThrustBlock> _thrusters) {
+            public MyThrustList(List<IMyThrust> _thrusters, MatrixD _referenceMatrix) {
                 thrusters = _thrusters;
-                transposedReferenceWorldMatrix = _transposedReferenceWorldMatrix;
+                referenceMatrix = _referenceMatrix;
             }
 
-            public Vector3D GetThrustVectorByDirection(Vector3D localDirection) {
+            public Vector3D GetThrustVectorByDirection(Vector3D worldDirection) {
                 tempThrusters.Clear();
                 Vector3D thrustSum = Vector3D.Zero;
-                float maxThrust = 0f;
-                foreach (MyThrustBlock block in thrusters) {
-                    double dot = Vector3D.Dot(block.localMatrix.Backward, localDirection);//TODO Backward?
-                    if (dot > 0d) {
-                        maxThrust += block.thruster.MaxEffectiveThrust;
-                        thrustSum += block.localMatrix.Backward;
-                        tempThrusters.Add(block.thruster);
+                Vector3D localDirection = Vector3D.TransformNormal(Vector3D.Normalize(worldDirection), MatrixD.Transpose(referenceMatrix));
+                foreach (IMyThrust block in thrusters) {
+                    Vector3D thrustDir = Vector3D.TransformNormal(block.WorldMatrix.Backward, MatrixD.Transpose(referenceMatrix));
+                    double dot = Vector3D.Dot(thrustDir, localDirection);
+                    if (dot > 0.1d) {//TODO
+                        if (!Vector3D.IsZero(thrustSum)) {
+                            thrustSum = (thrustSum + (block.WorldMatrix.Backward * block.MaxEffectiveThrust)) / 2;
+                        } else {
+                            thrustSum = block.WorldMatrix.Backward * block.MaxEffectiveThrust;
+                        }
+                        tempThrusters.Add(block);
                     }
                 }
-                thrustSum = Vector3D.TransformNormal(Vector3D.Normalize(thrustSum), transposedReferenceWorldMatrix);
-                return thrustSum * maxThrust;
+                return thrustSum;
             }
         }
 
