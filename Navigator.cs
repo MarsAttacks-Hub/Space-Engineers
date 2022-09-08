@@ -113,6 +113,7 @@ namespace IngameScript {
         public List<IMyShipMergeBlock> MERGESMINUSY = new List<IMyShipMergeBlock>();
         public List<IMyShipMergeBlock> MERGESMINUSZ = new List<IMyShipMergeBlock>();
         public List<IMyThrust> THRUSTERS = new List<IMyThrust>();
+        public List<IMyThrust> TEMPTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> UPTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> DOWNTHRUSTERS = new List<IMyThrust>();
         public List<IMyThrust> LEFTTHRUSTERS = new List<IMyThrust>();
@@ -171,8 +172,6 @@ namespace IngameScript {
         Vector3D collisionDir = Vector3D.Zero;
         Vector3D stopDir = Vector3D.Zero;
 
-        MyThrustList myThrustList;
-
         PID yawController;
         PID pitchController;
         PID rollController;
@@ -221,7 +220,6 @@ namespace IngameScript {
             if (LCDMODDEDSENSOR != null) { LCDMODDEDSENSOR.BackgroundColor = moddedSensor ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDCLOSECOMBAT != null) { LCDCLOSECOMBAT.BackgroundColor = closeRangeCombat ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDIDLETHRUSTERS != null) { LCDIDLETHRUSTERS.BackgroundColor = idleThrusters ? new Color(25, 0, 100) : new Color(0, 0, 0); }
-            myThrustList = new MyThrustList(THRUSTERS, CONTROLLER.WorldMatrix);
         }
 
         public void Main(string arg) {
@@ -231,9 +229,9 @@ namespace IngameScript {
                 Debug.RemoveDraw();
 
                 //----------------------------------
-                /*
+
                 if (CONTROLLER.GetShipVelocities().LinearVelocity.Length() > 0.3d) {
-                    Vector3D thrustVector = myThrustList.GetThrustVectorByDirection(CONTROLLER.GetShipVelocities().LinearVelocity);
+                    Vector3D thrustVector = GetThrustVectorByDirection(CONTROLLER.GetShipVelocities().LinearVelocity);
                     double thrustLength = thrustVector.Length();
                     thrustVector = Vector3D.Transform(thrustVector, mtrx);
 
@@ -243,16 +241,16 @@ namespace IngameScript {
 
                     Debug.PrintHUD($"thrustLength: {thrustLength:0.##}");
                 }
-                
-                foreach (IMyThrust block in myThrustList.tempThrusters) {
+
+                foreach (IMyThrust block in TEMPTHRUSTERS) {
                     Debug.DrawPoint(block.GetPosition(), Color.Red, 3f, onTop: true);
 
                     //Vector3D localDirection = Vector3D.TransformNormal(Vector3D.Normalize(block.WorldMatrix.Forward), MatrixD.Transpose(CONTROLLER.WorldMatrix));
                     //Vector3D position = block.GetPosition() + (localDirection * 20d);
                     //Debug.DrawLine(block.GetPosition(), position, Color.Magenta, thickness: 1f, onTop: true);
                 }
-                Debug.PrintHUD($"tempThrusters: {myThrustList.tempThrusters.Count}");
-                */
+                Debug.PrintHUD($"TEMPTHRUSTERS: {TEMPTHRUSTERS.Count}");
+
                 //----------------------------------
 
                 GetBroadcastMessages();
@@ -1111,22 +1109,37 @@ namespace IngameScript {
             return stopVector;//Stop distance is just the magnitude of our result vector
         }
 
+        public Vector3D GetThrustVectorByDirection(Vector3D worldDirection) {
+            TEMPTHRUSTERS.Clear();
+            Vector3D thrustSum = Vector3D.Zero;
+            foreach (IMyThrust block in THRUSTERS) {
+                double dot = Vector3D.Dot(block.WorldMatrix.Backward, Vector3D.Normalize(worldDirection));
+                if (dot > 0.1d) {//TODO why?
+                    thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
+                    TEMPTHRUSTERS.Add(block);
+                }
+            }
+            return thrustSum;
+        }
+
         void Descend(Vector3D myVelocity, Vector3D gravity) {
             float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
             double weight = mass * gravity.Length();
-            Vector3D descendVector = myThrustList.GetThrustVectorByDirection(-gravity);//TODO descendVector descendLength unused
-            //TODO
+
+            Vector3D descendVector = GetThrustVectorByDirection(-gravity);//TODO descendVector descendLength unused
             double descendLength = descendVector.Length();
+            descendVector = Vector3D.Transform(descendVector, mtrx);
+
             weight = (weight / 10d) * 8d;//80% thrust
-            double gThrust = weight / myThrustList.tempThrusters.Count;
-            foreach (IMyThrust thruster in myThrustList.tempThrusters) {
+            double gThrust = weight / TEMPTHRUSTERS.Count;
+            foreach (IMyThrust thruster in TEMPTHRUSTERS) {
                 thruster.ThrustOverride = (float)gThrust;
             }
             double altitude;
             CONTROLLER.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
             if (altitude < 30 && Vector3D.IsZero(myVelocity)) {
                 descend = false;
-                foreach (IMyThrust thruster in myThrustList.thrusters) {
+                foreach (IMyThrust thruster in THRUSTERS) {
                     thruster.ThrustOverride = 0f;
                 }
             }
@@ -2350,36 +2363,6 @@ namespace IngameScript {
                     _integralBuffer.Dequeue();
                 _integralBuffer.Enqueue(currentError * timeStep);
                 return _integralBuffer.Sum();
-            }
-        }
-
-        public class MyThrustList {
-            public List<IMyThrust> thrusters;
-            public List<IMyThrust> tempThrusters = new List<IMyThrust>();
-            MatrixD referenceMatrix;
-
-            public MyThrustList(List<IMyThrust> _thrusters, MatrixD _referenceMatrix) {
-                thrusters = _thrusters;
-                referenceMatrix = _referenceMatrix;
-            }
-
-            public Vector3D GetThrustVectorByDirection(Vector3D worldDirection) {
-                tempThrusters.Clear();
-                Vector3D thrustSum = Vector3D.Zero;
-                Vector3D localDirection = Vector3D.TransformNormal(Vector3D.Normalize(worldDirection), MatrixD.Transpose(referenceMatrix));
-                foreach (IMyThrust block in thrusters) {
-                    Vector3D thrustDir = Vector3D.TransformNormal(block.WorldMatrix.Backward, MatrixD.Transpose(referenceMatrix));
-                    double dot = Vector3D.Dot(thrustDir, localDirection);
-                    if (dot > 0.1d) {//TODO
-                        if (!Vector3D.IsZero(thrustSum)) {
-                            thrustSum = (thrustSum + (block.WorldMatrix.Backward * block.MaxEffectiveThrust)) / 2;
-                        } else {
-                            thrustSum = block.WorldMatrix.Backward * block.MaxEffectiveThrust;
-                        }
-                        tempThrusters.Add(block);
-                    }
-                }
-                return thrustSum;
             }
         }
 
