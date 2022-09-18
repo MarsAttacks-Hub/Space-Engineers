@@ -82,7 +82,6 @@ namespace IngameScript {
         int collisionCheckCount = 0;
         int keepAltitudeCount = 0;
         int sendMessageCount = 0;
-        int keepRightAltitudeCount = 0;
         int manageDampenersCount = 0;
         int manageThrustersCount = 0;
         long targId;
@@ -161,6 +160,7 @@ namespace IngameScript {
         Vector3D landPosition = Vector3D.Zero;
         Vector3D lastForwardVector = Vector3D.Zero;
         Vector3D lastUpVector = Vector3D.Zero;
+        Vector3D targHitPos = Vector3D.Zero;
         Vector3D targPosition = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
         Vector3D lastVelocity = Vector3D.Zero;
@@ -449,7 +449,7 @@ namespace IngameScript {
                     if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long>) {
                         MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long> data = (MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long>)igcMessage.Data;
                         targFound = data.Item1;
-                        //targHitPos = data.Item2;
+                        targHitPos = data.Item2;
                         targVelVec = data.Item3;
                         targOrientation = data.Item4;
                         targPosition = data.Item5;
@@ -511,7 +511,7 @@ namespace IngameScript {
             }
         }
 
-        void GyroStabilize(bool isAutoPiloted, Vector3D gravity, double mySpeed, bool isTargetEmpty) {//TODO make pid control dinamic based on angles
+        void GyroStabilize(bool isAutoPiloted, Vector3D gravity, double mySpeed, bool isTargetEmpty) {
             if (useGyrosToStabilize && !targFound && !aimTarget && !isAutoPiloted && isTargetEmpty) {
                 if (!Vector3D.IsZero(gravity)) {
                     double pitchAngle, rollAngle, yawAngle;
@@ -519,30 +519,34 @@ namespace IngameScript {
                     double mousePitch = CONTROLLER.RotationIndicator.X;
                     double mouseRoll = CONTROLLER.RollIndicator;
                     Vector3D horizonVec = Vector3D.Cross(gravity, Vector3D.Cross(CONTROLLER.WorldMatrix.Forward, gravity));//left vector
-                    GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-                    if (mousePitch != 0d) {
-                        mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
-                    }
-                    mousePitch = mousePitch == 0d ? pitchController.Control(pitchAngle) : pitchController.Control(mousePitch);
-                    if (mouseRoll != 0d) {
-                        mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
-                    }
-                    mouseRoll = mouseRoll == 0d ? rollController.Control(rollAngle) : rollController.Control(mouseRoll);
-                    if (mouseYaw != 0d) {
-                        mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
-                    }
-                    mouseYaw = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
-                    if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0) {
+                    double dot = Vector3D.Dot(CONTROLLER.WorldMatrix.Forward, Vector3D.Normalize(horizonVec));
+                    if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0 && dot > 0.999d) {
                         if (unlockGyrosOnce) {
                             UnlockGyros();
                             lastForwardVector = Vector3D.Zero;
                             lastUpVector = Vector3D.Zero;
                             unlockGyrosOnce = false;
                         }
-                    } else {
-                        ApplyGyroOverride(mousePitch, mouseYaw, mouseRoll, GYROS, CONTROLLER.WorldMatrix);
-                        unlockGyrosOnce = true;
+                        return;
                     }
+                    GetRotationAnglesSimultaneous(horizonVec, -gravity, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+                    double yawSpeed;
+                    double pitchSpeed;
+                    double rollSpeed;
+                    if (mousePitch != 0d) {
+                        mousePitch = mousePitch < 0d ? MathHelper.Clamp(mousePitch, -10d, -2d) : MathHelper.Clamp(mousePitch, 2d, 10d);
+                    }
+                    pitchSpeed = mousePitch == 0d ? pitchController.Control(pitchAngle) : pitchController.Control(mousePitch);
+                    if (mouseRoll != 0d) {
+                        mouseRoll = mouseRoll < 0d ? MathHelper.Clamp(mouseRoll, -10d, -2d) : MathHelper.Clamp(mouseRoll, 2d, 10d);
+                    }
+                    rollSpeed = mouseRoll == 0d ? rollController.Control(rollAngle) : rollController.Control(mouseRoll);
+                    if (mouseYaw != 0d) {
+                        mouseYaw = mouseYaw < 0d ? MathHelper.Clamp(mouseYaw, -10d, -2d) : MathHelper.Clamp(mouseYaw, 2d, 10d);
+                    }
+                    yawSpeed = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
+                    ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+                    unlockGyrosOnce = true;
                 } else {
                     if (mySpeed > 2d) {
                         double pitchAngle, yawAngle, rollAngle;
@@ -724,12 +728,8 @@ namespace IngameScript {
                         dirNew = MergeDirectionValues(dirNN, dirNew);
                         dir = MergeDirectionValues(dir, dirNew);
 
-                        if (keepRightAltitudeCount >= 10) {//TODO
-                            dirNew = KeepRightAltitude(gravity, altitude);
-                            dir = MergeDirectionValues(dir, dirNew);
-                            keepRightAltitudeCount = 0;
-                        }
-                        keepRightAltitudeCount++;
+                        dirNew = KeepRightAltitude(gravity, altitude);
+                        dir = MergeDirectionValues(dir, dirNew);
                     } else {
                         if (!initRandomMagneticDriveOnce) {
                             randomDir = Vector3D.Zero;
@@ -797,9 +797,7 @@ namespace IngameScript {
                 }
             }
 
-            if (!Vector3D.IsZero(gravity) && !isAutoPiloted) {
-                dir = GravityCompensation(acceleration.Length(), dir, gravity);
-            }
+            //if (!Vector3D.IsZero(gravity) && !isAutoPiloted) { dir = GravityCompensation(acceleration.Length(), dir, gravity); }
 
             SetPower(dir);
         }
@@ -813,17 +811,13 @@ namespace IngameScript {
 
             double acceleration;
             Vector3D stopDirection = CalculateStopVectorAndAccelerationByDirection(myVelocity, out acceleration);
+            //stopDirection = Vector3D.Rotate(stopDirection, MatrixD.Transpose(CONTROLLER.WorldMatrix));
 
             //------------------------------------
             Vector3D normalizedVec = Vector3D.Normalize(stopDirection);
             Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVec * stopDirection.Length());
-            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Yellow, thickness: 2f, onTop: true);
-            Debug.DrawPoint(position, Color.Yellow, 50f, onTop: true);
-
-            normalizedVec = Vector3D.TransformNormal(Vector3D.Normalize(stopDirection), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-            position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVec * stopDirection.Length());
             Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Red, thickness: 2f, onTop: true);
-            Debug.DrawPoint(position, Color.Red, 50f, onTop: true);
+            //Debug.DrawPoint(position, Color.Red, 50f, onTop: true);
             //------------------------------------
 
             if (!Vector3D.IsZero(collisionDir)) {
@@ -849,12 +843,8 @@ namespace IngameScript {
                     dirNew = MergeDirectionValues(dirNN, dirNew);
                     dir = MergeDirectionValues(dir, dirNew);
 
-                    if (keepRightAltitudeCount >= 10) {//TODO
-                        dirNew = KeepRightAltitude(gravity, altitude);
-                        dir = MergeDirectionValues(dir, dirNew);
-                        keepRightAltitudeCount = 0;
-                    }
-                    keepRightAltitudeCount++;
+                    dirNew = KeepRightAltitude(gravity, altitude);
+                    dir = MergeDirectionValues(dir, dirNew);
                 } else {
                     if (!initRandomMagneticDriveOnce) {
                         randomDir = Vector3D.Zero;
@@ -948,7 +938,7 @@ namespace IngameScript {
                 }
                 if (collisionCheckCount >= collisionCheckDelay) {
                     double stopDistance = stopDirection.Length();
-                    RaycastStopPosition(stopDistance, myVelocity, mySpeed);
+                    RaycastStopPosition(stopDistance, stopDirection, mySpeed);//TODO RaycastStopPosition(stopDistance, myVelocity, mySpeed);
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
                     SensorDetection();
@@ -986,8 +976,9 @@ namespace IngameScript {
 
         void ManageThrustersDrive(Vector3D direction) {
             if (!Vector3D.IsZero(direction)) {
+                direction = Vector3D.Normalize(direction);
                 foreach (IMyThrust thuster in THRUSTERS) {
-                    double dot = Vector3D.Dot(thuster.WorldMatrix.Backward, Vector3D.Normalize(direction));
+                    double dot = Vector3D.Dot(thuster.WorldMatrix.Backward, direction);
                     if (dot > 0.1d) {
                         thuster.ThrustOverridePercentage = thuster.MaxEffectiveThrust * (float)dot;
                     }
@@ -1032,9 +1023,9 @@ namespace IngameScript {
         }
 
         Vector3D CalculateStopVectorAndAccelerationByDirection(Vector3D worldDirection, out double accelerationByDirection) {
-            Vector3D localVelocity = Vector3D.Rotate(worldDirection, MatrixD.Transpose(CONTROLLER.WorldMatrix));
+            //Vector3D localVelocity = Vector3D.Rotate(worldDirection, MatrixD.Transpose(CONTROLLER.WorldMatrix));
             Vector3D thrustSumVector = GetThrustByDirection(worldDirection);
-            thrustSumVector = Vector3D.Rotate(thrustSumVector, MatrixD.Transpose(CONTROLLER.WorldMatrix));
+            //thrustSumVector = Vector3D.Rotate(thrustSumVector, MatrixD.Transpose(CONTROLLER.WorldMatrix));
             float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
             accelerationByDirection = thrustSumVector.Length() / mass;
             //This vector sum needs to be along orthagonal axes (subgrids will botch this).
@@ -1046,7 +1037,8 @@ namespace IngameScript {
                 Vector3D direction = baseDirection[i] * Math.Sign(thrustSum);
                 thrustSum = Math.Abs(thrustSum);
                 double acceleration = thrustSum / mass;
-                double relevantSpeed = Math.Abs(localVelocity.GetDim(i));
+                //double relevantSpeed = Math.Abs(localVelocity.GetDim(i));
+                double relevantSpeed = Math.Abs(worldDirection.GetDim(i));
                 double timeToStop = acceleration == 0 ? 0 : relevantSpeed / acceleration;
                 double distToStop = (relevantSpeed * timeToStop) - (0.5 * acceleration * timeToStop * timeToStop);
                 if (timeToStop > maxTimeToStop) {
@@ -1059,12 +1051,38 @@ namespace IngameScript {
 
         Vector3D GetThrustByDirection(Vector3D worldDirection) {
             Vector3D thrustSum = Vector3D.Zero;
-            foreach (IMyThrust block in THRUSTERS) {
-                double dot = Vector3D.Dot(block.WorldMatrix.Backward, Vector3D.Normalize(worldDirection));
-                if (dot > 0.1d) {
-                    thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
+
+            //---------------------------------------------------------------------------
+            StringBuilder builder = new StringBuilder("");
+            int count = 0;
+            //Debug.PrintHUD($"worldDirectionLength: {worldDirection.Length()}");
+            //---------------------------------------------------------------------------
+            if (worldDirection.Length() > 2d) {
+                worldDirection = Vector3D.Normalize(worldDirection);
+                foreach (IMyThrust block in THRUSTERS) {
+                    double dot = Vector3D.Dot(block.WorldMatrix.Backward, worldDirection);
+                    if (dot > 0.1d) {
+                        //if (dot > 0d) {
+                        //---------------------------------------------------------------------------
+                        builder.Append($"{dot:0.####}, ");
+                        count++;
+                        if (count > 5) {
+                            builder.Append("\n");
+                            count = 0;
+                        }
+                        Debug.DrawPoint(block.GetPosition(), Color.Red, 4f, onTop: true);
+                        //---------------------------------------------------------------------------
+
+                        //thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
+                        thrustSum += block.WorldMatrix.Backward * (dot * block.MaxEffectiveThrust);
+                    }
                 }
             }
+
+            //---------------------------------------------------------------------------
+            Debug.PrintHUD(builder.ToString());
+            //---------------------------------------------------------------------------
+
             //thrustSum = Vector3D.Transform(thrustSum, mtrx);
             return thrustSum;
         }
@@ -1113,8 +1131,9 @@ namespace IngameScript {
                 float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
                 double weight = mass * gravity.Length();
                 int count = 0;
+                gravity = Vector3D.Normalize(-gravity);
                 foreach (IMyThrust block in THRUSTERS) {
-                    double dot = Vector3D.Dot(block.WorldMatrix.Backward, Vector3D.Normalize(-gravity));
+                    double dot = Vector3D.Dot(block.WorldMatrix.Backward, gravity);
                     if (dot > 0.1d) {
                         count++;
                     }
@@ -1122,10 +1141,10 @@ namespace IngameScript {
                 weight /= count;
                 weight = weight / 10d * 8d;
                 foreach (IMyThrust block in THRUSTERS) {
-                    double dot = Vector3D.Dot(block.WorldMatrix.Backward, Vector3D.Normalize(-gravity));
+                    double dot = Vector3D.Dot(block.WorldMatrix.Backward, gravity);
                     if (dot > 0.1d) {
                         block.ThrustOverride = (float)(weight * dot);
-                        //thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
+                        //thrustSum += block.WorldMatrix.Backward * (dot * block.MaxEffectiveThrust);//thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
                     } else {
                         block.ThrustOverride = 0f;
                     }
@@ -1192,7 +1211,7 @@ namespace IngameScript {
             }
             Vector3D vel = myVelocity;
             vel = Vector3D.Transform(vel, MatrixD.Transpose(CONTROLLER.WorldMatrix.GetOrientation()));
-            vel = (direction * 105d) - Vector3D.Transform(vel, mtrx);
+            vel = (direction * 105d) - Vector3D.Transform(vel, mtrx);//TODO set maxSpeed variable
             if (Math.Abs(vel.X) < 2d) { vel.X = 0d; }
             if (Math.Abs(vel.Y) < 2d) { vel.Y = 0d; }
             if (Math.Abs(vel.Z) < 2d) { vel.Z = 0d; }
@@ -1417,7 +1436,9 @@ namespace IngameScript {
                 targetVelocity = Vector3D.Normalize(targetVelocity);
                 double distance = Vector3D.Distance(CONTROLLER.CubeGrid.WorldVolume.Center, targetPos);
                 double angle = AngleBetween(targetVelocity, Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - targetPos)) * rad2deg;
-                if (angle < (9000d / distance)) {
+
+                if (angle < (9000d / distance)) {//TODO not good
+
                     Vector3D enemyDirectionPosition = targetPos + (targetVelocity * distance);
                     Vector3D escapeDirection = CONTROLLER.CubeGrid.WorldVolume.Center - enemyDirectionPosition;//toward my center
                     escapeDirection = Vector3D.TransformNormal(Vector3D.Normalize(escapeDirection), MatrixD.Transpose(CONTROLLER.WorldMatrix));
@@ -1440,7 +1461,10 @@ namespace IngameScript {
 
         Vector3D EvadeEnemy(MatrixD targOrientation, Vector3D targVel, Vector3D targPos, Vector3D myPosition, Vector3D myVelocity, Vector3D gravity, bool targetFound) {
             if (targetFound) {
-                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(CONTROLLER.WorldMatrix.Backward);//TODO it's not backward if the target isn't in front of me
+                Base6Directions.Direction closeDirection = CONTROLLER.WorldMatrix.GetClosestDirection(Vector3D.Normalize(targPos - CONTROLLER.CubeGrid.WorldVolume.Center));
+                closeDirection = Base6Directions.GetFlippedDirection(closeDirection);
+                Vector3D flippedDirection = CONTROLLER.WorldMatrix.GetDirectionVector(closeDirection);
+                Base6Directions.Direction enemyForward = targOrientation.GetClosestDirection(flippedDirection);//CONTROLLER.WorldMatrix.Backward
                 Base6Directions.Direction perpendicular = Base6Directions.GetPerpendicular(enemyForward);
                 Vector3D enemyForwardVec = targOrientation.GetDirectionVector(enemyForward);
                 Vector3D enemyPerpendicularVec = targOrientation.GetDirectionVector(perpendicular);
@@ -1472,7 +1496,8 @@ namespace IngameScript {
                 Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.##}, safety:{4500d / distance:0.##}");
                 //---------------------------------------------------------------------------
 
-                if (angle < (4500d / distance)) {
+                if (angle < (4500d / distance)) {//TODO not good
+
                     Vector3D evadeDirection = CONTROLLER.CubeGrid.WorldVolume.Center - (targPos + (enemyForwardVec * distance));//toward my center
                     evadeDirection = Vector3D.TransformNormal(Vector3D.Normalize(evadeDirection), MatrixD.Transpose(CONTROLLER.WorldMatrix));
 
@@ -1572,7 +1597,8 @@ namespace IngameScript {
                     lidar = GetCameraWithMaxRange(LIDARSRIGHT);
                     break;
             }
-            stopDistance += (mySpeed * 10d);//TODO
+
+            stopDistance += (mySpeed * 10d);//TODO not good
 
             //----------------------------------
             Vector3D stop = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
@@ -2191,127 +2217,145 @@ namespace IngameScript {
             rollController = new PID(1d, 0d, 1d, globalTimestep);
         }
 
-        void ManagePIDControllers(bool isTargetEmpty) {//TODO make it dinamic based on angles
-            if (!isTargetEmpty || targFound) {
-                if (updateOnce) {
-                    UpdatePIDControllers(5d, 0d, 5d, 5d, 0d, 5d, 1d, 0d, 1d);
-                    updateOnce = false;
-                }
+        void ManagePIDControllers(bool isTargetEmpty) {
+            if (targFound) {
+                Vector3D toTarget = Vector3D.Normalize(targHitPos - CONTROLLER.WorldVolume.Center);
+                double angle = AngleBetween(CONTROLLER.WorldMatrix.Forward, toTarget) * rad2deg;
+                angle = MathHelper.Clamp(angle, 1d, 10d);
+                UpdatePIDControllers(angle);
+            } else if (!isTargetEmpty) {
+                Vector3D toTarget = Vector3D.Normalize(targetInfo.HitPosition.Value - CONTROLLER.WorldVolume.Center);
+                double angle = AngleBetween(CONTROLLER.WorldMatrix.Forward, toTarget) * rad2deg;
+                angle = MathHelper.Clamp(angle, 1d, 10d);
+                UpdatePIDControllers(angle);
             } else {
-                if (!updateOnce) {
-                    UpdatePIDControllers(1d, 0d, 1d, 1d, 0d, 1d, 1d, 0d, 1d);
-                    updateOnce = true;
+                double mouseYaw = CONTROLLER.RotationIndicator.Y;
+                double mousePitch = CONTROLLER.RotationIndicator.X;
+                double mouseRoll = CONTROLLER.RollIndicator;
+                if (mouseYaw != 0d || mousePitch != 0d || mouseRoll != 0) {
+                    if (updateOnce) {
+                        UpdatePIDControllers(10d);
+                        updateOnce = false;
+                    }
+                } else {
+                    if (!updateOnce) {
+                        UpdatePIDControllers(1d);
+                        updateOnce = true;
+                    }
                 }
             }
         }
 
-        void UpdatePIDControllers(double yawAimP, double yawAimI, double yawAimD, double pitchAimP, double pitchAimI, double pitchAimD, double rollAimP, double rollAimI, double rollAimD) {
-            yawController.Update(yawAimP, yawAimI, yawAimD);
-            pitchController.Update(pitchAimP, pitchAimI, pitchAimD);
-            rollController.Update(rollAimP, rollAimI, rollAimD);
+        void UpdatePIDControllers(double aim) {
+            yawController.KD = aim;
+            yawController.KP = aim;
+            pitchController.KD = aim;
+            pitchController.KP = aim;
+            rollController.KD = aim;
+            rollController.KP = aim;
         }
 
         public class PID {
-            double _kP = 0;
-            double _kI = 0;
-            double _kD = 0;
+            public double KP { get; set; }
+            public double KI { get; set; }
+            public double KD { get; set; }
 
-            double _timeStep = 0;
-            double _inverseTimeStep = 0;
-            double _errorSum = 0;
-            double _lastError = 0;
-            bool _firstRun = true;
+            double timeStep = 0;
+            double inverseTimeStep = 0;
+            double errorSum = 0;
+            double lastError = 0;
+            bool firstRun = true;
 
             public double Value { get; private set; }
 
-            public PID(double kP, double kI, double kD, double timeStep) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
+            public PID(double _kP, double _kI, double _kD, double _timeStep) {
+                KP = _kP;
+                KI = _kI;
+                KD = _kD;
+                timeStep = _timeStep;
+                inverseTimeStep = 1 / timeStep;
             }
 
             protected virtual double GetIntegral(double currentError, double errorSum, double timeStep) {
                 return errorSum + (currentError * timeStep);
             }
 
-            public void Update(double kP, double kI, double kD) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
+            public void Update(double _kP, double _kI, double _kD) {
+                KP = _kP;
+                KI = _kI;
+                KD = _kD;
                 Reset();
             }
 
             public double Control(double error) {
-                double errorDerivative = (error - _lastError) * _inverseTimeStep;//Compute derivative term
-                if (_firstRun) {
+                double errorDerivative = (error - lastError) * inverseTimeStep;//Compute derivative term
+                if (firstRun) {
                     errorDerivative = 0;
-                    _firstRun = false;
+                    firstRun = false;
                 }
-                _errorSum = GetIntegral(error, _errorSum, _timeStep);//Get error sum
-                _lastError = error;//Store this error as last error
-                Value = (_kP * error) + (_kI * _errorSum) + (_kD * errorDerivative);//Construct output
+                errorSum = GetIntegral(error, errorSum, timeStep);//Get error sum
+                lastError = error;//Store this error as last error
+                Value = (KP * error) + (KI * errorSum) + (KD * errorDerivative);//Construct output
                 return Value;
             }
 
-            public double Control(double error, double timeStep) {
-                if (timeStep != _timeStep) {
-                    _timeStep = timeStep;
-                    _inverseTimeStep = 1 / _timeStep;
+            public double Control(double error, double _timeStep) {
+                if (_timeStep != timeStep) {
+                    timeStep = _timeStep;
+                    inverseTimeStep = 1 / timeStep;
                 }
                 return Control(error);
             }
 
             public void Reset() {
-                _errorSum = 0;
-                _lastError = 0;
-                _firstRun = true;
+                errorSum = 0;
+                lastError = 0;
+                firstRun = true;
             }
         }
 
         public class DecayingIntegralPID : PID {
-            readonly double _decayRatio;
+            readonly double decayRatio;
 
-            public DecayingIntegralPID(double kP, double kI, double kD, double timeStep, double decayRatio) : base(kP, kI, kD, timeStep) {
-                _decayRatio = decayRatio;
+            public DecayingIntegralPID(double kP, double kI, double kD, double timeStep, double _decayRatio) : base(kP, kI, kD, timeStep) {
+                decayRatio = _decayRatio;
             }
 
             protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
                 //return errorSum = errorSum * (1.0 - _decayRatio) + currentError * timeStep;
-                return (errorSum * (1.0 - _decayRatio)) + (currentError * timeStep);
+                return (errorSum * (1.0 - decayRatio)) + (currentError * timeStep);
             }
         }
 
         public class ClampedIntegralPID : PID {
-            readonly double _upperBound;
-            readonly double _lowerBound;
+            readonly double upperBound;
+            readonly double lowerBound;
 
-            public ClampedIntegralPID(double kP, double kI, double kD, double timeStep, double lowerBound, double upperBound) : base(kP, kI, kD, timeStep) {
-                _upperBound = upperBound;
-                _lowerBound = lowerBound;
+            public ClampedIntegralPID(double kP, double kI, double kD, double timeStep, double _lowerBound, double _upperBound) : base(kP, kI, kD, timeStep) {
+                upperBound = _upperBound;
+                lowerBound = _lowerBound;
             }
 
             protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
                 errorSum += currentError * timeStep;
-                return Math.Min(_upperBound, Math.Max(errorSum, _lowerBound));
+                return Math.Min(upperBound, Math.Max(errorSum, lowerBound));
             }
         }
 
         public class BufferedIntegralPID : PID {
-            readonly Queue<double> _integralBuffer = new Queue<double>();
-            readonly int _bufferSize = 0;
+            readonly Queue<double> integralBuffer = new Queue<double>();
+            readonly int bufferSize = 0;
 
-            public BufferedIntegralPID(double kP, double kI, double kD, double timeStep, int bufferSize) : base(kP, kI, kD, timeStep) {
-                _bufferSize = bufferSize;
+            public BufferedIntegralPID(double kP, double kI, double kD, double timeStep, int _bufferSize) : base(kP, kI, kD, timeStep) {
+                bufferSize = _bufferSize;
             }
 
             protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
-                if (_integralBuffer.Count == _bufferSize) {
-                    _integralBuffer.Dequeue();
+                if (integralBuffer.Count == bufferSize) {
+                    integralBuffer.Dequeue();
                 }
-                _integralBuffer.Enqueue(currentError * timeStep);
-                return _integralBuffer.Sum();
+                integralBuffer.Enqueue(currentError * timeStep);
+                return integralBuffer.Sum();
             }
         }
 
