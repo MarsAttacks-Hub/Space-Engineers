@@ -258,7 +258,7 @@ namespace IngameScript {
                     needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || !isTargetEmpty;
                 }
 
-                SendBroadcastControllerMessage(needControl);//TODO set a delay?
+                SendBroadcastControllerMessage(needControl);
 
                 if (aimTarget) {
                     bool aligned;
@@ -633,9 +633,6 @@ namespace IngameScript {
 
         void ManageDampeners(double mySpeed, bool isUnderControl, bool isAutoPiloted) {
             if (manageDampenersCount >= 10) {
-                //if (descend && !magneticDrive) {//TODO
-                //look Descend();
-                //} else
                 if (!Vector3D.IsZero(collisionDir) && magneticDrive) {
                     if (REMOTE.DampenersOverride) {
                         REMOTE.DampenersOverride = false;
@@ -715,7 +712,7 @@ namespace IngameScript {
                     }
                     if (autoCombat && !isUnderControl && targFound) {
                         initRandomMagneticDriveOnce = false;
-                        RandomMagneticDrive();
+                        RandomDrive(myVelocity);
                         dir = randomDir;
                         Vector3D dirNN = Vector3D.Zero;
                         foreach (MyDetectedEntityInfo target in targetsInfo) {
@@ -766,9 +763,9 @@ namespace IngameScript {
                     }
                 }
                 if (collisionCheckCount >= collisionCheckDelay) {
-                    Vector3D stopVector = CalculateStopDistance(myVelocity);//TODO add gravity to the equation
+                    Vector3D stopVector = CalculateStopDistance(myVelocity);
                     double stopDistance = stopVector.Length();
-                    RaycastStopPosition(stopDistance, myVelocity, mySpeed);
+                    RaycastStopPosition(stopDistance, myVelocity);
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
                     SensorDetection();
@@ -830,7 +827,7 @@ namespace IngameScript {
                 }
                 if (autoCombat && !isUnderControl && targFound) {
                     initRandomMagneticDriveOnce = false;
-                    RandomMagneticDrive();//TODO
+                    RandomDrive(myVelocity);
                     dir = randomDir;
                     Vector3D dirNN = Vector3D.Zero;
                     foreach (MyDetectedEntityInfo target in targetsInfo) {
@@ -905,11 +902,12 @@ namespace IngameScript {
                         }
 
                         //TODO
-                        Vector3D direction = CONTROLLER.MoveIndicator;
-                        direction = Vector3D.Transform(direction, mtrx);
-                        if (!Vector3D.IsZero(direction)) {
-                            dir = Vector3D.Normalize(direction);
-                        }
+                        //Vector3D direction = CONTROLLER.MoveIndicator;
+                        //direction = Vector3D.Transform(direction, mtrx);
+                        //if (!Vector3D.IsZero(direction)) {
+                        //dir = Vector3D.Normalize(direction);
+                        //}
+
                     }
                 }
             }
@@ -938,7 +936,7 @@ namespace IngameScript {
                 }
                 if (collisionCheckCount >= collisionCheckDelay) {
                     double stopDistance = stopDirection.Length();
-                    RaycastStopPosition(stopDistance, stopDirection, mySpeed);//TODO RaycastStopPosition(stopDistance, myVelocity, mySpeed);
+                    RaycastStopPosition(stopDistance, stopDirection);//myVelocity
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
                     SensorDetection();
@@ -1016,6 +1014,7 @@ namespace IngameScript {
                     foreach (IMyThrust thuster in LEFTTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
                 }*/
             } else {
+                //TODO set once
                 foreach (IMyThrust thuster in THRUSTERS) {
                     thuster.ThrustOverridePercentage = 0f;
                 }
@@ -1083,7 +1082,6 @@ namespace IngameScript {
             Debug.PrintHUD(builder.ToString());
             //---------------------------------------------------------------------------
 
-            //thrustSum = Vector3D.Transform(thrustSum, mtrx);
             return thrustSum;
         }
 
@@ -1149,7 +1147,6 @@ namespace IngameScript {
                         block.ThrustOverride = 0f;
                     }
                 }
-                //thrustSum = Vector3D.Transform(thrustSum, mtrx);
             }
             double altitude;
             CONTROLLER.TryGetPlanetElevation(MyPlanetElevation.Surface, out altitude);
@@ -1211,7 +1208,7 @@ namespace IngameScript {
             }
             Vector3D vel = myVelocity;
             vel = Vector3D.Transform(vel, MatrixD.Transpose(CONTROLLER.WorldMatrix.GetOrientation()));
-            vel = (direction * 105d) - Vector3D.Transform(vel, mtrx);//TODO set maxSpeed variable
+            vel = (direction * 104.38d) - Vector3D.Transform(vel, mtrx);//TODO set maxSpeed variable
             if (Math.Abs(vel.X) < 2d) { vel.X = 0d; }
             if (Math.Abs(vel.Y) < 2d) { vel.Y = 0d; }
             if (Math.Abs(vel.Z) < 2d) { vel.Z = 0d; }
@@ -1275,17 +1272,28 @@ namespace IngameScript {
             }
         }
 
-        void RandomMagneticDrive() {
+        void RandomDrive(Vector3D myVelocity) {
             if (randomCount >= 10) {//TODO increase delay?
                 randomDir = Vector3D.Zero;
-                float randomFloat;
-                randomFloat = (float)random.Next(-1, 2);
-                randomDir.X = randomFloat;
-                randomFloat = (float)random.Next(-1, 2);
-                randomDir.Y = randomFloat;
-                randomFloat = (float)random.Next(-1, 2);
-                randomDir.Z = randomFloat;
-                randomCount = 0;
+                if (magneticDrive) {
+                    float randomFloat;
+                    randomFloat = (float)random.Next(-1, 2);
+                    randomDir.X = randomFloat;
+                    randomFloat = (float)random.Next(-1, 2);
+                    randomDir.Y = randomFloat;
+                    randomFloat = (float)random.Next(-1, 2);
+                    randomDir.Z = randomFloat;
+                    randomCount = 0;
+                } else {
+                    //TODO to test
+                    double angle = random.NextDouble() * Math.PI * 2d;
+                    Vector3D perpendicular = Vector3D.CalculatePerpendicularVector(myVelocity);
+                    MatrixD matrix = MatrixD.CreateFromDir(Vector3D.Normalize(myVelocity), Vector3D.Normalize(perpendicular));//normalize?
+                    randomDir = Math.Sin(angle) * matrix.Up + Math.Cos(angle) * matrix.Right;
+                    randomDir = Vector3D.Normalize(randomDir);
+                    //randomDir = Math.Sin(angle) * CONTROLLER.WorldMatrix.Up + Math.Cos(angle) * CONTROLLER.WorldMatrix.Right;
+                    //randomDir *= 0.25d;
+                }
             }
             randomCount++;
         }
@@ -1573,7 +1581,7 @@ namespace IngameScript {
             return stopDistance;//Stop distance is just the magnitude of our result vector now
         }
 
-        void RaycastStopPosition(double stopDistance, Vector3D myVelocity, double mySpeed) {
+        void RaycastStopPosition(double stopDistance, Vector3D myVelocity) {
             Vector3D normalizedVelocity = Vector3D.Normalize(myVelocity);
             Base6Directions.Direction direction = Base6Directions.GetClosestDirection(Vector3D.TransformNormal(normalizedVelocity, MatrixD.Transpose(CONTROLLER.WorldMatrix)));//relative
             IMyCameraBlock lidar = null;
@@ -1598,13 +1606,14 @@ namespace IngameScript {
                     break;
             }
 
-            stopDistance += (mySpeed * 10d);//TODO not good
+            //stopDistance += (mySpeed * 10d);//TODO not good
+            stopDistance *= collisionCheckDelay;
 
             //----------------------------------
             Vector3D stop = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance);
             Debug.DrawPoint(stop, Color.Blue, 5f, onTop: true);
             Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, stop, Color.Cyan, thickness: 2f, onTop: true);
-            Debug.PrintHUD($"raycast stopDistance:{stopDistance:0.##}");
+            Debug.PrintHUD($"raycast stopDistance:{stopDistance / collisionCheckDelay:0.##}, multiplied:{stopDistance:0.##}");
             //----------------------------------
 
             MyDetectedEntityInfo entityInfo = lidar.Raycast(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance));
@@ -1742,9 +1751,8 @@ namespace IngameScript {
                         keepAltitudeOnce = true;
                     }
                 }
-
                 if (!Vector3D.IsZero(landPosition) && magneticDrive) {
-                    Vector3D stopVector = CalculateStopDistance(myVelocity);//TODO add gravity to the equation
+                    Vector3D stopVector = CalculateStopDistance(myVelocity);
                     double stopDistance = stopVector.Length();
                     //Vector3D landPos = landPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - landPosition) * stopDistance);//(stopDistance * 2d)
                     //if (Vector3D.Distance(landPos, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
@@ -1762,7 +1770,6 @@ namespace IngameScript {
                         magneticDrive = false;
                     }
                 }
-
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(rangeFinderPosition)) {
                     if (Vector3D.Distance(rangeFinderPosition, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
                         REMOTE.SetAutoPilotEnabled(false);
