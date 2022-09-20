@@ -152,7 +152,6 @@ namespace IngameScript {
         IMyBroadcastListener BROADCASTLISTENER;
         MyDetectedEntityInfo targetInfo;
         public List<MyDetectedEntityInfo> targetsInfo = new List<MyDetectedEntityInfo>();
-        Matrix mtrx;
         MatrixD targOrientation = new MatrixD();
         Vector3D rangeFinderPosition = Vector3D.Zero;
         Vector3D returnPosition = Vector3D.Zero;
@@ -212,7 +211,6 @@ namespace IngameScript {
             foreach (IMyCameraBlock cam in LIDARSRIGHT) { cam.EnableRaycast = true; }
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
-            CONTROLLER.Orientation.GetMatrix(out mtrx);
             if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
@@ -305,7 +303,7 @@ namespace IngameScript {
                         Descend(myVelocity, gravity);
                     } else {
                         if (needControl && !isAutoPiloted) {
-                            ManageDrive(isUnderControl, gravity, myVelocity, mySpeed);
+                            ManageThrustersDrive(isUnderControl, gravity, myVelocity, mySpeed);
                         }
                     }
                 }
@@ -337,7 +335,7 @@ namespace IngameScript {
                             landPosition = Vector3D.Zero;
                             descend = false;
                             foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
-                            magneticDrive = true;
+                            magneticDrive = true;//TODO
                             REMOTE.ClearWaypoints();
                             REMOTE.SetAutoPilotEnabled(false);
                             REMOTE.SetCollisionAvoidance(true);
@@ -437,6 +435,8 @@ namespace IngameScript {
                     break;
                 case "LoggerOff":
                     logger = false;
+                    break;
+                default:
                     break;
             }
         }
@@ -799,7 +799,7 @@ namespace IngameScript {
             SetPower(dir);
         }
 
-        void ManageDrive(bool isUnderControl, Vector3D gravity, Vector3D myVelocity, double mySpeed) {
+        void ManageThrustersDrive(bool isUnderControl, Vector3D gravity, Vector3D myVelocity, double mySpeed) {
             Vector3D dir = Vector3D.Zero;
             double altitude = 60d;
             if (!Vector3D.IsZero(gravity)) {
@@ -901,12 +901,7 @@ namespace IngameScript {
                             initlandMagneticDriveOnce = true;
                         }
 
-                        //TODO
-                        //Vector3D direction = CONTROLLER.MoveIndicator;
-                        //direction = Vector3D.Transform(direction, mtrx);
-                        //if (!Vector3D.IsZero(direction)) {
-                        //dir = Vector3D.Normalize(direction);
-                        //}
+                        //TODO CONTROLLER.MoveIndicator ?
 
                     }
                 }
@@ -981,38 +976,6 @@ namespace IngameScript {
                         thuster.ThrustOverridePercentage = thuster.MaxEffectiveThrust * (float)dot;
                     }
                 }
-                /*if (direction.Z < 0f) {
-                    foreach (IMyThrust thuster in FORWARDTHRUSTERS) { thuster.ThrustOverridePercentage = 1f; }
-                    foreach (IMyThrust thuster in BACKWARDTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                } else if (direction.Z > 0f) {
-                    foreach (IMyThrust thuster in BACKWARDTHRUSTERS) { thuster.ThrustOverridePercentage = 1f; }
-                    foreach (IMyThrust thuster in FORWARDTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                } else {
-                    foreach (IMyThrust thuster in BACKWARDTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                    foreach (IMyThrust thuster in FORWARDTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                }
-
-                if (direction.Y < 0f) {
-                    foreach (IMyThrust thuster in DOWNTHRUSTERS) { thuster.ThrustOverridePercentage = 1f; }
-                    foreach (IMyThrust thuster in UPTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                } else if (direction.Y > 0f) {
-                    foreach (IMyThrust thuster in UPTHRUSTERS) { thuster.ThrustOverridePercentage = 1f; }
-                    foreach (IMyThrust thuster in DOWNTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                } else {
-                    foreach (IMyThrust thuster in UPTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                    foreach (IMyThrust thuster in DOWNTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                }
-
-                if (direction.X < 0f) {
-                    foreach (IMyThrust thuster in LEFTTHRUSTERS) { thuster.ThrustOverridePercentage = 1f; }
-                    foreach (IMyThrust thuster in RIGHTTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                } else if (direction.X > 0f) {
-                    foreach (IMyThrust thuster in RIGHTTHRUSTERS) { thuster.ThrustOverridePercentage = 1f; }
-                    foreach (IMyThrust thuster in LEFTTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                } else {
-                    foreach (IMyThrust thuster in RIGHTTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                    foreach (IMyThrust thuster in LEFTTHRUSTERS) { thuster.ThrustOverridePercentage = 0f; }
-                }*/
             } else {
                 //TODO set once
                 foreach (IMyThrust thuster in THRUSTERS) {
@@ -1022,13 +985,9 @@ namespace IngameScript {
         }
 
         Vector3D CalculateStopVectorAndAccelerationByDirection(Vector3D worldDirection, out double accelerationByDirection) {
-            //Vector3D localVelocity = Vector3D.Rotate(worldDirection, MatrixD.Transpose(CONTROLLER.WorldMatrix));
             Vector3D thrustSumVector = GetThrustByDirection(worldDirection);
-            //thrustSumVector = Vector3D.Rotate(thrustSumVector, MatrixD.Transpose(CONTROLLER.WorldMatrix));
             float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
             accelerationByDirection = thrustSumVector.Length() / mass;
-            //This vector sum needs to be along orthagonal axes (subgrids will botch this).
-            //Will need to check against controller reference directions. Maybe a TransformNormal?
             Vector3D displacementVector = Vector3D.Zero;
             double maxTimeToStop = 0;
             for (int i = 0; i < 3; ++i) {
@@ -1036,7 +995,6 @@ namespace IngameScript {
                 Vector3D direction = baseDirection[i] * Math.Sign(thrustSum);
                 thrustSum = Math.Abs(thrustSum);
                 double acceleration = thrustSum / mass;
-                //double relevantSpeed = Math.Abs(localVelocity.GetDim(i));
                 double relevantSpeed = Math.Abs(worldDirection.GetDim(i));
                 double timeToStop = acceleration == 0 ? 0 : relevantSpeed / acceleration;
                 double distToStop = (relevantSpeed * timeToStop) - (0.5 * acceleration * timeToStop * timeToStop);
@@ -1050,38 +1008,15 @@ namespace IngameScript {
 
         Vector3D GetThrustByDirection(Vector3D worldDirection) {
             Vector3D thrustSum = Vector3D.Zero;
-
-            //---------------------------------------------------------------------------
-            StringBuilder builder = new StringBuilder("");
-            int count = 0;
-            //Debug.PrintHUD($"worldDirectionLength: {worldDirection.Length()}");
-            //---------------------------------------------------------------------------
             if (worldDirection.Length() > 2d) {
                 worldDirection = Vector3D.Normalize(worldDirection);
                 foreach (IMyThrust block in THRUSTERS) {
                     double dot = Vector3D.Dot(block.WorldMatrix.Backward, worldDirection);
                     if (dot > 0.1d) {
-                        //if (dot > 0d) {
-                        //---------------------------------------------------------------------------
-                        builder.Append($"{dot:0.####}, ");
-                        count++;
-                        if (count > 5) {
-                            builder.Append("\n");
-                            count = 0;
-                        }
-                        Debug.DrawPoint(block.GetPosition(), Color.Red, 4f, onTop: true);
-                        //---------------------------------------------------------------------------
-
-                        //thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
                         thrustSum += block.WorldMatrix.Backward * (dot * block.MaxEffectiveThrust);
                     }
                 }
             }
-
-            //---------------------------------------------------------------------------
-            Debug.PrintHUD(builder.ToString());
-            //---------------------------------------------------------------------------
-
             return thrustSum;
         }
 
@@ -1124,7 +1059,6 @@ namespace IngameScript {
                 CONTROLLER.DampenersOverride = true;
                 foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
             } else {
-                //Vector3D thrustSum = Vector3D.Zero;
                 CONTROLLER.DampenersOverride = false;
                 float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
                 double weight = mass * gravity.Length();
@@ -1142,7 +1076,6 @@ namespace IngameScript {
                     double dot = Vector3D.Dot(block.WorldMatrix.Backward, gravity);
                     if (dot > 0.1d) {
                         block.ThrustOverride = (float)(weight * dot);
-                        //thrustSum += block.WorldMatrix.Backward * (dot * block.MaxEffectiveThrust);//thrustSum += dot * block.WorldMatrix.Backward * block.MaxEffectiveThrust;
                     } else {
                         block.ThrustOverride = 0f;
                     }
@@ -1194,63 +1127,58 @@ namespace IngameScript {
         }
 
         Vector3D MagneticDrive() {
-            Vector3D direction = CONTROLLER.MoveIndicator;
-            direction = Vector3D.Transform(direction, mtrx);
+            Vector3D direction = Vector3D.TransformNormal(CONTROLLER.MoveIndicator, CONTROLLER.WorldMatrix);
             if (!Vector3D.IsZero(direction)) {
-                direction = Vector3D.Normalize(direction);//direction /= direction.Length();
+                return Vector3D.Normalize(direction);
+            } else {
+                return Vector3D.Zero;
             }
-            return direction;
         }
 
         Vector3D MagneticDampeners(Vector3D direction, Vector3D myVelocity, Vector3D gravity) {
             if (Vector3D.IsZero(gravity) && !CONTROLLER.DampenersOverride && direction.LengthSquared() == 0d) {
                 return Vector3D.Zero;
             }
-            Vector3D vel = myVelocity;
-            vel = Vector3D.Transform(vel, MatrixD.Transpose(CONTROLLER.WorldMatrix.GetOrientation()));
-            vel = (direction * 104.38d) - Vector3D.Transform(vel, mtrx);//TODO set maxSpeed variable
-            if (Math.Abs(vel.X) < 2d) { vel.X = 0d; }
-            if (Math.Abs(vel.Y) < 2d) { vel.Y = 0d; }
-            if (Math.Abs(vel.Z) < 2d) { vel.Z = 0d; }
-            return vel;
+            direction = (direction * 104.38d) - myVelocity;
+            if (Math.Abs(direction.X) < 2d) { direction.X = 0d; }
+            if (Math.Abs(direction.Y) < 2d) { direction.Y = 0d; }
+            if (Math.Abs(direction.Z) < 2d) { direction.Z = 0d; }
+            return direction;
         }
 
-        void SetPower(Vector3D pow) {
-            if (pow.X != 0f) {
-                if (pow.X > 0f) {
-                    foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = true; }
-                    foreach (IMyShipMergeBlock block in MERGESMINUSX) { block.Enabled = false; }
-                } else {
-                    foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = false; }
-                    foreach (IMyShipMergeBlock block in MERGESMINUSX) { block.Enabled = true; }
-                }
+        void SetPower(Vector3D dir) {
+            double dot = Vector3D.Dot(CONTROLLER.WorldMatrix.Backward, Vector3D.Normalize(dir));//TODO normalize?
+            if (dot > 0.1d) {
+                foreach (IMyShipMergeBlock block in MERGESPLUSZ) { block.Enabled = true; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSZ) { block.Enabled = false; }
+            } else if (dot < -0.1d) {
+                foreach (IMyShipMergeBlock block in MERGESPLUSZ) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSZ) { block.Enabled = true; }
             } else {
-                foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = false; }
-                foreach (IMyShipMergeBlock block in MERGESMINUSX) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESPLUSZ) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSZ) { block.Enabled = false; }
             }
-            if (pow.Y != 0f) {
-                if (pow.Y > 0f) {
-                    foreach (IMyShipMergeBlock block in MERGESPLUSY) { block.Enabled = true; }
-                    foreach (IMyShipMergeBlock block in MERGESMINUSY) { block.Enabled = false; }
-                } else {
-                    foreach (IMyShipMergeBlock block in MERGESPLUSY) { block.Enabled = false; }
-                    foreach (IMyShipMergeBlock block in MERGESMINUSY) { block.Enabled = true; }
-                }
+            dot = Vector3D.Dot(CONTROLLER.WorldMatrix.Up, Vector3D.Normalize(dir));//TODO normalize?
+            if (dot > 0.1d) {
+                foreach (IMyShipMergeBlock block in MERGESPLUSY) { block.Enabled = true; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSY) { block.Enabled = false; }
+            } else if (dot < -0.1d) {
+                foreach (IMyShipMergeBlock block in MERGESPLUSY) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSY) { block.Enabled = true; }
             } else {
                 foreach (IMyShipMergeBlock block in MERGESPLUSY) { block.Enabled = false; }
                 foreach (IMyShipMergeBlock block in MERGESMINUSY) { block.Enabled = false; }
             }
-            if (pow.Z != 0f) {
-                if (pow.Z > 0f) {
-                    foreach (IMyShipMergeBlock block in MERGESPLUSZ) { block.Enabled = true; }
-                    foreach (IMyShipMergeBlock block in MERGESMINUSZ) { block.Enabled = false; }
-                } else {
-                    foreach (IMyShipMergeBlock block in MERGESPLUSZ) { block.Enabled = false; }
-                    foreach (IMyShipMergeBlock block in MERGESMINUSZ) { block.Enabled = true; }
-                }
+            dot = Vector3D.Dot(CONTROLLER.WorldMatrix.Right, Vector3D.Normalize(dir));//TODO normalize?
+            if (dot > 0.1d) {
+                foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = true; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSX) { block.Enabled = false; }
+            } else if (dot < -0.1d) {
+                foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSX) { block.Enabled = true; }
             } else {
-                foreach (IMyShipMergeBlock block in MERGESPLUSZ) { block.Enabled = false; }
-                foreach (IMyShipMergeBlock block in MERGESMINUSZ) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESPLUSX) { block.Enabled = false; }
+                foreach (IMyShipMergeBlock block in MERGESMINUSX) { block.Enabled = false; }
             }
         }
 
@@ -1289,10 +1217,22 @@ namespace IngameScript {
                     double angle = random.NextDouble() * Math.PI * 2d;
                     Vector3D perpendicular = Vector3D.CalculatePerpendicularVector(myVelocity);
                     MatrixD matrix = MatrixD.CreateFromDir(Vector3D.Normalize(myVelocity), Vector3D.Normalize(perpendicular));//normalize?
+                    matrix.Translation = CONTROLLER.CubeGrid.WorldVolume.Center;
                     randomDir = Math.Sin(angle) * matrix.Up + Math.Cos(angle) * matrix.Right;
                     randomDir = Vector3D.Normalize(randomDir);
                     //randomDir = Math.Sin(angle) * CONTROLLER.WorldMatrix.Up + Math.Cos(angle) * CONTROLLER.WorldMatrix.Right;
                     //randomDir *= 0.25d;
+
+                    //------------------------------------
+                    Vector3D normalizedVec = Vector3D.Normalize(myVelocity);
+                    Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVec * 500d);
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Red, thickness: 1f, onTop: true);
+                    normalizedVec = Vector3D.Normalize(perpendicular);
+                    position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVec * 500d);
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Red, thickness: 1f, onTop: true);
+                    position = CONTROLLER.CubeGrid.WorldVolume.Center + (randomDir * 500d);
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.Magenta, thickness: 1f, onTop: true);
+                    //------------------------------------
                 }
             }
             randomCount++;
@@ -1359,9 +1299,6 @@ namespace IngameScript {
             } else if (distance < minDistance) {
                 dir = -Vector3D.TransformNormal(Vector3D.Normalize(direction), MatrixD.Transpose(CONTROLLER.WorldMatrix));
             }
-
-            Debug.PrintHUD($"KeepRightDistance: {dir.X:0.##},{dir.Y:0.##},{dir.Z:0.##}");
-
             return dir;//TODO multiply by value?
         }
 
@@ -1455,7 +1392,6 @@ namespace IngameScript {
                     Vector3D normalizedVec = Vector3D.Normalize(escapeDirection);
                     Vector3D position = CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVec * 1000d);
                     Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, position, Color.LimeGreen, thickness: 1f, onTop: true);
-                    Debug.PrintHUD($"CheckCollisions: {escapeDirection.X:0.##},{escapeDirection.Y:0.##},{escapeDirection.Z:0.##}");
                     //------------------------------------
 
                     return escapeDirection;//TODO multiply by value?
@@ -1513,7 +1449,6 @@ namespace IngameScript {
                     Debug.DrawPoint(targPos + (enemyForwardVec * distance), Color.Green, 4f, onTop: true);
                     Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center, Color.Yellow, 4f, onTop: true);
                     Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, targPos + (enemyForwardVec * distance), Color.Purple, thickness: 1f, onTop: true);
-                    Debug.PrintHUD($"EvadeEnemy: {evadeDirection.X:0.##},{evadeDirection.Y:0.##},{evadeDirection.Z:0.##}");
                     //---------------------------------------------------------------------------
 
                     return evadeDirection;//TODO multiply by value?
@@ -1643,8 +1578,6 @@ namespace IngameScript {
             if (!Vector3D.IsZero(gravity)) {
                 if (altitude < 100d) {
                     dir = Vector3D.TransformNormal(Vector3D.Normalize(-gravity), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-
-                    Debug.PrintHUD($"KeepRightAltitude: {dir.X:0.##},{dir.Y:0.##},{dir.Z:0.##}");
                 }
             }
             return dir;//TODO multiply by value?
@@ -1674,13 +1607,8 @@ namespace IngameScript {
                     }
                     if (altitude < altitudeToKeep - 30d) {
                         dir = Vector3D.TransformNormal(Vector3D.Normalize(-gravity), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-
-                        Debug.PrintHUD($"KeepAltitude: {dir.X:0.##},{dir.Y:0.##},{dir.Z:0.##}");
-
                     } else if (altitude > altitudeToKeep + 30d) {
                         dir = Vector3D.TransformNormal(Vector3D.Normalize(gravity), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-
-                        Debug.PrintHUD($"KeepAltitude: {dir.X:0.##},{dir.Y:0.##},{dir.Z:0.##}");
                     }
                 }
             } else {
@@ -1858,10 +1786,12 @@ namespace IngameScript {
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.Planet) {
                     landPosition = TARGET.HitPosition.Value + (Vector3D.Normalize(-gravity) * 100d);
-                    REMOTE.ClearWaypoints();
-                    REMOTE.AddWaypoint(landPosition, "landPosition");
-                    REMOTE.SetAutoPilotEnabled(true);
-                    REMOTE.SetCollisionAvoidance(false);
+                    if (magneticDrive) {
+                        REMOTE.ClearWaypoints();
+                        REMOTE.AddWaypoint(landPosition, "landPosition");
+                        REMOTE.SetAutoPilotEnabled(true);
+                        REMOTE.SetCollisionAvoidance(false);
+                    }
                 }
             }
         }
