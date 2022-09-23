@@ -1514,7 +1514,7 @@ namespace IngameScript {
             positions.Add(position);
 
             for (int i = 0; i < positions.Count - 1; i++) {
-                DrawLine(frame, positions[i], positions[i + 1], width, color);
+                DrawLine(frame, positions[i], positions[i + 1], width, color);//TODO use ref
             }
             return positions;
         }
@@ -1528,7 +1528,7 @@ namespace IngameScript {
             }
 
             for (int i = 0; i < positions.Count - 1; i++) {
-                DrawLine(frame, positions[i], positions[i + 1], width, color);
+                DrawLine(frame, positions[i], positions[i + 1], width, color);//TODO use ref
             }
         }
 
