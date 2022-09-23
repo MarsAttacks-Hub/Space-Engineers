@@ -709,7 +709,7 @@ namespace IngameScript {
                     initCollisionMagneticDriveOnce = true;
                 }
                 if (isAutoPiloted) {
-                    dir = AutoMagneticDrive(dir);//normal
+                    dir = AutoMagneticDrive(dir);//world normal
 
                     //----------------------------------
                     Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
@@ -722,7 +722,7 @@ namespace IngameScript {
                     }
                     if (autoCombat && !isUnderControl && targFound) {
                         initRandomMagneticDriveOnce = false;
-                        RandomDrive(myVelocity);//normal
+                        RandomDrive(myVelocity);//world normal
                         dir = randomDir;
                         Vector3D dirNN = Vector3D.Zero;
                         foreach (MyDetectedEntityInfo target in targetsInfo) {
@@ -784,10 +784,10 @@ namespace IngameScript {
                 if (obstaclesCheckCount >= obstaclesCheckDelay) {
                     Vector3D stopDirection = CalculateStopDistance(myVelocity);//world
                     double stopDistance = stopDirection.Length();
-                    RaycastStopPosition(stopDistance, stopDirection, mySpeed);//stopDir normal
+                    RaycastStopPosition(stopDistance, stopDirection, mySpeed);//stopDir world normal
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
-                    SensorDetection();//sensorDir normal
+                    SensorDetection();//sensorDir world normal
 
                     obstaclesCheckCount = 0;
                 }
@@ -1154,7 +1154,11 @@ namespace IngameScript {
             if (FORWARDTHRUST.CurrentThrust > 0f) { dir.Z = -1f; } else if (BACKWARDTHRUST.CurrentThrust > 0f) { dir.Z = 1f; }
             if (UPTHRUST.CurrentThrust > 0f) { dir.Y = 1f; } else if (DOWNTHRUST.CurrentThrust > 0f) { dir.Y = -1f; }
             if (LEFTTHRUST.CurrentThrust > 0f) { dir.X = -1f; } else if (RIGHTTHRUST.CurrentThrust > 0f) { dir.X = 1f; }
-            return SafeNormalize(dir);
+            if (!Vector3D.IsZero(dir)) {
+                return Vector3D.TransformNormal(Vector3D.Normalize(dir), CONTROLLER.WorldMatrix);
+            } else {
+                return Vector3D.Zero;
+            }
         }
 
         Vector3D MagneticDrive() {
@@ -1238,7 +1242,9 @@ namespace IngameScript {
                     randomDir.Y = randomFloat;
                     randomFloat = (float)random.Next(-1, 2);
                     randomDir.Z = randomFloat;
-                    randomDir = SafeNormalize(randomDir);
+                    if (!Vector3D.IsZero(randomDir)) {
+                        randomDir = Vector3D.TransformNormal(Vector3D.Normalize(randomDir), CONTROLLER.WorldMatrix);
+                    }
                     randomCount = 0;
                 } else {
                     //TODO to test
@@ -1296,7 +1302,9 @@ namespace IngameScript {
             } else if (entitiesB.Count > 0) {
                 sensorDir.Z = -1f;
             }
-            sensorDir = SafeNormalize(sensorDir);
+            if (!Vector3D.IsZero(sensorDir)) {
+                sensorDir = Vector3D.TransformNormal(Vector3D.Normalize(sensorDir), CONTROLLER.WorldMatrix);
+            }
         }
 
         Vector3D KeepRightDistance(Vector3D targPos) {
@@ -1584,7 +1592,9 @@ namespace IngameScript {
                 } else if (CONTROLLER.WorldMatrix.Right.Dot(normalizedVelocity) > 0d) {
                     stopDir.X = -1f;
                 }
-                stopDir = SafeNormalize(stopDir);
+                if (!Vector3D.IsZero(stopDir)) {
+                    stopDir = Vector3D.TransformNormal(Vector3D.Normalize(stopDir), CONTROLLER.WorldMatrix);
+                }
             }
         }
 
