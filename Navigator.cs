@@ -30,13 +30,13 @@ namespace IngameScript {
         bool idleThrusters = false;//enable/disable thrusters
         bool safetyDampeners = false;//enable/disable safety dampeners
         bool useGyrosToStabilize = true;//enable/disable gyro stabilization on planets and when driving
-        bool autoCombat = true;//enable/disable automatic fighting when ship is not controlled, valid only if magneticDrive is true
-        bool obstaclesAvoidance = true;//enable/disable detection of obstacles while driving, valid only if magneticDrive is true
-        bool collisionDetection = true;//enable/disable detection of incoming ram attacks, valid only if magneticDrive is true
-        bool enemyEvasion = true;//enable/disable evasion from enemy aim, valid only if magneticDrive is true
-        bool keepAltitude = true;//enable/disable keeping altitude on planets, valid only if magneticDrive is true
-        bool moddedSensor = false;//define if is using modded sensors, valid only if obstaclesAvoidance is true and magneticDrive is true
-        bool closeRangeCombat = false;//set the fight distance for the automatic fight, valid only if autoCombat is true and magneticDrive is true
+        bool autoCombat = true;//enable/disable automatic fighting when ship is not controlled
+        bool obstaclesAvoidance = true;//enable/disable detection of obstacles while driving
+        bool collisionDetection = true;//enable/disable detection of incoming ram attacks
+        bool enemyEvasion = true;//enable/disable evasion from enemy aim
+        bool keepAltitude = true;//enable/disable keeping altitude on planets
+        bool moddedSensor = false;//define if is using modded sensors, valid only if obstaclesAvoidance is true
+        bool closeRangeCombat = false;//set the fight distance for the automatic fight, valid only if autoCombat is true
         bool sunAlign = false;//enable/disable sun chase on space
         bool logger = true;//enable/disable logging
 
@@ -173,8 +173,19 @@ namespace IngameScript {
         readonly Vector3D[] baseDirection = new Vector3D[3] {
             Vector3D.Right,
             Vector3D.Up,
-            Vector3D.Backward,
+            Vector3D.Backward
         };
+
+        readonly Vector3D[] directions = new Vector3D[6] {
+            Vector3D.Right,
+            Vector3D.Left,
+            Vector3D.Up,
+            Vector3D.Down,
+            Vector3D.Backward,
+            Vector3D.Forward,
+        };
+
+        double[] thrustSums = new double[6];
 
         PID yawController;
         PID pitchController;
@@ -211,6 +222,7 @@ namespace IngameScript {
             foreach (IMyCameraBlock cam in LIDARSRIGHT) { cam.EnableRaycast = true; }
             selectedPlanet = planetsList.ElementAt(0).Key;
             InitPIDControllers();
+            CalculateBaseThrust();
             if (LCDSUNALIGN != null) { LCDSUNALIGN.BackgroundColor = new Color(0, 0, 0); }
             if (LCDSAFETYDAMPENERS != null) { LCDSAFETYDAMPENERS.BackgroundColor = safetyDampeners ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             if (LCDMAGNETICDRIVE != null) { LCDMAGNETICDRIVE.BackgroundColor = magneticDrive ? new Color(25, 0, 100) : new Color(0, 0, 0); }
@@ -329,6 +341,14 @@ namespace IngameScript {
             switch (argument) {
                 case "RangeFinder":
                     if (Vector3D.IsZero(gravity)) {
+                        if (!Vector3D.IsZero(rangeFinderPosition)) {
+                            rangeFinderPosition = Vector3D.Zero;
+                            if (magneticDrive) {
+                                REMOTE.ClearWaypoints();
+                                REMOTE.SetAutoPilotEnabled(false);
+                            }
+                            break;
+                        }
                         RangeFinder();
                     } else {
                         if (!Vector3D.IsZero(landPosition) || descend) {
@@ -823,8 +843,8 @@ namespace IngameScript {
                 }
             }
 
-            if (!Vector3D.IsZero(gravity) && !isAutoPiloted) {
-                dir = GravityCompensation(maxAccel.Length(), dir, gravity);//TODO maxAccel?
+            if (!Vector3D.IsZero(gravity) && !Vector3D.IsZero(dir) && !isAutoPiloted) {
+                dir = GravityCompensation(maxAccel.Length(), dir, gravity);//TODO transpose maxAccel?//world normal
             }
 
             //----------------------------------
@@ -842,15 +862,18 @@ namespace IngameScript {
             }
 
             double acceleration;
-            Vector3D stopDirection = CalculateStopVectorAndAccelerationByDirection(myVelocity, out acceleration);//world
-
-            //------------------------------------
-            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + stopDirection, Color.Red, thickness: 2f, onTop: true);
-            //------------------------------------
+            Vector3D stopDirection = CalculateStopVectorAndAccelerationByDirection(myVelocity, out acceleration);
+            double stopDistance = stopDirection.Length();
+            bool slowdown = false;
 
             if (!Vector3D.IsZero(collisionDir)) {
                 initCollisionMagneticDriveOnce = false;
-                dir = collisionDir;
+                dir = collisionDir;//world normal
+
+                //----------------------------------
+                Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                Debug.PrintHUD("collisionDir");
+                //----------------------------------
             } else {
                 if (!initCollisionMagneticDriveOnce) {
                     randomDir = Vector3D.Zero;
@@ -858,21 +881,25 @@ namespace IngameScript {
                 }
                 if (autoCombat && !isUnderControl && targFound) {
                     initRandomMagneticDriveOnce = false;
-                    RandomDrive(myVelocity);
+                    RandomDrive(myVelocity);//world normal
                     dir = randomDir;
                     Vector3D dirNN = Vector3D.Zero;
                     foreach (MyDetectedEntityInfo target in targetsInfo) {
-                        Vector3D escapeDir = CONTROLLER.CubeGrid.WorldVolume.Center - target.Position;
-                        escapeDir = Vector3D.TransformNormal(Vector3D.Normalize(escapeDir), MatrixD.Transpose(CONTROLLER.WorldMatrix));
+                        Vector3D escapeDir = Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - target.Position);//world normal
                         dirNN = SetResultVector(dirNN, escapeDir);
                     }
-                    Vector3D dirNew = KeepRightDistance(targPosition);
+                    Vector3D dirNew = KeepRightDistance(targPosition);//world normal
 
                     dirNew = MergeDirectionValues(dirNN, dirNew);
                     dir = MergeDirectionValues(dir, dirNew);
 
-                    dirNew = KeepMinAltitude(gravity, altitude);
+                    dirNew = KeepMinAltitude(gravity, altitude);//world normal
                     dir = MergeDirectionValues(dir, dirNew);
+
+                    //----------------------------------
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                    Debug.PrintHUD("randomDir");
+                    //----------------------------------
                 } else {
                     if (!initRandomMagneticDriveOnce) {
                         randomDir = Vector3D.Zero;
@@ -880,12 +907,18 @@ namespace IngameScript {
                     }
                     if (!Vector3D.IsZero(landPosition)) {
                         initlandMagneticDriveOnce = false;
-                        double stopDistance = stopDirection.Length();
                         Vector3D landPos = landPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - landPosition) * stopDistance);
-                        Vector3D landDir = landPos - CONTROLLER.CubeGrid.WorldVolume.Center;
-                        landDir = Vector3D.TransformNormal(Vector3D.Normalize(landDir), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-                        landDir = CalculateDriftCompensation(myVelocity, landDir, acceleration);
+                        Vector3D landDir = Vector3D.Normalize(landPos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
+                        landDir = CalculateDriftCompensation(myVelocity, landDir, acceleration);//output as input
                         dir = MergeDirectionValues(dir, landDir);
+
+                        //----------------------------------
+                        Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                        Debug.PrintHUD("landDir");
+                        Debug.DrawPoint(landPosition, Color.Red, 10f, onTop: true);
+                        Debug.DrawPoint(landPos, Color.Orange, 10f, onTop: true);
+                        //----------------------------------
+
                         if (Vector3D.Distance(landPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= stopDistance) {
                             dir = Vector3D.Zero;
                             CONTROLLER.DampenersOverride = true;
@@ -896,12 +929,18 @@ namespace IngameScript {
                         }
                     } else if (!Vector3D.IsZero(returnPosition)) {
                         initlandMagneticDriveOnce = false;
-                        double stopDistance = stopDirection.Length();
                         Vector3D pos = returnPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - returnPosition) * stopDistance);
-                        Vector3D direction = pos - CONTROLLER.CubeGrid.WorldVolume.Center;
-                        direction = Vector3D.TransformNormal(Vector3D.Normalize(direction), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-                        direction = CalculateDriftCompensation(myVelocity, direction, acceleration);
+                        Vector3D direction = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
+                        direction = CalculateDriftCompensation(myVelocity, direction, acceleration);//output as input
                         dir = MergeDirectionValues(dir, direction);
+
+                        //----------------------------------
+                        Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                        Debug.PrintHUD("returnPosition");
+                        Debug.DrawPoint(returnPosition, Color.Red, 10f, onTop: true);
+                        Debug.DrawPoint(pos, Color.Orange, 10f, onTop: true);
+                        //----------------------------------
+
                         if (Vector3D.Distance(returnPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= stopDistance) {
                             dir = Vector3D.Zero;
                             CONTROLLER.DampenersOverride = true;
@@ -911,13 +950,26 @@ namespace IngameScript {
                         }
                     } else if (!Vector3D.IsZero(rangeFinderPosition)) {
                         initlandMagneticDriveOnce = false;
-                        double stopDistance = stopDirection.Length();
+
                         Vector3D pos = rangeFinderPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - rangeFinderPosition) * stopDistance);
-                        Vector3D direction = pos - CONTROLLER.CubeGrid.WorldVolume.Center;
-                        direction = Vector3D.TransformNormal(Vector3D.Normalize(direction), MatrixD.Transpose(CONTROLLER.WorldMatrix));
-                        direction = CalculateDriftCompensation(myVelocity, direction, acceleration);
+
+                        //double posToMeDist = Vector3D.Distance(rangeFinderPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                        //double stopPosToMeDist = Vector3D.Distance(CONTROLLER.CubeGrid.WorldVolume.Center, pos);
+                        //if (posToMeDist < stopPosToMeDist) { slowdown = true; }
+
+                        Vector3D direction = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
+                        direction = CalculateDriftCompensation(myVelocity, direction, acceleration);//output as input
+
                         dir = MergeDirectionValues(dir, direction);
-                        if (Vector3D.Distance(rangeFinderPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= stopDistance) {
+
+                        //----------------------------------
+                        Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                        Debug.PrintHUD($"rangeFinderPosition, stopDistance: {stopDistance:0.##}");
+                        Debug.DrawPoint(rangeFinderPosition, Color.Red, 10f, onTop: true);
+                        Debug.DrawPoint(pos, Color.Orange, 10f, onTop: true);
+                        //----------------------------------
+
+                        if (Vector3D.Distance(rangeFinderPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
                             dir = Vector3D.Zero;
                             CONTROLLER.DampenersOverride = true;
                             if (myVelocity.Length() < 0.2d) {
@@ -932,19 +984,24 @@ namespace IngameScript {
                             initlandMagneticDriveOnce = true;
                         }
 
-                        //TODO CONTROLLER.MoveIndicator ?
-
+                        //Vector3D direction = Vector3D.TransformNormal(CONTROLLER.MoveIndicator, CONTROLLER.WorldMatrix);
+                        //dir = !Vector3D.IsZero(direction) ? Vector3D.Normalize(direction) : Vector3D.Zero;
                     }
                 }
             }
-
+            /*
             if (enemyEvasion) {
-                Vector3D dirN = EvadeEnemy(targOrientation, targVelVec, targPosition, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity, targFound);
+                Vector3D dirN = EvadeEnemy(targOrientation, targVelVec, targPosition, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity, targFound);//world normal
                 foreach (MyDetectedEntityInfo target in targetsInfo) {
-                    Vector3D escapeDir = EvadeEnemy(target.Orientation, target.Velocity, target.Position, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity, targFound);
+                    Vector3D escapeDir = EvadeEnemy(target.Orientation, target.Velocity, target.Position, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity, targFound);//world normal
                     dirN = SetResultVector(dirN, escapeDir);
                 }
                 dir = MergeDirectionValues(dir, dirN);
+
+                //----------------------------------
+                //Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Orange, thickness: 2f, onTop: true);
+                //Debug.PrintHUD("EvadeEnemy");
+                //----------------------------------
             }
 
             if (obstaclesAvoidance && mySpeed > 10f && Vector3D.IsZero(landPosition)) {
@@ -961,21 +1018,31 @@ namespace IngameScript {
                     }
                 }
                 if (obstaclesCheckCount >= obstaclesCheckDelay) {
-                    double stopDistance = stopDirection.Length();
-                    RaycastStopPosition(stopDistance, myVelocity, mySpeed);//TODO use stopVector(input must be a world direction)
+                    RaycastStopPosition(stopDistance, myVelocity, mySpeed);//stopDir world normal
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
-                    SensorDetection();
+                    SensorDetection();//sensorDir world normal
 
                     obstaclesCheckCount = 0;
                 }
                 obstaclesCheckCount++;
                 if (!Vector3D.IsZero(stopDir)) {
                     dir = MergeDirectionValues(dir, stopDir);
+
+                    //----------------------------------
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Orange, thickness: 2f, onTop: true);
+                    Debug.PrintHUD("stopDir");
+                    //----------------------------------
+
                     checkAllTicks = true;
                 }
                 if (!Vector3D.IsZero(sensorDir)) {
                     dir = MergeDirectionValues(dir, sensorDir);
+
+                    //----------------------------------
+                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Orange, thickness: 2f, onTop: true);
+                    Debug.PrintHUD("sensorDir");
+                    //----------------------------------
                 }
             } else {
                 if (!sensorDetectionOnce) {
@@ -991,20 +1058,41 @@ namespace IngameScript {
                 }
             }
 
-            if (!Vector3D.IsZero(gravity)) {
-                dir = GravityCompensation(acceleration, dir, gravity);
+            if (!Vector3D.IsZero(gravity) && !Vector3D.IsZero(dir)) {
+                dir = GravityCompensation(acceleration, dir, gravity);//output as input
             }
+            */
+            //----------------------------------
+            //Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Green, thickness: 2f, onTop: true);
+            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (Vector3D.Normalize(myVelocity) * 1000d), Color.Green, thickness: 2f, onTop: true);
+            //----------------------------------
 
-            SetThrustersDrive(dir);
+            SetThrustersDrive(dir, slowdown, mySpeed);
         }
 
-        void SetThrustersDrive(Vector3D direction) {
+        void SetThrustersDrive(Vector3D direction, bool slowdown, double mySpeed) {
             if (!Vector3D.IsZero(direction)) {
-                direction = Vector3D.Normalize(direction);
+
+                direction = Vector3D.Normalize(direction);//TODO
+
                 foreach (IMyThrust thuster in THRUSTERS) {
                     double dot = Vector3D.Dot(thuster.WorldMatrix.Backward, direction);
                     if (dot > 0.1d) {
+
+                        //-------------------------------------------------------------------------------------------
+                        Debug.DrawPoint(thuster.GetPosition(), Color.Red, 4f, onTop: true);
+                        //-------------------------------------------------------------------------------------------
+                        /*if (slowdown) {
+                            if (mySpeed > 5d) {
+                                thuster.ThrustOverridePercentage = 0f;
+                            } else {
+                                thuster.ThrustOverridePercentage = thuster.MaxEffectiveThrust * (float)dot;
+                            }
+                        } else {*/
                         thuster.ThrustOverridePercentage = thuster.MaxEffectiveThrust * (float)dot;
+                        //}
+                    } else {
+                        thuster.ThrustOverridePercentage = 0f;
                     }
                 }
             } else {
@@ -1015,40 +1103,70 @@ namespace IngameScript {
             }
         }
 
-        //double maxTimeToStop = 0;//TODO
         Vector3D CalculateStopVectorAndAccelerationByDirection(Vector3D worldDirection, out double accelerationByDirection) {
             Vector3D localDirection = Vector3D.TransformNormal(worldDirection, MatrixD.Transpose(CONTROLLER.WorldMatrix));
-            Vector3D thrustSumVector = GetThrustByDirection(worldDirection);
-            thrustSumVector = Vector3D.TransformNormal(thrustSumVector, MatrixD.Transpose(CONTROLLER.WorldMatrix));
-            float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
-            accelerationByDirection = thrustSumVector.Length() / mass;
+            Vector3D thrustSumVector = GetThrustByDirection(localDirection);
             Vector3D displacementVector = Vector3D.Zero;
-            for (int i = 0; i < 3; ++i) {
-                double thrustSum = thrustSumVector.GetDim(i);
-                Vector3D direction = baseDirection[i] * Math.Sign(thrustSum);
-                thrustSum = Math.Abs(thrustSum);
-                double acceleration = thrustSum / mass;
-                double relevantSpeed = Math.Abs(localDirection.GetDim(i));
-                double timeToStop = acceleration == 0 ? 0 : relevantSpeed / acceleration;
-                double distToStop = (relevantSpeed * timeToStop) - (0.5 * acceleration * timeToStop * timeToStop);
-                //if (timeToStop > maxTimeToStop) { maxTimeToStop = timeToStop; }
-                displacementVector += direction * distToStop;
+            accelerationByDirection = 0d;
+            if (!Vector3D.IsZero(thrustSumVector)) {
+                thrustSumVector = Vector3D.TransformNormal(thrustSumVector, MatrixD.Transpose(CONTROLLER.WorldMatrix));
+                float mass = CONTROLLER.CalculateShipMass().PhysicalMass;
+                accelerationByDirection = thrustSumVector.Length() / mass;
+                for (int i = 0; i < 3; ++i) {
+                    double thrustSum = thrustSumVector.GetDim(i);
+                    Vector3D direction = baseDirection[i] * Math.Sign(thrustSum);
+                    thrustSum = Math.Abs(thrustSum);
+                    double acceleration = thrustSum / mass;
+                    double relevantSpeed = Math.Abs(localDirection.GetDim(i));
+                    double timeToStop = acceleration == 0d ? 0d : relevantSpeed / acceleration;
+                    double distToStop = (relevantSpeed * timeToStop) - (0.5d * acceleration * timeToStop * timeToStop);
+                    displacementVector += direction * distToStop;
+                }
+                displacementVector = Vector3D.TransformNormal(displacementVector, CONTROLLER.WorldMatrix);
             }
-            return Vector3D.TransformNormal(displacementVector, CONTROLLER.WorldMatrix);
+
+            //------------------------------------
+            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + displacementVector, Color.Red, thickness: 2f, onTop: true);
+            Debug.PrintHUD($"acceleration: {accelerationByDirection:0.##}, stopDistance: {displacementVector.Length():0.##}");
+            //------------------------------------
+
+            return displacementVector;
         }
 
-        Vector3D GetThrustByDirection(Vector3D worldDirection) {
+        Vector3D GetThrustByDirection(Vector3D localDirection) {
             Vector3D thrustSum = Vector3D.Zero;
-            if (worldDirection.Length() > 2d) {
-                worldDirection = Vector3D.Normalize(worldDirection);
-                foreach (IMyThrust block in THRUSTERS) {
-                    double dot = Vector3D.Dot(block.WorldMatrix.Backward, worldDirection);
-                    if (dot > 0.1d) {
-                        thrustSum += block.WorldMatrix.Backward * (dot * block.MaxEffectiveThrust);
-                    }
+            for (int i = 0; i < 6; ++i) {
+                var thrustDirn = directions[i] * thrustSums[i];
+                double dot;
+                Vector3D.Dot(ref thrustDirn, ref localDirection, out dot);
+                if (dot > 0d) {
+                    thrustSum += thrustDirn;
                 }
             }
-            return thrustSum;
+            return Vector3D.Rotate(thrustSum, CONTROLLER.WorldMatrix);
+        }
+
+        void CalculateBaseThrust() {
+            MatrixD transposedWm = MatrixD.Transpose(CONTROLLER.WorldMatrix);
+            thrustSums = new double[6];
+            foreach (IMyThrust thrust in THRUSTERS) {
+                Vector3D dirn = Vector3D.Rotate(thrust.WorldMatrix.Forward * thrust.MaxEffectiveThrust, transposedWm);
+                if (dirn.X >= 0) {
+                    thrustSums[0] += dirn.X;
+                } else {
+                    thrustSums[1] -= dirn.X;
+                }
+                if (dirn.Y >= 0) {
+                    thrustSums[2] += dirn.Y;
+                } else {
+                    thrustSums[3] -= dirn.Y;
+                }
+                if (dirn.Z >= 0) {
+                    thrustSums[4] += dirn.Z;
+                } else {
+                    thrustSums[5] -= dirn.Z;
+                }
+            }
         }
 
         Vector3D GravityCompensation(double acceleration, Vector3D desiredDirection, Vector3D gravity) {
@@ -1102,7 +1220,7 @@ namespace IngameScript {
                     }
                 }
                 weight /= count;
-                weight = weight / 10d * 8d;
+                weight = weight / 10d * 9d;
                 foreach (IMyThrust block in THRUSTERS) {
                     double dot = Vector3D.Dot(block.WorldMatrix.Backward, gravity);
                     if (dot > 0.1d) {
@@ -1669,6 +1787,7 @@ namespace IngameScript {
         void ManageWaypoints(bool isUnderControl, bool isTargetEmpty, Vector3D myVelocity) {
             if (targFound || !isTargetEmpty) {
                 //TODO do once
+                rangeFinderPosition = Vector3D.Zero;
                 landPosition = Vector3D.Zero;
                 descend = false;
                 aimTarget = false;
