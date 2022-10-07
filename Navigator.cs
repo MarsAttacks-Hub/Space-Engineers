@@ -48,6 +48,7 @@ namespace IngameScript {
         bool checkAllTicks = false;
         bool descend = false;
         bool initDescend = false;
+        bool recoverMagneticDrive = false;
         bool unlockGyrosOnce = true;
         bool returnOnce = true;
         bool initMagneticDriveOnce = true;
@@ -62,6 +63,8 @@ namespace IngameScript {
         bool updateOnce = true;
         bool controlThrustersOnce = false;
         bool safetyDampenersOnce = false;
+        bool thrustOverrideOnce = true;
+        bool targetFoundOnce = false;
         string selectedPlanet = "";
         string rangeFinderName = "";
         double altitudeToKeep = 0d;
@@ -69,6 +72,7 @@ namespace IngameScript {
         double moveYaw = .01;
         double rangeFinderDiameter = 0d;
         double rangeFinderDistance = 0d;
+        double timeSinceLastRaycast = 0d;
         float prevSunPower = 0f;
         int planetSelector = 0;
         int sunAlignmentStep = 0;
@@ -156,8 +160,6 @@ namespace IngameScript {
         Vector3D returnPosition = Vector3D.Zero;
         Vector3D hoverPosition = Vector3D.Zero;
         Vector3D landPosition = Vector3D.Zero;
-        Vector3D lastForwardVector = Vector3D.Zero;
-        Vector3D lastUpVector = Vector3D.Zero;
         Vector3D targHitPos = Vector3D.Zero;
         Vector3D targPosition = Vector3D.Zero;
         Vector3D targVelVec = Vector3D.Zero;
@@ -240,7 +242,10 @@ namespace IngameScript {
             try {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
+                //----------------------------------
                 Debug.RemoveDraw();
+                Debug.PrintHUD($"LastRunTimeMs:{Runtime.LastRunTimeMs:0.####}");
+                //----------------------------------
 
                 GetBroadcastMessages();
 
@@ -262,9 +267,9 @@ namespace IngameScript {
 
                 bool needControl;
                 if (magneticDrive) {
-                    needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || isAutoPiloted || mySpeed > 2d || !isTargetEmpty;
+                    needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || isAutoPiloted || mySpeed > 2d || !isTargetEmpty || targFound;
                 } else {
-                    needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || !isTargetEmpty;
+                    needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || !isTargetEmpty || targFound;
                 }
 
                 SendBroadcastControllerMessage(needControl);
@@ -275,7 +280,7 @@ namespace IngameScript {
                     if (!aligned) { return; }
                 }
 
-                if (!needControl && sunAlign && Vector3D.IsZero(gravity) && isTargetEmpty) {
+                if (!needControl && sunAlign && Vector3D.IsZero(gravity) && isTargetEmpty && !targFound) {
                     SunChase();
                     return;
                 } else {
@@ -353,11 +358,15 @@ namespace IngameScript {
                         if (!Vector3D.IsZero(landPosition) || descend) {
                             landPosition = Vector3D.Zero;
                             descend = false;
+                            initDescend = false;
                             foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
-                            magneticDrive = true;//TODO
-                            REMOTE.ClearWaypoints();
-                            REMOTE.SetAutoPilotEnabled(false);
-                            REMOTE.SetCollisionAvoidance(true);
+                            if (recoverMagneticDrive) {
+                                magneticDrive = true;
+                                REMOTE.ClearWaypoints();
+                                REMOTE.SetAutoPilotEnabled(false);
+                                REMOTE.SetCollisionAvoidance(true);
+                                recoverMagneticDrive = false;
+                            }
                             break;
                         }
                         Land(gravity);
@@ -532,6 +541,7 @@ namespace IngameScript {
 
         void GyroStabilize(bool isAutoPiloted, Vector3D gravity, bool isTargetEmpty) {
             if (useGyrosToStabilize && !targFound && !aimTarget && !isAutoPiloted && isTargetEmpty && !Vector3D.IsZero(gravity)) {
+                unlockGyrosOnce = true;
                 double pitchAngle, rollAngle, yawAngle;
                 double mouseYaw = CONTROLLER.RotationIndicator.Y;
                 double mousePitch = CONTROLLER.RotationIndicator.X;
@@ -541,8 +551,6 @@ namespace IngameScript {
                 if (mousePitch == 0 && mouseYaw == 0 && mouseRoll == 0 && dot > 0.999d) {
                     if (unlockGyrosOnce) {
                         UnlockGyros();
-                        lastForwardVector = Vector3D.Zero;
-                        lastUpVector = Vector3D.Zero;
                         unlockGyrosOnce = false;
                     }
                     return;
@@ -564,12 +572,9 @@ namespace IngameScript {
                 }
                 yawSpeed = mouseYaw == 0d ? yawController.Control(yawAngle) : yawController.Control(mouseYaw);
                 ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
-                unlockGyrosOnce = true;
             } else {
                 if (unlockGyrosOnce) {
                     UnlockGyros();
-                    lastForwardVector = Vector3D.Zero;
-                    lastUpVector = Vector3D.Zero;
                     unlockGyrosOnce = false;
                 }
             }
@@ -663,7 +668,8 @@ namespace IngameScript {
             Vector3D dir = Vector3D.Zero;
             SyncRotors();
 
-            UpdateAcceleration(Runtime.TimeSinceLastRun.TotalSeconds, myVelocity);//world (unused)
+            double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+            UpdateAcceleration(timeSinceLastRun, myVelocity);//world (unused)
 
             if (!Vector3D.IsZero(collisionDir)) {
                 initCollisionMagneticDriveOnce = false;
@@ -704,7 +710,7 @@ namespace IngameScript {
                         Vector3D dirDist = KeepRightDistance(targPosition);//world normal
                         dir = !Vector3D.IsZero(dirDist) ? dirDist : dir;
 
-                        Vector3D dirMinAlt = KeepMinAltitude(gravity);//TODO world normal
+                        Vector3D dirMinAlt = KeepMinAltitude(gravity);//world normal
                         dir = !Vector3D.IsZero(dirMinAlt) ? dirMinAlt : dir;
 
                         //----------------------------------
@@ -751,15 +757,17 @@ namespace IngameScript {
                         checkAllTicksCount = 0;
                     }
                 }
+                timeSinceLastRaycast += timeSinceLastRun;
                 if (obstaclesCheckCount >= obstaclesCheckDelay) {
                     Vector3D stopDirection = CalculateStopDistance(myVelocity);//world
                     double stopDistance = stopDirection.Length();
-                    RaycastStopPosition(stopDistance, stopDirection, mySpeed);//stopDir world normal
+                    RaycastStopPosition(stopDistance, stopDirection, myVelocity);//stopDir world normal
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
                     SensorDetection();//sensorDir world normal
 
                     obstaclesCheckCount = 0;
+                    timeSinceLastRaycast = 0d;
                 }
                 obstaclesCheckCount++;
                 if (!Vector3D.IsZero(stopDir)) {
@@ -776,6 +784,7 @@ namespace IngameScript {
 
             } else {
                 if (!sensorDetectionOnce) {
+                    timeSinceLastRaycast = 0d;
                     foreach (IMySensorBlock sensor in SENSORS) {
                         sensor.BackExtend = 0.1f;
                         sensor.BottomExtend = 0.1f;
@@ -814,7 +823,6 @@ namespace IngameScript {
 
                 //----------------------------------
                 Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
-                Debug.PrintHUD("collisionDir");
                 //----------------------------------
             } else {
                 if (!initCollisionMagneticDriveOnce) {
@@ -835,12 +843,11 @@ namespace IngameScript {
                     Vector3D dirDist = KeepRightDistance(targPosition);//world normal
                     dir = !Vector3D.IsZero(dirDist) ? dirDist : dir;
 
-                    Vector3D dirMinAlt = KeepMinAltitude(gravity);//TODO world normal
+                    Vector3D dirMinAlt = KeepMinAltitude(gravity);//world normal
                     dir = !Vector3D.IsZero(dirMinAlt) ? dirMinAlt : dir;
 
                     //----------------------------------
                     Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
-                    Debug.PrintHUD("randomDir");
                     //----------------------------------
                 } else {
                     if (!initRandomMagneticDriveOnce) {
@@ -943,12 +950,15 @@ namespace IngameScript {
                         checkAllTicksCount = 0;
                     }
                 }
+                double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
+                timeSinceLastRaycast += timeSinceLastRun;
                 if (obstaclesCheckCount >= obstaclesCheckDelay) {
-                    RaycastStopPosition(stopDistance, stopDirection, mySpeed);//stopDir world normal
+                    RaycastStopPosition(stopDistance, stopDirection, myVelocity);//stopDir world normal
 
                     if (moddedSensor) { SetSensorsStopDistance((float)stopDistance, (float)mySpeed); }
                     SensorDetection();//sensorDir world normal
 
+                    timeSinceLastRaycast = 0d;
                     obstaclesCheckCount = 0;
                 }
                 obstaclesCheckCount++;
@@ -966,6 +976,7 @@ namespace IngameScript {
 
             } else {
                 if (!sensorDetectionOnce) {
+                    timeSinceLastRaycast = 0d;
                     foreach (IMySensorBlock sensor in SENSORS) {
                         sensor.BackExtend = 0.1f;
                         sensor.BottomExtend = 0.1f;
@@ -991,7 +1002,7 @@ namespace IngameScript {
 
         void SetThrustersDrive(Vector3D direction, Vector3D myVelocity) {
             if (!Vector3D.IsZero(direction)) {
-                //direction = Vector3D.Normalize(direction);
+                thrustOverrideOnce = false;
                 Vector3D position = Vector3D.Zero;
                 if (!Vector3D.IsZero(rangeFinderPosition)) {
                     position = rangeFinderPosition;
@@ -1031,9 +1042,11 @@ namespace IngameScript {
                     }
                 }
             } else {
-                //TODO set once
-                foreach (IMyThrust thuster in THRUSTERS) {
-                    thuster.ThrustOverridePercentage = 0f;
+                if (!thrustOverrideOnce) {
+                    thrustOverrideOnce = true;
+                    foreach (IMyThrust thuster in THRUSTERS) {
+                        thuster.ThrustOverridePercentage = 0f;
+                    }
                 }
             }
         }
@@ -1170,8 +1183,12 @@ namespace IngameScript {
             if (altitude < 30d && Vector3D.IsZero(myVelocity)) {
                 CONTROLLER.DampenersOverride = true;
                 descend = false;
+                initDescend = false;
+                if (recoverMagneticDrive) {
+                    magneticDrive = true;
+                    recoverMagneticDrive = false;
+                }
                 foreach (IMyThrust block in THRUSTERS) { block.ThrustOverride = 0f; }
-                magneticDrive = true;
             }
         }
 
@@ -1285,9 +1302,10 @@ namespace IngameScript {
         }
 
         void RandomDrive(Vector3D myVelocity) {
-            if (randomCount >= 10) {//TODO increase delay?
-                randomDir = Vector3D.Zero;
-                if (magneticDrive) {
+            if (magneticDrive) {
+                if (randomCount >= 10) {
+                    randomDir = Vector3D.Zero;
+                    randomCount = 0;
                     float randomFloat;
                     randomFloat = (float)random.Next(-1, 2);
                     randomDir.X = randomFloat;
@@ -1298,26 +1316,21 @@ namespace IngameScript {
                     if (!Vector3D.IsZero(randomDir)) {
                         randomDir = Vector3D.TransformNormal(Vector3D.Normalize(randomDir), CONTROLLER.WorldMatrix);
                     }
+                }
+                randomCount++;
+            } else {
+                if (randomCount >= 50) {
+                    randomDir = Vector3D.Zero;
                     randomCount = 0;
-                } else {
-                    //TODO to test
                     double angle = random.NextDouble() * Math.PI * 2d;
                     Vector3D perpendicular = Vector3D.CalculatePerpendicularVector(myVelocity);
-                    MatrixD matrix = MatrixD.CreateFromDir(Vector3D.Normalize(myVelocity), Vector3D.Normalize(perpendicular));//normalize?
+                    MatrixD matrix = MatrixD.CreateFromDir(Vector3D.Normalize(myVelocity), Vector3D.Normalize(perpendicular));
                     matrix.Translation = CONTROLLER.CubeGrid.WorldVolume.Center;
                     randomDir = Math.Sin(angle) * matrix.Up + Math.Cos(angle) * matrix.Right;
                     randomDir = Vector3D.Normalize(randomDir);
-                    //randomDir = Math.Sin(angle) * CONTROLLER.WorldMatrix.Up + Math.Cos(angle) * CONTROLLER.WorldMatrix.Right;
-                    //randomDir *= 0.25d;
-
-                    //------------------------------------
-                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + myVelocity, Color.Red, thickness: 1f, onTop: true);
-                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + perpendicular, Color.Red, thickness: 1f, onTop: true);
-                    Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (randomDir * 500d), Color.Magenta, thickness: 1f, onTop: true);
-                    //------------------------------------
                 }
+                randomCount++;
             }
-            randomCount++;
         }
 
         void SensorDetection() {
@@ -1387,7 +1400,7 @@ namespace IngameScript {
             return dir;
         }
 
-        bool TurretsDetection() {
+        bool TurretsDetection() {//TODO
             bool targetFound = false;
             turretsDetectionDelay = Vector3D.IsZero(collisionDir) ? 5 : 1;
             if (turretsDetectionCount >= turretsDetectionDelay) {
@@ -1446,7 +1459,7 @@ namespace IngameScript {
             return targetFound;
         }
 
-        void ManageCollisions() {
+        void ManageCollisions() {//TODO
             if (!targFound) {
                 if (!targetInfo.IsEmpty() && targetInfo.HitPosition.HasValue) {
                     Vector3D targetVelocity = targetInfo.Velocity;
@@ -1467,7 +1480,7 @@ namespace IngameScript {
                 double distance = Vector3D.Distance(CONTROLLER.CubeGrid.WorldVolume.Center, targetPos);
                 double angle = AngleBetween(targetVelocity, Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - targetPos)) * rad2deg;
 
-                if (angle < (9000d / distance)) {//TODO not good
+                if (angle < (9000d / distance)) {//not good
 
                     Vector3D enemyDirectionPosition = targetPos + (targetVelocity * distance);
                     Vector3D escapeDirection = CONTROLLER.CubeGrid.WorldVolume.Center - enemyDirectionPosition;//toward my center
@@ -1517,7 +1530,7 @@ namespace IngameScript {
             Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.##}, safety:{4500d / distance:0.##}");
             //---------------------------------------------------------------------------
 
-            if (angle < (4500d / distance)) {//TODO not good
+            if (angle < (4500d / distance)) {//not good
 
                 //---------------------------------------------------------------------------
                 Debug.DrawPoint(targPos + (enemyForwardVec * distance), Color.Green, 4f, onTop: true);
@@ -1589,8 +1602,8 @@ namespace IngameScript {
             return Vector3D.TransformNormal(stopDistance, CONTROLLER.WorldMatrix);
         }
 
-        void RaycastStopPosition(double stopDistance, Vector3D myVelocity, double mySpeed) {
-            Vector3D normalizedVelocity = Vector3D.Normalize(myVelocity);
+        void RaycastStopPosition(double stopDistance, Vector3D stopDirection, Vector3D myVelocity) {
+            Vector3D normalizedVelocity = Vector3D.Normalize(stopDirection);
             Base6Directions.Direction direction = Base6Directions.GetClosestDirection(Vector3D.TransformNormal(normalizedVelocity, MatrixD.Transpose(CONTROLLER.WorldMatrix)));
             IMyCameraBlock lidar = null;
             switch (direction) {
@@ -1616,12 +1629,14 @@ namespace IngameScript {
                     break;
             }
 
-            stopDistance *= obstaclesCheckDelay * (mySpeed / 104.38d);//TODO not good
+            Vector3D scanPos = CONTROLLER.CubeGrid.WorldVolume.Center + (myVelocity * timeSinceLastRaycast);
+            double dist = Vector3D.Distance(scanPos, CONTROLLER.CubeGrid.WorldVolume.Center);
+            stopDistance += dist;
 
             //----------------------------------
             Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Blue, 5f, onTop: true);
             Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Cyan, thickness: 2f, onTop: true);
-            Debug.PrintHUD($"raycast stopDistance:{stopDistance / obstaclesCheckDelay:0.##}, multiplied:{stopDistance:0.##}");
+            Debug.PrintHUD($"raycast stopDistance:{stopDirection.Length():0.##}, multiplied:{stopDistance:0.##}");
             //----------------------------------
 
             MyDetectedEntityInfo entityInfo = lidar.Raycast(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance));
@@ -1709,22 +1724,29 @@ namespace IngameScript {
 
         void ManageWaypoints(bool isUnderControl, bool isTargetEmpty, Vector3D myVelocity) {
             if (targFound || !isTargetEmpty) {
-                //TODO do once
-                rangeFinderPosition = Vector3D.Zero;
-                landPosition = Vector3D.Zero;
-                descend = false;
-                aimTarget = false;
-                sunAlign = false;
-
-                if (REMOTE.IsAutoPilotEnabled) {
-                    REMOTE.SetAutoPilotEnabled(false);
-                    REMOTE.SetCollisionAvoidance(true);
-                }
-                if (returnOnce && Vector3D.IsZero(returnPosition) && !isUnderControl) {
-                    returnPosition = REMOTE.CubeGrid.WorldVolume.Center;
-                    returnOnce = false;
+                if (!targetFoundOnce) {
+                    targetFoundOnce = true;
+                    rangeFinderPosition = Vector3D.Zero;
+                    landPosition = Vector3D.Zero;
+                    descend = false;
+                    initDescend = false;
+                    aimTarget = false;
+                    sunAlign = false;
+                    if (recoverMagneticDrive) {
+                        magneticDrive = true;
+                        recoverMagneticDrive = false;
+                    }
+                    if (REMOTE.IsAutoPilotEnabled) {
+                        REMOTE.SetAutoPilotEnabled(false);
+                        REMOTE.SetCollisionAvoidance(true);
+                    }
+                    if (returnOnce && Vector3D.IsZero(returnPosition) && !isUnderControl) {
+                        returnPosition = REMOTE.CubeGrid.WorldVolume.Center;
+                        returnOnce = false;
+                    }
                 }
             } else {
+                targetFoundOnce = false;
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(returnPosition)) {
                     if (Vector3D.Distance(returnPosition, REMOTE.CubeGrid.WorldVolume.Center) < 50d) {
                         REMOTE.ClearWaypoints();
@@ -1761,6 +1783,7 @@ namespace IngameScript {
                         landPosition = Vector3D.Zero;
                         descend = true;
                         magneticDrive = false;
+                        recoverMagneticDrive = true;
                     }
                 }
                 if (REMOTE.IsAutoPilotEnabled && !Vector3D.IsZero(rangeFinderPosition)) {
