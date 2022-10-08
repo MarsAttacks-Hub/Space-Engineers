@@ -89,6 +89,7 @@ namespace IngameScript {
         bool updateOnce = true;
 
         MyDetectedEntityInfo targetInfo;
+        public List<MyDetectedEntityInfo> targetsInfo = new List<MyDetectedEntityInfo>();
         readonly Random random = new Random();
 
         const float globalTimestep = 10.0f / 60.0f;
@@ -190,7 +191,7 @@ namespace IngameScript {
 
                 if (!String.IsNullOrEmpty(arg)) { ProcessArgs(arg); }
 
-                bool targetFound = TurretsDetection(targetInfo.IsEmpty());
+                bool targetFound = TurretsDetection(targetInfo.IsEmpty());//TODO add delay
                 bool isTargetEmpty = targetInfo.IsEmpty();
 
                 if (!isTargetEmpty) {
@@ -356,6 +357,7 @@ namespace IngameScript {
 
         bool TurretsDetection(bool isTargetEmpty) {
             bool targetFound = false;
+            targetsInfo.Clear();
             if (!isTargetEmpty) {
                 foreach (IMyLargeTurretBase turret in TURRETS) {
                     MyDetectedEntityInfo targ = turret.GetTargetedEntity();
@@ -364,6 +366,10 @@ namespace IngameScript {
                             targetInfo = targ;
                             targetFound = true;
                             break;
+                        } else {
+                            if (IsValidLidarTarget(ref targ)) {
+                                targetsInfo.Add(targ);
+                            }
                         }
                     }
                 }
@@ -378,6 +384,9 @@ namespace IngameScript {
                         }
                     }
                 }
+            }
+            if (!targetFound) {
+                targetInfo = default(MyDetectedEntityInfo);
             }
             return targetFound;
         }
@@ -791,6 +800,15 @@ namespace IngameScript {
         void SendBroadcastTargetMessage(bool targFound, Vector3D targHitPos, Vector3D targVel, MatrixD targOrientation, Vector3D targPos, long targId) {
             MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long> tuple = MyTuple.Create(targFound, targHitPos, targVel, targOrientation, targPos, targId);
             IGC.SendBroadcastMessage("[NAVIGATOR]", tuple, TransmissionDistance.ConnectedConstructs);
+            if (targetsInfo.Count > 0) {
+                ImmutableArray<MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long>>.Builder immArray = ImmutableArray.CreateBuilder<MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long>>();
+                foreach (MyDetectedEntityInfo target in targetsInfo) {
+                    Vector3D vel = target.Velocity;
+                    MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> tup = MyTuple.Create(target.HitPosition.Value, vel, target.Orientation, target.Position, target.EntityId);
+                    immArray.Add(tup);
+                }
+                IGC.SendBroadcastMessage("[NAVIGATOR]", immArray.ToImmutable(), TransmissionDistance.ConnectedConstructs);
+            }
         }
 
         void SendBroadcastGunsMessage(int weaponType, bool assaultCanShoot, bool artilleryCanShoot, bool railgunsCanShoot, bool smallRailgunsCanShoot) {

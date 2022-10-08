@@ -29,7 +29,7 @@ namespace IngameScript {
         bool greenPowerOnce = true;
         bool hydrogenPowerOnce = true;
         bool fullSteamOnce = true;
-        bool isControlled = false;
+        //bool isControlled = false;
 
         string powerStatus;
         float terminalCurrentInput;
@@ -61,7 +61,7 @@ namespace IngameScript {
         public List<IMyPowerProducer> HENGINES = new List<IMyPowerProducer>();
         public List<IMyGasTank> HTANKS = new List<IMyGasTank>();
 
-        IMyBroadcastListener BROADCASTLISTENER;
+        //IMyBroadcastListener BROADCASTLISTENER;
 
         public StringBuilder oresLog = new StringBuilder("");
         public StringBuilder ingotsLog = new StringBuilder("");
@@ -73,7 +73,8 @@ namespace IngameScript {
         public StringBuilder powerLog = new StringBuilder("");
 
         Program() {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            //Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Setup();
         }
 
@@ -85,7 +86,7 @@ namespace IngameScript {
             GetBatteriesMaxOut();
             GetHydrogenEnginesMaxOutput();
             GetReactorsMaxOutput();
-            BROADCASTLISTENER = IGC.RegisterBroadcastListener("[POWERMANAGER]");
+            //BROADCASTLISTENER = IGC.RegisterBroadcastListener("[POWERMANAGER]");
             Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
         }
 
@@ -98,7 +99,7 @@ namespace IngameScript {
                     if (!togglePB) { CalcPower(); SendBroadcastMessage(); return; }
                 }
 
-                GetBroadcastMessages();
+                //GetBroadcastMessages();
 
                 CalcPower();
                 PowerFlow();
@@ -170,8 +171,9 @@ namespace IngameScript {
         }
 
         void PowerFlow() {
-            float shipInput;
-            if (!isControlled) { shipInput = terminalCurrentInput; } else { shipInput = terminalMaxRequiredInput; }
+            //float shipInput;
+            //if (!isControlled) { shipInput = terminalCurrentInput; } else { shipInput = terminalMaxRequiredInput; }
+            float shipInput = terminalCurrentInput;
             if (shipInput < (solarMaxOutput + turbineMaxOutput)) {
                 if (solarPowerOnce) {
                     greenPowerOnce = true;
@@ -180,10 +182,16 @@ namespace IngameScript {
                     powerStatus = "Solar Power";
                     foreach (IMyPowerProducer block in HENGINES) { block.Enabled = false; }
                     foreach (IMyReactor block in REACTORS) { block.Enabled = false; }
-                    foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Recharge; }
+                    IMyBatteryBlock battery = GetBatteryWithLowerCharge();
+                    if (battery != null) {
+                        foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                        battery.ChargeMode = ChargeMode.Recharge;
+                    } else {
+                        foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                    }
                     solarPowerOnce = false;
                 }
-            } else if (shipInput < (solarMaxOutput + turbineMaxOutput + battsMaxOutput)) {
+            } else if (shipInput < (solarMaxOutput + turbineMaxOutput + battsCurrentOutput)) {//TODO check battery stored power, battsMaxOutput or battsCurrentOutput ?
                 if (greenPowerOnce) {
                     solarPowerOnce = true;
                     hydrogenPowerOnce = true;
@@ -194,7 +202,7 @@ namespace IngameScript {
                     foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                     greenPowerOnce = false;
                 }
-            } else if (shipInput < (hEngMaxOutput + solarMaxOutput + turbineMaxOutput + battsMaxOutput) && tankCapacityPercent > 20d) {
+            } else if (shipInput < (hEngCurrentOutput + solarMaxOutput + turbineMaxOutput + battsCurrentOutput) && tankCapacityPercent > 20d) {//TODO check battery stored power, battsMaxOutput or battsCurrentOutput ? hEngCurrentOutput or hEngMaxOutput ?
                 if (hydrogenPowerOnce) {
                     greenPowerOnce = true;
                     solarPowerOnce = true;
@@ -217,6 +225,21 @@ namespace IngameScript {
                     fullSteamOnce = false;
                 }
             }
+        }
+
+        IMyBatteryBlock GetBatteryWithLowerCharge() {
+            IMyBatteryBlock battery = null;
+            float storedPower = 10000f;
+            foreach (IMyBatteryBlock block in BATTERIES) {
+                if (block.CurrentStoredPower == block.MaxStoredPower) {
+                    continue;
+                }
+                if (block.CurrentStoredPower < storedPower) {
+                    storedPower = block.CurrentStoredPower;
+                    battery = block;
+                }
+            }
+            return battery;
         }
 
         void CalcPower() {
@@ -312,7 +335,7 @@ namespace IngameScript {
             if (totFill > 0 && totCapacity > 0d) { tankCapacityPercent = (totFill / totCapacity) * 100d; }
         }
 
-        bool GetBroadcastMessages() {
+        /*bool GetBroadcastMessages() {
             bool received = false;
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
@@ -328,7 +351,7 @@ namespace IngameScript {
                 }
             }
             return received;
-        }
+        }*/
 
         void SendBroadcastMessage() {
             var tuple = MyTuple.Create(
