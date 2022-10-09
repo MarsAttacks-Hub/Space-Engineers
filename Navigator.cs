@@ -544,7 +544,7 @@ namespace IngameScript {
                     double maxStoredPower = 0d;
                     if (JUMPERS.Count != 0) {
                         maxJump = (int)JUMPERS[0].MaxJumpDistanceMeters;
-                        currentJump = (int)(JUMPERS[0].MaxJumpDistanceMeters / 100f * JUMPERS[0].JumpDistanceMeters);
+                        currentJump = (int)(JUMPERS[0].JumpDistanceMeters / JUMPERS[0].MaxJumpDistanceMeters * 100f);
                         foreach (IMyJumpDrive block in JUMPERS) {
                             MyJumpDriveStatus status = block.Status;
                             if (status == MyJumpDriveStatus.Charging) {
@@ -1965,7 +1965,7 @@ namespace IngameScript {
                     Vector3D perpendicularVec = orientation.GetDirectionVector(perpendicular);
                     dockOrientation = MatrixD.CreateFromDir(forwardVec, perpendicularVec);
                     dockOrientation.Translation = TARGET.HitPosition.Value;
-                    dockPosition = dockOrientation.Translation + dockOrientation.Forward * 250d;
+                    dockPosition = dockOrientation.Translation + (dockOrientation.Forward * 250d);
                 }
             }
         }

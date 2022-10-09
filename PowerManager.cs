@@ -24,12 +24,12 @@ namespace IngameScript {
         //POWER MANAGER
         bool togglePB = true;//enable/disable PB
         bool logger = true;//enable/disable logging
+        bool activeManagment = false;//enable/disable active power managment
 
         bool solarPowerOnce = true;
         bool greenPowerOnce = true;
         bool hydrogenPowerOnce = true;
         bool fullSteamOnce = true;
-        //bool isControlled = false;
 
         string powerStatus;
         float terminalCurrentInput;
@@ -51,9 +51,13 @@ namespace IngameScript {
         float turbineMaxOutput;
 
         double tankCapacityPercent;
+
         int sendCount = 0;
+        int electricsIndex = 0;
+        int blocksToScanPerRun = 0;
 
         public List<Electric> ELECTRICS = new List<Electric>();
+        public List<Electric> TEMPELECTRICS = new List<Electric>();
         public List<IMyBatteryBlock> BATTERIES = new List<IMyBatteryBlock>();
         public List<IMyReactor> REACTORS = new List<IMyReactor>();
         public List<IMySolarPanel> SOLARS = new List<IMySolarPanel>();
@@ -61,20 +65,12 @@ namespace IngameScript {
         public List<IMyPowerProducer> HENGINES = new List<IMyPowerProducer>();
         public List<IMyGasTank> HTANKS = new List<IMyGasTank>();
 
-        //IMyBroadcastListener BROADCASTLISTENER;
+        IMyTextPanel LCDACTIVEMANAGMENT;
 
-        public StringBuilder oresLog = new StringBuilder("");
-        public StringBuilder ingotsLog = new StringBuilder("");
-        public StringBuilder ammosLog = new StringBuilder("");
-        public StringBuilder componentsLog = new StringBuilder("");
-        public StringBuilder refineriesInputLog = new StringBuilder("");
-        public StringBuilder assemblersInputLog = new StringBuilder("");
-        public StringBuilder inventoriesPercentLog = new StringBuilder("");
-        public StringBuilder powerLog = new StringBuilder("");
+        IEnumerator<bool> stateMachine;
 
         Program() {
-            //Runtime.UpdateFrequency = UpdateFrequency.Update10;
-            Runtime.UpdateFrequency = UpdateFrequency.Update100;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
             Setup();
         }
 
@@ -86,30 +82,40 @@ namespace IngameScript {
             GetBatteriesMaxOut();
             GetHydrogenEnginesMaxOutput();
             GetReactorsMaxOutput();
-            //BROADCASTLISTENER = IGC.RegisterBroadcastListener("[POWERMANAGER]");
+            if (!activeManagment) { powerStatus = "Management Deactivated"; }
+            if (LCDACTIVEMANAGMENT != null) { LCDACTIVEMANAGMENT.BackgroundColor = activeManagment ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
+            blocksToScanPerRun = (int)Math.Ceiling(ELECTRICS.Count / 4d);
+            stateMachine = RunOverTime();
         }
 
-        public void Main(string argument) {
+        public void Main(string argument, UpdateType updateType) {
             try {
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(argument)) {
                     ProcessArgument(argument);
-                    if (!togglePB) { CalcPower(); SendBroadcastMessage(); return; }
-                }
-
-                //GetBroadcastMessages();
-
-                CalcPower();
-                PowerFlow();
-
-                if (logger) {
-                    if (sendCount >= 10) {
+                    if (!togglePB) {
+                        CalcPower();
                         SendBroadcastMessage();
-                        sendCount = 0;
+                        return;
                     }
-                    sendCount++;
+                } else {
+                    if (activeManagment) {
+                        CalcPower();
+                        PowerFlow();
+                        if (logger) {
+                            if (sendCount >= 10) {
+                                SendBroadcastMessage();
+                                sendCount = 0;
+                            }
+                            sendCount++;
+                        }
+                    } else {
+                        if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
+                            RunStateMachine();
+                        }
+                    }
                 }
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
@@ -167,14 +173,69 @@ namespace IngameScript {
                     CalcPower();
                     SendBroadcastMessage();
                     break;
+                case "ToggleActiveManagment":
+                    activeManagment = !activeManagment;
+                    if (!activeManagment) {
+                        powerStatus = "Management Deactivated";
+                        foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
+                        foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }
+                        foreach (IMyBatteryBlock block in BATTERIES) { block.Enabled = true; block.ChargeMode = ChargeMode.Auto; }
+                        if (LCDACTIVEMANAGMENT != null) { LCDACTIVEMANAGMENT.BackgroundColor = new Color(0, 0, 0); }
+                    } else {
+                        if (LCDACTIVEMANAGMENT != null) { LCDACTIVEMANAGMENT.BackgroundColor = new Color(25, 0, 100); }
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        public IEnumerator<bool> RunOverTime() {
+            GetBatteriesCurrentInOut();
+            yield return true;
+
+            GetSolarsCurrentOutput();
+            GetTurbinesCurrentOutput();
+            yield return true;
+
+            GetHydrogenEnginesCurrentOutput();
+            GetPercentTanksCapacity();
+            yield return true;
+
+            GetReactorsCurrentOutput();
+            yield return true;
+
+            while (!ScanElectrics()) {
+                yield return true;
+            }
+
+            powerStatus = "Management Deactivated";
+            IMyBatteryBlock battery = GetBatteryWithLowerCharge();
+            if (battery != null) {
+                foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+                battery.ChargeMode = ChargeMode.Recharge;
+            } else {
+                foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
+            }
+            SendBroadcastMessage();
+            yield return true;
+        }
+
+        public void RunStateMachine() {
+            if (stateMachine != null) {
+                bool hasMoreSteps = stateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
+                } else {
+                    stateMachine.Dispose();
+                    stateMachine = RunOverTime();//stateMachine = null;
+                }
             }
         }
 
         void PowerFlow() {
-            //float shipInput;
-            //if (!isControlled) { shipInput = terminalCurrentInput; } else { shipInput = terminalMaxRequiredInput; }
-            float shipInput = terminalCurrentInput;
-            if (shipInput < (solarMaxOutput + turbineMaxOutput)) {
+            float storedPow = battsCurrentStoredPower / battsMaxStoredPower * 100f;
+            if (terminalCurrentInput < (solarMaxOutput + turbineMaxOutput)) {
                 if (solarPowerOnce) {
                     greenPowerOnce = true;
                     hydrogenPowerOnce = true;
@@ -191,7 +252,7 @@ namespace IngameScript {
                     }
                     solarPowerOnce = false;
                 }
-            } else if (shipInput < (solarMaxOutput + turbineMaxOutput + battsCurrentOutput)) {//TODO check battery stored power, battsMaxOutput or battsCurrentOutput ?
+            } else if (terminalCurrentInput < (solarMaxOutput + turbineMaxOutput + battsMaxOutput) && storedPow > 5f) {
                 if (greenPowerOnce) {
                     solarPowerOnce = true;
                     hydrogenPowerOnce = true;
@@ -202,7 +263,7 @@ namespace IngameScript {
                     foreach (IMyBatteryBlock block in BATTERIES) { block.ChargeMode = ChargeMode.Auto; }
                     greenPowerOnce = false;
                 }
-            } else if (shipInput < (hEngCurrentOutput + solarMaxOutput + turbineMaxOutput + battsCurrentOutput) && tankCapacityPercent > 20d) {//TODO check battery stored power, battsMaxOutput or battsCurrentOutput ? hEngCurrentOutput or hEngMaxOutput ?
+            } else if (terminalCurrentInput < (hEngMaxOutput + solarMaxOutput + turbineMaxOutput + battsMaxOutput) && tankCapacityPercent > 20d && storedPow > 5f) {
                 if (hydrogenPowerOnce) {
                     greenPowerOnce = true;
                     solarPowerOnce = true;
@@ -225,6 +286,41 @@ namespace IngameScript {
                     fullSteamOnce = false;
                 }
             }
+        }
+
+        bool ScanElectrics() {
+            TEMPELECTRICS.Clear();
+            bool scanComplete;
+            if (electricsIndex >= ELECTRICS.Count - 1) {
+                electricsIndex = 0;
+                return true;
+            } else {
+                scanComplete = false;
+            }
+            if (electricsIndex == 0) {
+                terminalCurrentInput = 0f;
+                terminalMaxRequiredInput = 0f;
+            }
+            int count = 0;
+            for (int i = electricsIndex; i < ELECTRICS.Count; i++) {
+                if (i == ELECTRICS.Count - 1) {
+                    TEMPELECTRICS.Add(ELECTRICS[i]);
+                    electricsIndex = i + 1;
+                } else {
+                    if (count <= blocksToScanPerRun) {
+                        TEMPELECTRICS.Add(ELECTRICS[i]);
+                    } else {
+                        electricsIndex = i;
+                        break;
+                    }
+                }
+                count++;
+            }
+            foreach (Electric block in TEMPELECTRICS) {
+                terminalCurrentInput += block.GetCurrentInput();
+                terminalMaxRequiredInput += block.GetMaxInput();
+            }
+            return scanComplete;
         }
 
         IMyBatteryBlock GetBatteryWithLowerCharge() {
@@ -335,24 +431,6 @@ namespace IngameScript {
             if (totFill > 0 && totCapacity > 0d) { tankCapacityPercent = (totFill / totCapacity) * 100d; }
         }
 
-        /*bool GetBroadcastMessages() {
-            bool received = false;
-            if (BROADCASTLISTENER.HasPendingMessage) {
-                while (BROADCASTLISTENER.HasPendingMessage) {
-                    MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    if (igcMessage.Data is MyTuple<string, bool>) {
-                        MyTuple<string, bool> data = (MyTuple<string, bool>)igcMessage.Data;
-                        string variable = data.Item1;
-                        if (variable == "isControlled") {
-                            isControlled = data.Item2;
-                            received = true;
-                        }
-                    }
-                }
-            }
-            return received;
-        }*/
-
         void SendBroadcastMessage() {
             var tuple = MyTuple.Create(
                 MyTuple.Create(powerStatus, terminalCurrentInput, terminalMaxRequiredInput),
@@ -387,6 +465,7 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyPowerProducer>(HENGINES, block => block.CustomName.Contains("[CRX] HEngine"));
             HTANKS.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyGasTank>(HTANKS, block => block.CustomName.Contains("[CRX] HTank"));
+            LCDACTIVEMANAGMENT = GridTerminalSystem.GetBlockWithName("[CRX] LCD Toggle Active Power Managment") as IMyTextPanel;
         }
 
         public class Electric {

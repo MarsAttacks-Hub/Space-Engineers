@@ -20,7 +20,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        
+
         //SHOOTER
         int launchDelay = 25;
         int selectedDrop = 0;//0 decoys - 1 bombs
@@ -58,6 +58,9 @@ namespace IngameScript {
         public List<IMyShipMergeBlock> MERGES1 = new List<IMyShipMergeBlock>();
         public List<IMyShipMergeBlock> MERGES2 = new List<IMyShipMergeBlock>();
         public List<IMyShipMergeBlock> MERGES3 = new List<IMyShipMergeBlock>();
+        public List<IMySensorBlock> JOLTSENSORS = new List<IMySensorBlock>();
+
+        public List<MyDetectedEntityInfo> detectedEntities = new List<MyDetectedEntityInfo>();
 
         Program() {
             Setup();
@@ -65,6 +68,7 @@ namespace IngameScript {
 
         void Setup() {
             GetBlocks();
+            foreach (IMySensorBlock block in JOLTSENSORS) { block.Enabled = true; }
             if (selectedDrop == 0) {
                 TEMPPROJECTORS = PROJECTORSDECOY;
                 foreach (IMyProjector block in PROJECTORSDECOY) { block.Enabled = true; }
@@ -92,7 +96,13 @@ namespace IngameScript {
                 }
 
                 if (firing) {
-                    FireJolt();
+                    detectedEntities.Clear();
+                    foreach (IMySensorBlock block in JOLTSENSORS) {
+                        block.DetectedEntities(detectedEntities);
+                    }
+                    if (detectedEntities.Count == 0) {
+                        FireJolt();
+                    }
                 }
 
                 if (build1) {
@@ -357,6 +367,8 @@ namespace IngameScript {
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES2, block => block.CustomName.Contains("2 Jolt"));
             MERGES3.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyShipMergeBlock>(MERGES3, block => block.CustomName.Contains("3 Jolt"));
+            JOLTSENSORS.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMySensorBlock>(JOLTSENSORS, block => block.CustomName.Contains("[CRX] Sensor Jolt"));
         }
 
         void Build_1() {
@@ -420,7 +432,6 @@ namespace IngameScript {
             }
             buildTick++;
         }
-
 
     }
 }
