@@ -24,7 +24,7 @@ namespace IngameScript {
         //check speed and roll be4 detaching the decoy or launch the missile
         //PAINTER
         readonly int missilesCount = 2;
-        bool creative = true;//define if is playing creative mode or not
+        bool creative = true;//define if playing creative mode or not
         bool sequenceWeapons = false;//enable/disable guns sequencing
         bool autoFire = true;//enable/disable automatic fire
         bool autoMissiles = false;//enable/disable automatic missiles launch
