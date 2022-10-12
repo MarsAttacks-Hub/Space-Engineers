@@ -24,7 +24,7 @@ namespace IngameScript {
         //POWER MANAGER
         bool togglePB = true;//enable/disable PB
         bool logger = true;//enable/disable logging
-        bool activeManagment = false;//enable/disable active power managment
+        bool activeManagement = false;//enable/disable active power managment
 
         bool solarPowerOnce = true;
         bool greenPowerOnce = true;
@@ -82,8 +82,8 @@ namespace IngameScript {
             GetBatteriesMaxOut();
             GetHydrogenEnginesMaxOutput();
             GetReactorsMaxOutput();
-            if (!activeManagment) { powerStatus = "Management Deactivated"; }
-            if (LCDACTIVEMANAGMENT != null) { LCDACTIVEMANAGMENT.BackgroundColor = activeManagment ? new Color(25, 0, 100) : new Color(0, 0, 0); }
+            if (!activeManagement) { powerStatus = "Management Deactivated"; }
+            if (LCDACTIVEMANAGMENT != null) { LCDACTIVEMANAGMENT.BackgroundColor = activeManagement ? new Color(25, 0, 100) : new Color(0, 0, 0); }
             Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
             blocksToScanPerRun = (int)Math.Ceiling(ELECTRICS.Count / 4d);
             stateMachine = RunOverTime();
@@ -101,7 +101,7 @@ namespace IngameScript {
                         return;
                     }
                 } else {
-                    if (activeManagment) {
+                    if (activeManagement) {
                         CalcPower();
                         PowerFlow();
                         if (logger) {
@@ -174,8 +174,8 @@ namespace IngameScript {
                     SendBroadcastMessage();
                     break;
                 case "ToggleActiveManagment":
-                    activeManagment = !activeManagment;
-                    if (!activeManagment) {
+                    activeManagement = !activeManagement;
+                    if (!activeManagement) {
                         powerStatus = "Management Deactivated";
                         foreach (IMyReactor block in REACTORS) { block.Enabled = true; }
                         foreach (IMyPowerProducer block in HENGINES) { block.Enabled = true; }

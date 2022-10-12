@@ -20,8 +20,7 @@ using System.Collections.Immutable;
 
 namespace IngameScript {
     partial class Program : MyGridProgram {
-        //TODO
-        //check speed and roll be4 detaching the decoy or launch the missile
+
         //PAINTER
         readonly int missilesCount = 2;
         bool creative = true;//define if playing creative mode or not
@@ -39,7 +38,6 @@ namespace IngameScript {
         int railgunsDelay = 1;
         int smallRailgunsDelay = 1;
         int selectedMissile = 1;
-        int autoMissilesCounter = 0;
         int checkGunsCount = 0;
         int missedScan = 0;
         int rocketCount = 0;
@@ -74,6 +72,7 @@ namespace IngameScript {
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
         bool smallRailgunsCanShoot = true;
+        bool initLaunch = false;
         bool decoyRanOnce = false;
         bool activateOnce = false;
         bool gatlingsOnce = false;
@@ -158,8 +157,6 @@ namespace IngameScript {
             BROADCASTLISTENER = IGC.RegisterBroadcastListener("[PAINTER]");
             GetBlocks();
             SetBlocks();
-            GetMissileAntennas();
-            SetMissileAntennas();
             InitPIDControllers();
             if (selectedPayLoad == 0) {
                 TEMPPROJECTORS = PROJECTORSMISSILES;
@@ -170,7 +167,6 @@ namespace IngameScript {
                 foreach (IMyProjector block in PROJECTORSDRONES) { block.Enabled = true; }
                 foreach (IMyProjector block in PROJECTORSMISSILES) { block.Enabled = false; }
             }
-            autoMissilesCounter = 9 + 1;
             SetGunsDelay();
             if (LCDAUTOSWITCHGUNS != null) { LCDAUTOSWITCHGUNS.BackgroundColor = autoSwitchGuns ? new Color(0, 0, 50) : new Color(0, 0, 0); }
             if (LCDAUTOFIRE != null) { LCDAUTOFIRE.BackgroundColor = autoFire ? new Color(0, 0, 50) : new Color(0, 0, 0); }
@@ -222,14 +218,6 @@ namespace IngameScript {
                         SendMissileUnicastMessage("Update", id.Key, targetInfo.HitPosition.Value, targetVelocity);
                     }
 
-                    if (autoMissiles) {
-                        if (autoMissilesCounter > 9) {
-                            LaunchMissile();
-                            autoMissilesCounter = 0;
-                        }
-                        autoMissilesCounter++;
-                    }
-
                     CanShootGuns();
 
                     if (checkGunsCount >= 10) {
@@ -240,6 +228,10 @@ namespace IngameScript {
 
                     ManageGuns(timeSinceLastRun, targetInfo.Position);
 
+                    if (initLaunch || autoMissiles) {
+                        LaunchMissile();
+                    }
+
                     if (targetFound) {
                         timeSinceLastLock = 0;
                         missedScan = 0;
@@ -247,20 +239,18 @@ namespace IngameScript {
                         timeSinceLastLock += timeSinceLastRun;
                         missedScan++;
                     }
+                } else {
+                    //TODO launch drone to put in formation
+                    if (activateOnce) {
+                        initLaunch = false;
+                        missilesLoaded = false;
+                        activateOnce = false;
+                    }
                 }
 
                 ManagePIDControllers(isTargetEmpty);
 
                 SyncGuns(timeSinceLastRun);
-
-                bool completed = CheckProjectors();
-                if (!completed) {
-                    missilesLoaded = false;
-                } else {
-                    if (!missilesLoaded) {
-                        missilesLoaded = LoadMissiles();
-                    }
-                }
 
                 if (logger) {
                     if (sendMessageCount >= 10) {
@@ -283,11 +273,11 @@ namespace IngameScript {
             switch (arg) {
                 case "Lock": AcquireTarget(globalTimestep, Vector3D.Zero, Vector3D.Zero, Vector3D.Zero); break;
                 case "Launch":
-                    LaunchMissile();
+                    initLaunch = true;
                     break;
                 case "Clear":
                     ResetTargeter();
-                    return;
+                    return;//TODO
                 //break;
                 case "SwitchGun":
                     weaponType++;
@@ -296,11 +286,13 @@ namespace IngameScript {
                     }
                     break;
                 case "SwitchPayLoad":
-                    int blockCount = 0;
+                    int buildable = 0;
+                    int remaining = 0;
                     foreach (IMyProjector proj in TEMPPROJECTORS) {
-                        blockCount += proj.BuildableBlocksCount;//RemainingBlocks;
+                        buildable += proj.BuildableBlocksCount;
+                        remaining += proj.RemainingBlocks;
                     }
-                    if (blockCount == 0) {
+                    if (buildable == remaining) {
                         if (selectedPayLoad == 1) {
                             selectedPayLoad = 0;
                             TEMPPROJECTORS = PROJECTORSMISSILES;
@@ -351,6 +343,8 @@ namespace IngameScript {
                     break;
                 case "LoggerOff":
                     logger = false;
+                    break;
+                default:
                     break;
             }
         }
@@ -700,27 +694,27 @@ namespace IngameScript {
             }
         }
 
-        void LaunchMissile() {
-            if (missilesLoaded && !targetInfo.IsEmpty()) {
+        void LaunchMissile() {//TODO check angular and linear velocity b4 to launch?
+            if (missilesLoaded) {
+                GetMissileAntennas(selectedMissile);
                 foreach (IMyRadioAntenna block in MISSILEANTENNAS) {
-                    string antennaName = "A [M]" + selectedMissile.ToString();
-                    if (block.CustomName.Equals(antennaName)) {
-                        block.Enabled = true;
-                        block.EnableBroadcasting = true;
-                    }
+                    block.Enabled = true;
+                    block.EnableBroadcasting = true;
                 }
                 selectedMissile++;
-                if (selectedMissile > missilesCount + 1) {
-                    GetMissileAntennas();
-                    SetMissileAntennas();
+                if (selectedMissile > missilesCount) {// + 1
                     selectedMissile = 1;
                 }
                 SendMissileBroadcastMessage("Launch", targetInfo.HitPosition.Value, targetInfo.Velocity);
-            }
-            foreach (KeyValuePair<long, string> id in MissileIDs) {
-                if (!targetInfo.IsEmpty()) {
-                    if (id.Value.Contains("Lost")) {
-                        SendMissileUnicastMessage("Update", id.Key, targetInfo.HitPosition.Value, targetInfo.Velocity);
+                initLaunch = false;
+                missilesLoaded = false;
+            } else {
+                bool completed = CheckProjectors();
+                if (!completed) {
+                    missilesLoaded = false;
+                } else {
+                    if (!missilesLoaded) {
+                        missilesLoaded = LoadMissiles();
                     }
                 }
             }
@@ -896,8 +890,7 @@ namespace IngameScript {
             ResetGuns();
             targetInfo = default(MyDetectedEntityInfo);
             selectedMissile = 1;
-            activateOnce = false;
-            autoMissilesCounter = 9 + 1;
+            //activateOnce = false;//TODO
             missilesLoaded = false;
             fudgeFactor = 5d;
             scanFudge = false;
@@ -956,8 +949,8 @@ namespace IngameScript {
             bool completed = false;
             int blocksCount = 1000;
             foreach (IMyProjector block in TEMPPROJECTORS) {
-                if (block.CustomName.Contains(selection)) {
-                    blocksCount = block.BuildableBlocksCount;//RemainingBlocks;
+                if (block.CustomName.Contains(selection)) {//TODO not good
+                    blocksCount = block.RemainingBlocks;
                 }
             }
             if (blocksCount == 0) {
@@ -1023,13 +1016,13 @@ namespace IngameScript {
             return itemFound;
         }
 
-        void ManageGuns(double timeSinceLastRun, Vector3D trgtPos) {
+        void ManageGuns(double timeSinceLastRun, Vector3D trgtPos) {//TODO rockets never fire, jolt never fire above 2000
             if (autoFire) {
                 double distanceFromTarget = Vector3D.Distance(trgtPos, CONTROLLER.CubeGrid.WorldVolume.Center);
                 if (autoSwitchGuns) {
                     if (distanceFromTarget <= 2000d) {
                         maxRangeOnce = true;
-                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                        if (!decoyRanOnce && distanceFromTarget < 800d) {//TODO check angular and linear velocity be4 to launch
                             decoyRanOnce = SHOOTERPB.TryRun("LaunchDecoy");
                         }
                         if (weaponType != 2 && weaponType != 3 && (gatlingsOnce || autocannonOnce)) {
@@ -1166,13 +1159,13 @@ namespace IngameScript {
                             return;
                         }
                     }
-                    if (readyToFire && joltReady && weaponType == 0) {
+                    if (readyToFire && joltReady && weaponType == 0) {//TODO
                         SHOOTERPB.TryRun("FireJolt");
                     }
                 } else {
                     if (distanceFromTarget < 2000d) {
                         maxRangeOnce = true;
-                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                        if (!decoyRanOnce && distanceFromTarget < 800d) {//TODO check angular and linear velocity be4 to launch
                             decoyRanOnce = SHOOTERPB.TryRun("LaunchDecoy");
                         }
                         if (readyToFire) {
@@ -1321,28 +1314,28 @@ namespace IngameScript {
 
         void SetGunsDelay() {
             if (ROCKETS.Count > 0) {
-                rocketDelay = (int)Math.Ceiling(0.583 / (double)ROCKETS.Count);
+                rocketDelay = (int)Math.Ceiling(0.583d / (double)ROCKETS.Count);
                 if (rocketDelay == 0) { rocketDelay = 1; }
             }
             if (ASSAULT.Count > 0) {
-                assaultDelay = (int)Math.Ceiling(0.33 / (double)ASSAULT.Count);
+                assaultDelay = (int)Math.Ceiling(0.33d / (double)ASSAULT.Count);
                 if (assaultDelay == 0) { assaultDelay = 1; }
             }
             if (ARTILLERY.Count > 0) {
-                artilleryDelay = (int)Math.Ceiling(0.83 / (double)ARTILLERY.Count);
+                artilleryDelay = (int)Math.Ceiling(0.83d / (double)ARTILLERY.Count);
                 if (artilleryDelay == 0) { artilleryDelay = 1; }
             }
             if (RAILGUNS.Count > 0) {
-                railgunsDelay = (int)Math.Ceiling(3.083 / (double)RAILGUNS.Count);
+                railgunsDelay = (int)Math.Ceiling(3.083d / (double)RAILGUNS.Count);
                 if (railgunsDelay == 0) { railgunsDelay = 1; }
             }
             if (SMALLRAILGUNS.Count > 0) {
-                smallRailgunsDelay = (int)Math.Ceiling(3.083 / (double)SMALLRAILGUNS.Count);
+                smallRailgunsDelay = (int)Math.Ceiling(3.083d / (double)SMALLRAILGUNS.Count);
                 if (smallRailgunsDelay == 0) { smallRailgunsDelay = 1; }
             }
         }
 
-        bool LoadMissiles() {
+        bool LoadMissiles() {//TODO long range drone
             List<IMyShipConnector> MISSILECONNECTORS = new List<IMyShipConnector>();
             GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(MISSILECONNECTORS, b => b.CustomName.Contains("[M]"));
             if (MISSILECONNECTORS.Count == 0) { return false; }
@@ -1520,28 +1513,19 @@ namespace IngameScript {
             ANTENNA.EnableBroadcasting = true;
         }
 
-        void GetMissileAntennas() {
+        void GetMissileAntennas(int selected) {
             MISSILEANTENNAS.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyRadioAntenna>(MISSILEANTENNAS, b => b.CustomName.Contains("A [M]"));
-        }
-
-        void SetMissileAntennas() {
-            foreach (IMyRadioAntenna block in MISSILEANTENNAS) {
-                block.EnableBroadcasting = false;
-                block.Enabled = false;
-            }
+            GridTerminalSystem.GetBlocksOfType<IMyRadioAntenna>(MISSILEANTENNAS, b => b.CustomName.Contains("A [M]" + selected));
         }
 
         public static Vector3D SafeNormalize(Vector3D a) {
-            if (Vector3D.IsZero(a)) { return Vector3D.Zero; }
-            if (Vector3D.IsUnit(ref a)) { return a; }
-            return Vector3D.Normalize(a);
+            return Vector3D.IsZero(a) ? Vector3D.Zero : Vector3D.IsUnit(ref a) ? a : Vector3D.Normalize(a);
         }
 
         public static double AngleBetween(Vector3D a, Vector3D b) {//returns radians
-            if (Vector3D.IsZero(a) || Vector3D.IsZero(b)) {
-                return 0;
-            } else { return Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1)); }
+            return Vector3D.IsZero(a) || Vector3D.IsZero(b)
+                ? 0
+                : Math.Acos(MathHelper.Clamp(a.Dot(b) / Math.Sqrt(a.LengthSquared() * b.LengthSquared()), -1, 1));
         }
 
         void InitPIDControllers() {
@@ -1552,132 +1536,129 @@ namespace IngameScript {
 
         void ManagePIDControllers(bool isTargetEmpty) {
             if (!isTargetEmpty) {
-                if (updateOnce) {
-                    UpdatePIDControllers(5d, 0d, 5d, 5d, 0d, 5d, 1d, 0d, 1d);
-                    updateOnce = false;
-                }
+                Vector3D toTarget = Vector3D.Normalize(targetInfo.Position - CONTROLLER.WorldVolume.Center);
+                double angle = AngleBetween(CONTROLLER.WorldMatrix.Forward, toTarget) * rad2deg;//use dot?
+                angle = MathHelper.Clamp(angle, 0d, 10d);
+                UpdatePIDControllers(angle);
+                updateOnce = false;
             } else {
                 if (!updateOnce) {
-                    UpdatePIDControllers(1d, 0d, 1d, 1d, 0d, 1d, 1d, 0d, 1d);
+                    UpdatePIDControllers(1d);
                     updateOnce = true;
                 }
             }
         }
 
-        void UpdatePIDControllers(double yawAimP, double yawAimI, double yawAimD, double pitchAimP, double pitchAimI, double pitchAimD, double rollAimP, double rollAimI, double rollAimD) {
-            yawController.Update(yawAimP, yawAimI, yawAimD);
-            pitchController.Update(pitchAimP, pitchAimI, pitchAimD);
-            rollController.Update(rollAimP, rollAimI, rollAimD);
+        void UpdatePIDControllers(double aim) {
+            yawController.KP = aim;
+            yawController.KD = aim;
+            pitchController.KP = aim;
+            pitchController.KD = aim;
+            rollController.KP = aim;
+            rollController.KD = aim;
         }
 
         public class PID {
-            double _kP = 0;
-            double _kI = 0;
-            double _kD = 0;
+            public double KP { get; set; }
+            public double KI { get; set; }
+            public double KD { get; set; }
 
-            double _timeStep = 0;
-            double _inverseTimeStep = 0;
-            double _errorSum = 0;
-            double _lastError = 0;
-            bool _firstRun = true;
+            double timeStep = 0;
+            double inverseTimeStep = 0;
+            double errorSum = 0;
+            double lastError = 0;
+            bool firstRun = true;
 
             public double Value { get; private set; }
 
-            public PID(double kP, double kI, double kD, double timeStep) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
+            public PID(double _kP, double _kI, double _kD, double _timeStep) {
+                KP = _kP;
+                KI = _kI;
+                KD = _kD;
+                timeStep = _timeStep;
+                inverseTimeStep = 1 / timeStep;
             }
 
             protected virtual double GetIntegral(double currentError, double errorSum, double timeStep) {
-                return errorSum + currentError * timeStep;
+                return errorSum + (currentError * timeStep);
             }
 
-            public void Update(double kP, double kI, double kD) {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _firstRun = true;
+            public void Update(double _kP, double _kI, double _kD) {
+                KP = _kP;
+                KI = _kI;
+                KD = _kD;
+                Reset();
             }
 
             public double Control(double error) {
-                //Compute derivative term
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;
-
-                if (_firstRun) {
+                double errorDerivative = (error - lastError) * inverseTimeStep;//Compute derivative term
+                if (firstRun) {
                     errorDerivative = 0;
-                    _firstRun = false;
+                    firstRun = false;
                 }
-
-                //Get error sum
-                _errorSum = GetIntegral(error, _errorSum, _timeStep);
-
-                //Store this error as last error
-                _lastError = error;
-
-                //Construct output
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
-                return this.Value;
+                errorSum = GetIntegral(error, errorSum, timeStep);//Get error sum
+                lastError = error;//Store this error as last error
+                Value = (KP * error) + (KI * errorSum) + (KD * errorDerivative);//Construct output
+                return Value;
             }
 
-            public double Control(double error, double timeStep) {
-                if (timeStep != _timeStep) {
-                    _timeStep = timeStep;
-                    _inverseTimeStep = 1 / _timeStep;
+            public double Control(double error, double _timeStep) {
+                if (_timeStep != timeStep) {
+                    timeStep = _timeStep;
+                    inverseTimeStep = 1 / timeStep;
                 }
                 return Control(error);
             }
 
             public void Reset() {
-                _errorSum = 0;
-                _lastError = 0;
-                _firstRun = true;
+                errorSum = 0;
+                lastError = 0;
+                firstRun = true;
             }
         }
 
         public class DecayingIntegralPID : PID {
-            readonly double _decayRatio;
+            readonly double decayRatio;
 
-            public DecayingIntegralPID(double kP, double kI, double kD, double timeStep, double decayRatio) : base(kP, kI, kD, timeStep) {
-                _decayRatio = decayRatio;
+            public DecayingIntegralPID(double kP, double kI, double kD, double timeStep, double _decayRatio) : base(kP, kI, kD, timeStep) {
+                decayRatio = _decayRatio;
             }
 
             protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
                 //return errorSum = errorSum * (1.0 - _decayRatio) + currentError * timeStep;
-                return errorSum * (1.0 - _decayRatio) + currentError * timeStep;
+                return (errorSum * (1.0 - decayRatio)) + (currentError * timeStep);
             }
         }
 
         public class ClampedIntegralPID : PID {
-            readonly double _upperBound;
-            readonly double _lowerBound;
+            readonly double upperBound;
+            readonly double lowerBound;
 
-            public ClampedIntegralPID(double kP, double kI, double kD, double timeStep, double lowerBound, double upperBound) : base(kP, kI, kD, timeStep) {
-                _upperBound = upperBound;
-                _lowerBound = lowerBound;
+            public ClampedIntegralPID(double kP, double kI, double kD, double timeStep, double _lowerBound, double _upperBound) : base(kP, kI, kD, timeStep) {
+                upperBound = _upperBound;
+                lowerBound = _lowerBound;
             }
 
             protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
                 errorSum += currentError * timeStep;
-                return Math.Min(_upperBound, Math.Max(errorSum, _lowerBound));
+                return Math.Min(upperBound, Math.Max(errorSum, lowerBound));
             }
         }
 
         public class BufferedIntegralPID : PID {
-            readonly Queue<double> _integralBuffer = new Queue<double>();
-            readonly int _bufferSize = 0;
+            readonly Queue<double> integralBuffer = new Queue<double>();
+            readonly int bufferSize = 0;
 
-            public BufferedIntegralPID(double kP, double kI, double kD, double timeStep, int bufferSize) : base(kP, kI, kD, timeStep) {
-                _bufferSize = bufferSize;
+            public BufferedIntegralPID(double kP, double kI, double kD, double timeStep, int _bufferSize) : base(kP, kI, kD, timeStep) {
+                bufferSize = _bufferSize;
             }
 
             protected override double GetIntegral(double currentError, double errorSum, double timeStep) {
-                if (_integralBuffer.Count == _bufferSize)
-                    _integralBuffer.Dequeue();
-                _integralBuffer.Enqueue(currentError * timeStep);
-                return _integralBuffer.Sum();
+                if (integralBuffer.Count == bufferSize) {
+                    integralBuffer.Dequeue();
+                }
+                integralBuffer.Enqueue(currentError * timeStep);
+                return integralBuffer.Sum();
             }
         }
 

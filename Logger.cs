@@ -94,7 +94,6 @@ namespace IngameScript {
         bool useGyrosToStabilize = false;
         bool autoCombat = false;
         bool obstaclesAvoidance = false;
-        bool collisionDetection = false;
         bool enemyEvasion = false;
         bool keepAltitude = false;
         bool moddedSensor = false;
@@ -120,7 +119,7 @@ namespace IngameScript {
         public IMyBroadcastListener BROADCASTLISTENER;
         IEnumerator<bool> stateMachine;
 
-        public List<MySprite> sprites = new List<MySprite>();
+        public List<MySprite> sprites = new List<MySprite>();//TODO remove this list and use frame's inner list
 
         public StringBuilder data = new StringBuilder("");
         public StringBuilder data2 = new StringBuilder("");
@@ -384,7 +383,7 @@ namespace IngameScript {
                         MyTuple<string, int, int, double, double, double>,
                         MyTuple<Vector3D, string, double, double>,
                         MyTuple<bool, bool, bool, bool, bool, bool>,
-                        MyTuple<bool, bool, bool, bool, bool, bool>
+                        MyTuple<bool, bool, bool, bool, bool>
                     >)igcMessage.Data;
 
                     timeRemaining = data.Item1.Item1;
@@ -407,11 +406,10 @@ namespace IngameScript {
                     autoCombat = data.Item3.Item6;
 
                     obstaclesAvoidance = data.Item4.Item1;
-                    collisionDetection = data.Item4.Item2;
-                    enemyEvasion = data.Item4.Item3;
-                    keepAltitude = data.Item4.Item4;
-                    moddedSensor = data.Item4.Item5;
-                    closeRangeCombat = data.Item4.Item6;
+                    enemyEvasion = data.Item4.Item2;
+                    keepAltitude = data.Item4.Item3;
+                    moddedSensor = data.Item4.Item4;
+                    closeRangeCombat = data.Item4.Item5;
 
                     navigator = true;
                 }
@@ -1168,11 +1166,7 @@ namespace IngameScript {
             } else {
                 data2.Append("Evasion\n"); data.Append("\n");
             }
-            if (collisionDetection) {
-                data.Append("Collision\n"); data2.Append("\n");
-            } else {
-                data2.Append("Collision\n"); data.Append("\n");
-            }
+            //TODO
             if (obstaclesAvoidance) {
                 data.Append("Obstacles\n"); data2.Append("\n");
             } else {
@@ -1295,7 +1289,7 @@ namespace IngameScript {
             string pictureId;
             commercialsDict.TryGetValue(randomId, out pictureId);
 
-            sprites.Add(DrawSpritePicture(new Vector2(myPanel.viewport.Center.X - myPanel.viewport.Width / 2, myPanel.viewport.Y + myPanel.viewport.Center.Y), pictureId, "Default", myPanel.minScale));
+            sprites.Add(DrawSpritePicture(new Vector2(myPanel.viewport.Center.X - myPanel.viewport.Width / 2, myPanel.viewport.Y + myPanel.viewport.Center.Y), pictureId, "Default"));
 
             MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             foreach (var sprite in sprites) {
@@ -1317,7 +1311,7 @@ namespace IngameScript {
             };
         }
 
-        MySprite DrawSpritePicture(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
+        MySprite DrawSpritePicture(Vector2 pos, string data, string font, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
             return new MySprite() {
                 Type = SpriteType.TEXTURE,
                 Data = data,
