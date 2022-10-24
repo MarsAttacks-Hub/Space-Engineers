@@ -876,9 +876,6 @@ namespace IngameScript {
                             initPositionalDriveOnce = false;
                         }
 
-                        RaycastDockPosition(dockOrientation.Translation, dockVelocity, Runtime.TimeSinceLastRun.TotalSeconds);
-                        dockPosition = dockOrientation.Translation + (dockOrientation.Forward * 250d);
-
                         Vector3D pos = dockPosition + (Vector3D.Normalize(DOCKCONNECTOR.GetPosition() - dockPosition) * stopDistance);
                         dir = Vector3D.Normalize(pos - DOCKCONNECTOR.GetPosition());//world normal
                         dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
@@ -901,9 +898,6 @@ namespace IngameScript {
                             }
                         }
                     } else if (!Vector3D.IsZero(dockHitPosition)) {
-                        RaycastDockPosition(dockOrientation.Translation, dockVelocity, Runtime.TimeSinceLastRun.TotalSeconds);
-                        dockHitPosition = dockOrientation.Translation;
-
                         double pitchAngle, rollAngle, yawAngle;
                         GetRotationAnglesSimultaneous(dockOrientation.Up, dockOrientation.Forward, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
                         double yawSpeed = yawController.Control(yawAngle);
@@ -1604,28 +1598,6 @@ namespace IngameScript {
                 }
                 if (!Vector3D.IsZero(stopDir)) {
                     stopDir = Vector3D.TransformNormal(Vector3D.Normalize(stopDir), CONTROLLER.WorldMatrix);
-                }
-            }
-        }
-
-        void RaycastDockPosition(Vector3D dockHitPos, Vector3D dockVel, double timeSinceLastRun) {
-            dockHitPos += dockVel * (float)timeSinceLastRun;
-            Vector3D toTarget = Vector3D.Normalize(dockHitPos - CONTROLLER.CubeGrid.WorldVolume.Center);
-            IMyCameraBlock lidar = GetLidarByDirection(toTarget);
-            MyDetectedEntityInfo TARGET = lidar.Raycast(dockHitPos + (toTarget * 1d));//TODO
-            if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
-                if (TARGET.Type == MyDetectedEntityType.LargeGrid || TARGET.Type == MyDetectedEntityType.SmallGrid) {
-                    MatrixD orientation = TARGET.Orientation;
-                    Base6Directions.Direction closeDirection = CONTROLLER.WorldMatrix.GetClosestDirection(Vector3D.Normalize(TARGET.HitPosition.Value - CONTROLLER.CubeGrid.WorldVolume.Center));
-                    closeDirection = Base6Directions.GetFlippedDirection(closeDirection);
-                    Vector3D flippedDirection = CONTROLLER.WorldMatrix.GetDirectionVector(closeDirection);
-                    Base6Directions.Direction forward = orientation.GetClosestDirection(flippedDirection);//CONTROLLER.WorldMatrix.Backward
-                    Base6Directions.Direction perpendicular = Base6Directions.GetPerpendicular(forward);
-                    Vector3D forwardVec = orientation.GetDirectionVector(forward);
-                    Vector3D perpendicularVec = orientation.GetDirectionVector(perpendicular);
-                    dockOrientation = MatrixD.CreateFromDir(forwardVec, perpendicularVec);
-                    dockOrientation.Translation = TARGET.HitPosition.Value;
-                    dockVelocity = TARGET.Velocity;
                 }
             }
         }
