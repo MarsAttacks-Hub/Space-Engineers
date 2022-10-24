@@ -22,7 +22,6 @@ using System.Collections.Immutable;
 namespace IngameScript {
     partial class Program : MyGridProgram {
 
-        //TODO Follow() remove collisionDetection
         //NAVIGATOR
         //----------------------------------
         DebugAPI Debug;
@@ -43,6 +42,7 @@ namespace IngameScript {
 
         bool aimTarget = false;
         bool targFound = false;
+        bool follow = false;
         bool assaultCanShoot = true;
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
@@ -66,6 +66,7 @@ namespace IngameScript {
         bool safetyDampenersOnce = false;
         bool thrustOverrideOnce = true;
         bool targetFoundOnce = false;
+        bool initFollowOnce = true;
         string selectedPlanet = "";
         string rangeFinderName = "";
         double altitudeToKeep = 0d;
@@ -74,6 +75,7 @@ namespace IngameScript {
         double rangeFinderDiameter = 0d;
         double rangeFinderDistance = 0d;
         double timeSinceLastRaycast = 0d;
+        double distanceToKeep = 0d;
         float prevSunPower = 0f;
         int planetSelector = 0;
         int sunAlignmentStep = 0;
@@ -492,14 +494,14 @@ namespace IngameScript {
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long>) {
-                        MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long> data = (MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long>)igcMessage.Data;
+                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool>) {//TODO
+                        MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool> data = (MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool>)igcMessage.Data;
                         targFound = data.Item1;
                         targHitPos = data.Item2;
                         targVelVec = data.Item3;
                         targOrientation = data.Item4;
                         targPosition = data.Item5;
-                        //targId = data.Item6;
+                        follow = data.Item6;
                         received = true;
                     }
                     if (igcMessage.Data is MyTuple<int, bool, bool, bool, bool>) {
@@ -700,32 +702,47 @@ namespace IngameScript {
                     foreach (IMyThrust thrust in THRUSTERS) { thrust.Enabled = true; }
                     initAutoMagneticDriveOnce = true;
                 }
-                if (autoCombat && !isUnderControl && targFound) {
-                    initRandomMagneticDriveOnce = false;
-                    RandomDrive(myVelocity);//world normal
-                    dir = randomDir;
-                    Vector3D dirEsc = Vector3D.Zero;
-                    foreach (MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> target in targetsInfo) {//HitPosition, Velocity, Orientation, Position, EntityId
-                        Vector3D escapeDir = Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - target.Item4);//world normal
-                        dirEsc = SetResultVector(dirEsc, escapeDir);
+                if (follow) {
+                    if (initFollowOnce) {
+                        distanceToKeep = Vector3D.Distance(targPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                        initFollowOnce = false;
                     }
-                    dir = !Vector3D.IsZero(dirEsc) ? dirEsc : dir;
-
-                    Vector3D dirDist = KeepRightDistance(targPosition);//world normal
-                    dir = !Vector3D.IsZero(dirDist) ? dirDist : dir;
+                    dir = KeepSameDistance(targPosition, distanceToKeep);//world normal
 
                     Vector3D dirMinAlt = KeepMinAltitude(gravity);//world normal
                     dir = !Vector3D.IsZero(dirMinAlt) ? dirMinAlt : dir;
                 } else {
-                    if (!initRandomMagneticDriveOnce) {
-                        randomDir = Vector3D.Zero;
-                        initRandomMagneticDriveOnce = true;
+                    if (!initFollowOnce) {
+                        distanceToKeep = 0d;
+                        initFollowOnce = true;
                     }
-                    dir = MagneticDrive();//world normal
-                    dir = MagneticDampeners(dir, myVelocity, gravity);//world normal
+                    if (autoCombat && !isUnderControl && targFound) {
+                        initRandomMagneticDriveOnce = false;
+                        RandomDrive(myVelocity);//world normal
+                        dir = randomDir;
+                        Vector3D dirEsc = Vector3D.Zero;
+                        foreach (MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> target in targetsInfo) {//HitPosition, Velocity, Orientation, Position, EntityId
+                            Vector3D escapeDir = Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - target.Item4);//world normal
+                            dirEsc = SetResultVector(dirEsc, escapeDir);
+                        }
+                        dir = !Vector3D.IsZero(dirEsc) ? dirEsc : dir;
 
-                    Vector3D dirAlt = KeepAltitude(isUnderControl, keepAltitude, gravity);//world normal
-                    dir = !Vector3D.IsZero(dirAlt) ? dirAlt : dir;
+                        Vector3D dirDist = KeepRightDistance(targPosition);//world normal
+                        dir = !Vector3D.IsZero(dirDist) ? dirDist : dir;
+
+                        Vector3D dirMinAlt = KeepMinAltitude(gravity);//world normal
+                        dir = !Vector3D.IsZero(dirMinAlt) ? dirMinAlt : dir;
+                    } else {
+                        if (!initRandomMagneticDriveOnce) {
+                            randomDir = Vector3D.Zero;
+                            initRandomMagneticDriveOnce = true;
+                        }
+                        dir = MagneticDrive();//world normal
+                        dir = MagneticDampeners(dir, myVelocity, gravity);//world normal
+
+                        Vector3D dirAlt = KeepAltitude(isUnderControl, keepAltitude, gravity);//world normal
+                        dir = !Vector3D.IsZero(dirAlt) ? dirAlt : dir;
+                    }
                 }
             }
 
@@ -803,157 +820,172 @@ namespace IngameScript {
             Vector3D stopDirection = CalculateStopVectorAndAccelerationByDirection(myVelocity, mass, out acceleration);
             double stopDistance = stopDirection.Length();
 
-            if (autoCombat && !isUnderControl && targFound) {
-                initRandomMagneticDriveOnce = false;
-                RandomDrive(myVelocity);//world normal
-                dir = randomDir;
-                Vector3D dirEsc = Vector3D.Zero;
-                foreach (MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> target in targetsInfo) {//HitPosition, Velocity, Orientation, Position, EntityId
-                    Vector3D escapeDir = Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - target.Item4);//world normal
-                    dirEsc = SetResultVector(dirEsc, escapeDir);
+            if (follow) {
+                if (initFollowOnce) {
+                    distanceToKeep = Vector3D.Distance(targPosition, CONTROLLER.CubeGrid.WorldVolume.Center);
+                    initFollowOnce = false;
                 }
-                dir = !Vector3D.IsZero(dirEsc) ? dirEsc : dir;
-
-                Vector3D dirDist = KeepRightDistance(targPosition);//world normal
-                dir = !Vector3D.IsZero(dirDist) ? dirDist : dir;
+                dir = KeepSameDistance(targPosition, distanceToKeep);//world normal
 
                 Vector3D dirMinAlt = KeepMinAltitude(gravity);//world normal
                 dir = !Vector3D.IsZero(dirMinAlt) ? dirMinAlt : dir;
             } else {
-                if (!initRandomMagneticDriveOnce) {
-                    randomDir = Vector3D.Zero;
-                    initRandomMagneticDriveOnce = true;
+                if (!initFollowOnce) {
+                    distanceToKeep = 0d;
+                    initFollowOnce = true;
                 }
-                if (!Vector3D.IsZero(returnPosition)) {
-                    initPositionalDriveOnce = false;
-                    Vector3D pos = returnPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - returnPosition) * stopDistance);
-                    dir = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
-                    dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
-                    dir = Vector3D.Normalize(dir);
-                    if (Vector3D.Distance(returnPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
-                        dir = Vector3D.Zero;
-                        CONTROLLER.DampenersOverride = true;
-                        if (mySpeed < 0.2d) {
-                            returnPosition = Vector3D.Zero;
-                        }
+                if (autoCombat && !isUnderControl && targFound) {
+                    initRandomMagneticDriveOnce = false;
+                    RandomDrive(myVelocity);//world normal
+                    dir = randomDir;
+                    Vector3D dirEsc = Vector3D.Zero;
+                    foreach (MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> target in targetsInfo) {//HitPosition, Velocity, Orientation, Position, EntityId
+                        Vector3D escapeDir = Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - target.Item4);//world normal
+                        dirEsc = SetResultVector(dirEsc, escapeDir);
                     }
-                } else if (!Vector3D.IsZero(dockPosition)) {
-                    if (initPositionalDriveOnce) {
-                        foreach (IMyLandingGear block in LANDINGGEARS) {
-                            block.AutoLock = false;
-                        }
+                    dir = !Vector3D.IsZero(dirEsc) ? dirEsc : dir;
+
+                    Vector3D dirDist = KeepRightDistance(targPosition);//world normal
+                    dir = !Vector3D.IsZero(dirDist) ? dirDist : dir;
+
+                    Vector3D dirMinAlt = KeepMinAltitude(gravity);//world normal
+                    dir = !Vector3D.IsZero(dirMinAlt) ? dirMinAlt : dir;
+                } else {
+                    if (!initRandomMagneticDriveOnce) {
+                        randomDir = Vector3D.Zero;
+                        initRandomMagneticDriveOnce = true;
+                    }
+                    if (!Vector3D.IsZero(returnPosition)) {
                         initPositionalDriveOnce = false;
-                    }
-
-                    RaycastDockPosition(dockOrientation.Translation, dockVelocity, Runtime.TimeSinceLastRun.TotalSeconds);
-                    dockPosition = dockOrientation.Translation + (dockOrientation.Forward * 250d);
-
-                    Vector3D pos = dockPosition + (Vector3D.Normalize(DOCKCONNECTOR.GetPosition() - dockPosition) * stopDistance);
-                    dir = Vector3D.Normalize(pos - DOCKCONNECTOR.GetPosition());//world normal
-                    dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
-                    dir = Vector3D.Normalize(dir);
-
-                    //----------------------------------
-                    Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + stopDirection, Color.Red, thickness: 2f, onTop: true);
-                    Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
-                    Debug.DrawPoint(dockPosition, Color.Red, 10f, onTop: true);
-                    Debug.DrawPoint(pos, Color.Yellow, 10f, onTop: true);
-                    Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
-                    //----------------------------------
-
-                    if (Vector3D.Distance(dockPosition, DOCKCONNECTOR.GetPosition()) <= 5d) {
-                        dir = Vector3D.Zero;
-                        CONTROLLER.DampenersOverride = true;
-                        if (mySpeed < 0.2d) {
-                            dockPosition = Vector3D.Zero;
-                            dockHitPosition = dockOrientation.Translation;
-                        }
-                    }
-                } else if (!Vector3D.IsZero(dockHitPosition)) {
-                    RaycastDockPosition(dockOrientation.Translation, dockVelocity, Runtime.TimeSinceLastRun.TotalSeconds);
-                    dockHitPosition = dockOrientation.Translation;
-
-                    double pitchAngle, rollAngle, yawAngle;
-                    GetRotationAnglesSimultaneous(dockOrientation.Up, dockOrientation.Forward, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
-                    double yawSpeed = yawController.Control(yawAngle);
-                    double pitchSpeed = pitchController.Control(pitchAngle);
-                    double rollSpeed = rollController.Control(rollAngle);
-                    ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
-
-                    Vector3D connectorPosition = DOCKCONNECTOR.GetPosition() + DOCKCONNECTOR.WorldMatrix.Forward * 2.6d;
-                    Vector3D pos = dockHitPosition + (Vector3D.Normalize(connectorPosition - dockHitPosition) * stopDistance);
-                    dir = Vector3D.Normalize(pos - connectorPosition);//world normal
-                    dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
-                    dir = Vector3D.Normalize(dir);
-
-                    //----------------------------------
-                    Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + stopDirection, Color.Red, thickness: 2f, onTop: true);
-                    Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
-                    Debug.DrawPoint(dockHitPosition, Color.Red, 10f, onTop: true);
-                    Debug.DrawPoint(pos, Color.Yellow, 10f, onTop: true);
-                    Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
-                    //----------------------------------
-
-                    if (Vector3D.Distance(dockHitPosition, connectorPosition) <= 0.5d) {
-                        dir = Vector3D.Zero;
-                        CONTROLLER.DampenersOverride = true;
-                        if (mySpeed < 0.2d) {
-                            DOCKCONNECTOR.Connect();
-                            if (DOCKCONNECTOR.Status == MyShipConnectorStatus.Connected || failedConnectionCount >= 100) {
-                                foreach (IMyLandingGear block in LANDINGGEARS) {
-                                    block.AutoLock = true;
-                                }
-                                dockHitPosition = Vector3D.Zero;
-                                dockOrientation = default(MatrixD);
-                                dockVelocity = Vector3D.Zero;
-                                if (recoverMagneticDrive) {
-                                    magneticDrive = true;
-                                    recoverMagneticDrive = false;
-                                }
-                                failedConnectionCount = 0;
-                            } else {
-                                failedConnectionCount++;
+                        Vector3D pos = returnPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - returnPosition) * stopDistance);
+                        dir = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
+                        dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
+                        dir = Vector3D.Normalize(dir);
+                        if (Vector3D.Distance(returnPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
+                            dir = Vector3D.Zero;
+                            CONTROLLER.DampenersOverride = true;
+                            if (mySpeed < 0.2d) {
+                                returnPosition = Vector3D.Zero;
                             }
                         }
-                    }
-                } else if (!Vector3D.IsZero(landPosition)) {
-                    initPositionalDriveOnce = false;
-                    Vector3D pos = landPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - landPosition) * stopDistance);
-                    dir = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
-                    dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
-                    dir = Vector3D.Normalize(dir);
-                    if (Vector3D.Distance(landPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
-                        dir = Vector3D.Zero;
-                        CONTROLLER.DampenersOverride = true;
-                        if (mySpeed < 0.2d) {
+                    } else if (!Vector3D.IsZero(dockPosition)) {
+                        if (initPositionalDriveOnce) {
+                            foreach (IMyLandingGear block in LANDINGGEARS) {
+                                block.AutoLock = false;
+                            }
+                            initPositionalDriveOnce = false;
+                        }
+
+                        RaycastDockPosition(dockOrientation.Translation, dockVelocity, Runtime.TimeSinceLastRun.TotalSeconds);
+                        dockPosition = dockOrientation.Translation + (dockOrientation.Forward * 250d);
+
+                        Vector3D pos = dockPosition + (Vector3D.Normalize(DOCKCONNECTOR.GetPosition() - dockPosition) * stopDistance);
+                        dir = Vector3D.Normalize(pos - DOCKCONNECTOR.GetPosition());//world normal
+                        dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
+                        dir = Vector3D.Normalize(dir);
+
+                        //----------------------------------
+                        Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + stopDirection, Color.Red, thickness: 2f, onTop: true);
+                        Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                        Debug.DrawPoint(dockPosition, Color.Red, 10f, onTop: true);
+                        Debug.DrawPoint(pos, Color.Yellow, 10f, onTop: true);
+                        Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
+                        //----------------------------------
+
+                        if (Vector3D.Distance(dockPosition, DOCKCONNECTOR.GetPosition()) <= 20d) {
+                            dir = Vector3D.Zero;
+                            CONTROLLER.DampenersOverride = true;
+                            if (mySpeed < 0.2d) {
+                                dockPosition = Vector3D.Zero;
+                                dockHitPosition = dockOrientation.Translation;
+                            }
+                        }
+                    } else if (!Vector3D.IsZero(dockHitPosition)) {
+                        RaycastDockPosition(dockOrientation.Translation, dockVelocity, Runtime.TimeSinceLastRun.TotalSeconds);
+                        dockHitPosition = dockOrientation.Translation;
+
+                        double pitchAngle, rollAngle, yawAngle;
+                        GetRotationAnglesSimultaneous(dockOrientation.Up, dockOrientation.Forward, CONTROLLER.WorldMatrix, out pitchAngle, out yawAngle, out rollAngle);
+                        double yawSpeed = yawController.Control(yawAngle);
+                        double pitchSpeed = pitchController.Control(pitchAngle);
+                        double rollSpeed = rollController.Control(rollAngle);
+                        ApplyGyroOverride(pitchSpeed, yawSpeed, rollSpeed, GYROS, CONTROLLER.WorldMatrix);
+
+                        Vector3D connectorPosition = DOCKCONNECTOR.GetPosition() + DOCKCONNECTOR.WorldMatrix.Forward * 2.6d;
+                        Vector3D pos = dockHitPosition + (Vector3D.Normalize(connectorPosition - dockHitPosition) * stopDistance);
+                        dir = Vector3D.Normalize(pos - connectorPosition);//world normal
+                        dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
+                        dir = Vector3D.Normalize(dir);
+
+                        //----------------------------------
+                        Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + stopDirection, Color.Red, thickness: 2f, onTop: true);
+                        Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
+                        Debug.DrawPoint(dockHitPosition, Color.Red, 10f, onTop: true);
+                        Debug.DrawPoint(pos, Color.Yellow, 10f, onTop: true);
+                        Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
+                        //----------------------------------
+
+                        if (Vector3D.Distance(dockHitPosition, connectorPosition) <= 0.5d) {
+                            dir = Vector3D.Zero;
+                            CONTROLLER.DampenersOverride = true;
+                            if (mySpeed < 0.2d) {
+                                DOCKCONNECTOR.Connect();
+                                if (DOCKCONNECTOR.Status == MyShipConnectorStatus.Connected || failedConnectionCount >= 100) {
+                                    foreach (IMyLandingGear block in LANDINGGEARS) {
+                                        block.AutoLock = true;
+                                    }
+                                    dockHitPosition = Vector3D.Zero;
+                                    dockOrientation = default(MatrixD);
+                                    dockVelocity = Vector3D.Zero;
+                                    if (recoverMagneticDrive) {
+                                        magneticDrive = true;
+                                        recoverMagneticDrive = false;
+                                    }
+                                    failedConnectionCount = 0;
+                                } else {
+                                    failedConnectionCount++;
+                                }
+                            }
+                        }
+                    } else if (!Vector3D.IsZero(landPosition)) {
+                        initPositionalDriveOnce = false;
+                        Vector3D pos = landPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - landPosition) * stopDistance);
+                        dir = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
+                        dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
+                        dir = Vector3D.Normalize(dir);
+                        if (Vector3D.Distance(landPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
+                            dir = Vector3D.Zero;
+                            CONTROLLER.DampenersOverride = true;
+                            if (mySpeed < 0.2d) {
+                                landPosition = Vector3D.Zero;
+                            }
+                        }
+                    } else if (!Vector3D.IsZero(rangeFinderPosition)) {
+                        initPositionalDriveOnce = false;
+                        Vector3D pos = rangeFinderPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - rangeFinderPosition) * stopDistance);
+                        dir = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
+                        dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
+                        dir = Vector3D.Normalize(dir);
+                        if (Vector3D.Distance(rangeFinderPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
+                            dir = Vector3D.Zero;
+                            CONTROLLER.DampenersOverride = true;
+                            if (mySpeed < 0.2d) {
+                                rangeFinderPosition = Vector3D.Zero;
+                            }
+                        }
+                    } else {
+                        if (!initPositionalDriveOnce) {
                             landPosition = Vector3D.Zero;
-                        }
-                    }
-                } else if (!Vector3D.IsZero(rangeFinderPosition)) {
-                    initPositionalDriveOnce = false;
-                    Vector3D pos = rangeFinderPosition + (Vector3D.Normalize(CONTROLLER.CubeGrid.WorldVolume.Center - rangeFinderPosition) * stopDistance);
-                    dir = Vector3D.Normalize(pos - CONTROLLER.CubeGrid.WorldVolume.Center);//world normal
-                    dir = CalculateDriftCompensation(myVelocity, dir, acceleration);
-                    dir = Vector3D.Normalize(dir);
-                    if (Vector3D.Distance(rangeFinderPosition, CONTROLLER.CubeGrid.WorldVolume.Center) <= 5d) {
-                        dir = Vector3D.Zero;
-                        CONTROLLER.DampenersOverride = true;
-                        if (mySpeed < 0.2d) {
                             rangeFinderPosition = Vector3D.Zero;
+                            returnPosition = Vector3D.Zero;
+                            dockPosition = Vector3D.Zero;
+                            dockHitPosition = Vector3D.Zero;
+                            dockOrientation = default(MatrixD);
+                            foreach (IMyLandingGear block in LANDINGGEARS) {
+                                block.AutoLock = true;
+                            }
+                            initPositionalDriveOnce = true;
                         }
-                    }
-                } else {
-                    if (!initPositionalDriveOnce) {
-                        landPosition = Vector3D.Zero;
-                        rangeFinderPosition = Vector3D.Zero;
-                        returnPosition = Vector3D.Zero;
-                        dockPosition = Vector3D.Zero;
-                        dockHitPosition = Vector3D.Zero;
-                        dockOrientation = default(MatrixD);
-                        foreach (IMyLandingGear block in LANDINGGEARS) {
-                            block.AutoLock = true;
-                        }
-                        initPositionalDriveOnce = true;
                     }
                 }
             }
@@ -1577,9 +1609,10 @@ namespace IngameScript {
         }
 
         void RaycastDockPosition(Vector3D dockHitPos, Vector3D dockVel, double timeSinceLastRun) {
-            dockHitPos += (dockVel * (float)timeSinceLastRun);
-            IMyCameraBlock lidar = GetLidarByDirection(Vector3D.Normalize(dockHitPos - CONTROLLER.CubeGrid.WorldVolume.Center));
-            MyDetectedEntityInfo TARGET = lidar.Raycast(dockHitPos + 100d);
+            dockHitPos += dockVel * (float)timeSinceLastRun;
+            Vector3D toTarget = Vector3D.Normalize(dockHitPos - CONTROLLER.CubeGrid.WorldVolume.Center);
+            IMyCameraBlock lidar = GetLidarByDirection(toTarget);
+            MyDetectedEntityInfo TARGET = lidar.Raycast(dockHitPos + (toTarget * 1d));//TODO
             if (!TARGET.IsEmpty() && TARGET.HitPosition.HasValue) {
                 if (TARGET.Type == MyDetectedEntityType.LargeGrid || TARGET.Type == MyDetectedEntityType.SmallGrid) {
                     MatrixD orientation = TARGET.Orientation;

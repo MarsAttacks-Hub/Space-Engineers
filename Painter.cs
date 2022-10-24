@@ -72,7 +72,8 @@ namespace IngameScript {
         bool artilleryCanShoot = true;
         bool railgunsCanShoot = true;
         bool smallRailgunsCanShoot = true;
-        bool initLaunch = false;
+        bool launch = false;
+        bool follow = false;
         bool decoyRanOnce = false;
         bool activateOnce = false;
         bool gatlingsOnce = false;
@@ -185,9 +186,14 @@ namespace IngameScript {
 
                 double timeSinceLastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
-                if (!String.IsNullOrEmpty(arg)) { ProcessArgs(arg); }
+                if (!String.IsNullOrEmpty(arg)) {
+                    ProcessArgs(arg);
+                    if (arg == "Clear" || (arg == "Follow" && !follow)) {
+                        return;
+                    }
+                }
 
-                bool targetFound = TurretsDetection(targetInfo.IsEmpty());//TODO add delay
+                bool targetFound = TurretsDetection(targetInfo.IsEmpty());//TODO add delay?
                 bool isTargetEmpty = targetInfo.IsEmpty();
 
                 if (!isTargetEmpty) {
@@ -200,23 +206,25 @@ namespace IngameScript {
 
                     double lastLock = timeSinceLastLock + timeSinceLastRun;
                     Vector3D targetVelocity = targetInfo.Velocity;
+                    Vector3D myVelocity = CONTROLLER.GetShipVelocities().LinearVelocity;
+                    double myAngularVelocity = CONTROLLER.GetShipVelocities().AngularVelocity.Length();
 
                     Vector3D aimDirection = Vector3D.Normalize(targetInfo.Position - CONTROLLER.CubeGrid.WorldVolume.Center);
-                    if (AngleBetween(CONTROLLER.WorldMatrix.Forward, aimDirection) * rad2deg <= 43d) {
-                        if (!targetFound) {
+                    if (!targetFound) {
+                        if (AngleBetween(CONTROLLER.WorldMatrix.Forward, aimDirection) * rad2deg <= 43d) {
                             targetFound = AcquireTarget(lastLock, targetInfo.Position, targetVelocity, targetInfo.HitPosition.Value);
                         }
                     }
 
-                    IMyTerminalBlock refBlock;
-                    if (LIDARS.Count != 0) { refBlock = LIDARS[0]; } else { refBlock = CONTROLLER; }
-                    LockOnTarget(lastLock, targetInfo.HitPosition.Value, targetVelocity, CONTROLLER.GetNaturalGravity(), CONTROLLER.GetShipVelocities().LinearVelocity, refBlock.GetPosition());
-
-                    SendBroadcastTargetMessage(true, targetInfo.HitPosition.Value, targetVelocity, targetInfo.Orientation, targetInfo.Position, targetInfo.EntityId);
-
-                    foreach (KeyValuePair<long, string> id in MissileIDs) {
-                        SendMissileUnicastMessage("Update", id.Key, targetInfo.HitPosition.Value, targetVelocity);
+                    Vector3D refPos;
+                    if (LIDARS.Count != 0) {
+                        refPos = LIDARS[0].GetPosition();
+                    } else {
+                        refPos = CONTROLLER.CubeGrid.WorldVolume.Center;
                     }
+                    LockOnTarget(lastLock, targetInfo.HitPosition.Value, targetVelocity, CONTROLLER.GetNaturalGravity(), myVelocity, refPos);
+
+                    SendBroadcastTargetMessage(true, targetInfo.HitPosition.Value, targetVelocity, targetInfo.Orientation, targetInfo.Position, follow);
 
                     CanShootGuns();
 
@@ -226,10 +234,16 @@ namespace IngameScript {
                     }
                     checkGunsCount++;
 
-                    ManageGuns(timeSinceLastRun, targetInfo.Position);
+                    if (!follow) {
+                        foreach (KeyValuePair<long, string> id in MissileIDs) {
+                            SendMissileUnicastMessage("Update", id.Key, targetInfo.HitPosition.Value, targetVelocity);
+                        }
 
-                    if (initLaunch || autoMissiles) {
-                        LaunchMissile();
+                        ManageGuns(timeSinceLastRun, targetInfo.Position, myVelocity, myAngularVelocity);
+
+                        if (launch || autoMissiles) {
+                            LaunchMissile(myVelocity, myAngularVelocity);
+                        }
                     }
 
                     if (targetFound) {
@@ -242,9 +256,7 @@ namespace IngameScript {
                 } else {
                     //TODO launch drone to put in formation
                     if (activateOnce) {
-                        initLaunch = false;
-                        missilesLoaded = false;
-                        activateOnce = false;
+                        ResetTargeter();
                     }
                 }
 
@@ -271,17 +283,29 @@ namespace IngameScript {
 
         void ProcessArgs(string arg) {
             switch (arg) {
-                case "Lock": AcquireTarget(globalTimestep, Vector3D.Zero, Vector3D.Zero, Vector3D.Zero); break;
+                case "Lock":
+                    AcquireTarget(globalTimestep, Vector3D.Zero, Vector3D.Zero, Vector3D.Zero);
+                    break;
                 case "Launch":
-                    initLaunch = true;
+                    if (!follow && !targetInfo.IsEmpty()) {
+                        launch = true;
+                    }
+                    break;
+                case "Follow":
+                    follow = !follow;
+                    if (follow) {
+                        AcquireTarget(globalTimestep, Vector3D.Zero, Vector3D.Zero, Vector3D.Zero);
+                        break;
+                    } else {
+                        ResetTargeter();
+                    }
                     break;
                 case "Clear":
                     ResetTargeter();
-                    return;//TODO
-                //break;
+                    break;
                 case "SwitchGun":
                     weaponType++;
-                    if (weaponType > 4) {
+                    if (weaponType > 7) {
                         weaponType = 0;
                     }
                     break;
@@ -516,6 +540,9 @@ namespace IngameScript {
                 || entityInfo.Relationship == MyRelationsBetweenPlayerAndBlock.Neutral) {
                     return true;
                 }
+                if (follow) {
+                    return true;
+                }
             }
             return false;
         }
@@ -694,20 +721,23 @@ namespace IngameScript {
             }
         }
 
-        void LaunchMissile() {//TODO check angular and linear velocity b4 to launch?
+        void LaunchMissile(Vector3D myVelocity, double angularVelocity) {
             if (missilesLoaded) {
-                GetMissileAntennas(selectedMissile);
-                foreach (IMyRadioAntenna block in MISSILEANTENNAS) {
-                    block.Enabled = true;
-                    block.EnableBroadcasting = true;
+                double dot = Vector3D.Dot(Vector3D.Normalize(myVelocity), CONTROLLER.WorldMatrix.Down);
+                if (dot <= 0 && angularVelocity < 0.1d) {
+                    GetMissileAntennas(selectedMissile);
+                    foreach (IMyRadioAntenna block in MISSILEANTENNAS) {
+                        block.Enabled = true;
+                        block.EnableBroadcasting = true;
+                    }
+                    selectedMissile++;
+                    if (selectedMissile > missilesCount) {// + 1
+                        selectedMissile = 1;
+                    }
+                    SendMissileBroadcastMessage("Launch", targetInfo.HitPosition.Value, targetInfo.Velocity);
+                    launch = false;
+                    missilesLoaded = false;
                 }
-                selectedMissile++;
-                if (selectedMissile > missilesCount) {// + 1
-                    selectedMissile = 1;
-                }
-                SendMissileBroadcastMessage("Launch", targetInfo.HitPosition.Value, targetInfo.Velocity);
-                initLaunch = false;
-                missilesLoaded = false;
             } else {
                 bool completed = CheckProjectors();
                 if (!completed) {
@@ -791,8 +821,8 @@ namespace IngameScript {
             return uniMessageSent;
         }
 
-        void SendBroadcastTargetMessage(bool targFound, Vector3D targHitPos, Vector3D targVel, MatrixD targOrientation, Vector3D targPos, long targId) {
-            MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, long> tuple = MyTuple.Create(targFound, targHitPos, targVel, targOrientation, targPos, targId);
+        void SendBroadcastTargetMessage(bool targFound, Vector3D targHitPos, Vector3D targVel, MatrixD targOrientation, Vector3D targPos, bool follow) {
+            MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool> tuple = MyTuple.Create(targFound, targHitPos, targVel, targOrientation, targPos, follow);
             IGC.SendBroadcastMessage("[NAVIGATOR]", tuple, TransmissionDistance.ConnectedConstructs);
             if (targetsInfo.Count > 0) {
                 ImmutableArray<MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long>>.Builder immArray = ImmutableArray.CreateBuilder<MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long>>();
@@ -889,8 +919,8 @@ namespace IngameScript {
             TurnAlarmOff();
             ResetGuns();
             targetInfo = default(MyDetectedEntityInfo);
-            selectedMissile = 1;
-            //activateOnce = false;//TODO
+            activateOnce = false;
+            launch = false;
             missilesLoaded = false;
             fudgeFactor = 5d;
             scanFudge = false;
@@ -898,12 +928,16 @@ namespace IngameScript {
             timeSinceLastLock = 0d;
             hasCenter = true;
             scanCenter = false;
-            foreach (KeyValuePair<long, string> id in MissileIDs) {
-                if (!id.Value.Contains("Lost")) {
-                    SendMissileUnicastMessage("Lost", id.Key, Vector3D.Zero, Vector3D.Zero);
+            if (!follow) {
+                selectedMissile = 1;
+                foreach (KeyValuePair<long, string> id in MissileIDs) {
+                    if (!id.Value.Contains("Lost")) {
+                        SendMissileUnicastMessage("Lost", id.Key, Vector3D.Zero, Vector3D.Zero);
+                    }
                 }
             }
-            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero, default(MatrixD), Vector3D.Zero, 0);
+            follow = false;
+            SendBroadcastTargetMessage(false, Vector3D.Zero, Vector3D.Zero, default(MatrixD), Vector3D.Zero, follow);
         }
 
         void ActivateTargeter() {
@@ -1016,14 +1050,17 @@ namespace IngameScript {
             return itemFound;
         }
 
-        void ManageGuns(double timeSinceLastRun, Vector3D trgtPos) {//TODO rockets never fire, jolt never fire above 2000
+        void ManageGuns(double timeSinceLastRun, Vector3D trgtPos, Vector3D myVelocity, double angularVelocity) {//TODO rockets never fire, jolt never fire above 2000
             if (autoFire) {
                 double distanceFromTarget = Vector3D.Distance(trgtPos, CONTROLLER.CubeGrid.WorldVolume.Center);
                 if (autoSwitchGuns) {
                     if (distanceFromTarget <= 2000d) {
                         maxRangeOnce = true;
-                        if (!decoyRanOnce && distanceFromTarget < 800d) {//TODO check angular and linear velocity be4 to launch
-                            decoyRanOnce = SHOOTERPB.TryRun("LaunchDecoy");
+                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                            double dot = Vector3D.Dot(Vector3D.Normalize(myVelocity), CONTROLLER.WorldMatrix.Down);
+                            if (dot <= 0 && angularVelocity < 0.1d) {
+                                decoyRanOnce = SHOOTERPB.TryRun("LaunchDecoy");
+                            }
                         }
                         if (weaponType != 2 && weaponType != 3 && (gatlingsOnce || autocannonOnce)) {
                             foreach (IMyUserControllableGun block in GATLINGS) { block.Shoot = false; }
@@ -1165,8 +1202,11 @@ namespace IngameScript {
                 } else {
                     if (distanceFromTarget < 2000d) {
                         maxRangeOnce = true;
-                        if (!decoyRanOnce && distanceFromTarget < 800d) {//TODO check angular and linear velocity be4 to launch
-                            decoyRanOnce = SHOOTERPB.TryRun("LaunchDecoy");
+                        if (!decoyRanOnce && distanceFromTarget < 800d) {
+                            double dot = Vector3D.Dot(Vector3D.Normalize(myVelocity), CONTROLLER.WorldMatrix.Down);
+                            if (dot <= 0 && angularVelocity < 0.1d) {
+                                decoyRanOnce = SHOOTERPB.TryRun("LaunchDecoy");
+                            }
                         }
                         if (readyToFire) {
                             readyToFireOnce = true;
@@ -1543,7 +1583,7 @@ namespace IngameScript {
                 updateOnce = false;
             } else {
                 if (!updateOnce) {
-                    UpdatePIDControllers(1d);
+                    UpdatePIDControllers(5d);
                     updateOnce = true;
                 }
             }

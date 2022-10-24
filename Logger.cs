@@ -119,8 +119,6 @@ namespace IngameScript {
         public IMyBroadcastListener BROADCASTLISTENER;
         IEnumerator<bool> stateMachine;
 
-        public List<MySprite> sprites = new List<MySprite>();//TODO remove this list and use frame's inner list
-
         public StringBuilder data = new StringBuilder("");
         public StringBuilder data2 = new StringBuilder("");
         public StringBuilder data3 = new StringBuilder("");
@@ -563,6 +561,7 @@ namespace IngameScript {
 
         void LogNavigator(MyPanel myPanel) {
             Echo($"LogNavigator");
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             timeRemaining = timeRemaining == "" ? "0" : timeRemaining;
             data.Append($"\n"
@@ -595,27 +594,26 @@ namespace IngameScript {
 
             data3.Append($"JUMP DRIVE\n\n\n\n\nRANGE FINDER");
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + 20f, myPanel.col2_3.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + myPanel.col1_3.Width + 20f, myPanel.col1_3.Y + 20f), data3.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
             data3.Clear();
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsJumpRangeFinder(frame, myPanel.viewport.Center, myPanel.minScale);
+                DrawSpritesTabsJumpRangeFinder(ref frame, myPanel.viewport.Center, myPanel.minScale);
 
                 float columnSizeMultiplier = 150f * myPanel.minScale / 100f;
                 float width = 2f * myPanel.minScale;
 
-                DrawRandomGraph(frame, randomPositions1,
+                DrawRandomGraph(ref frame, randomPositions1,
                     columnSizeMultiplier,
                     width, transparentNeonAzure, myPanel.minScale, myPanel.viewport.Center);
 
-                DrawRandomGraph(frame, randomPositions2,
+                DrawRandomGraph(ref frame, randomPositions2,
                     columnSizeMultiplier,
                     width, transparentNeonMagenta, myPanel.minScale, myPanel.viewport.Center);
 
@@ -634,15 +632,14 @@ namespace IngameScript {
                 randomPositions2.Add(new Vector2(180f, 225f));
                 randomPositions2.Add(new Vector2(240f, 225f));
             }
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
+
             frame.Dispose();
-            sprites.Clear();
         }
 
         void LogPainter(MyPanel myPanel) {
             Echo($"LogPainter");
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             data5.Append($"PAINTER");
 
@@ -701,13 +698,13 @@ namespace IngameScript {
                 data4.Append($"\n");
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X, myPanel.col2_4.Y + 10f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width, myPanel.col3_4.Y + 10f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X, myPanel.col4_4.Y + 10f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width, myPanel.col1_4.Y + 10f), data5.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -715,19 +712,17 @@ namespace IngameScript {
             data4.Clear();
             data5.Clear();
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsPainter(frame, myPanel.viewport.Center, myPanel.minScale);
+                DrawSpritesTabsPainter(ref frame, myPanel.viewport.Center, myPanel.minScale);
             }
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
+
             frame.Dispose();
-            sprites.Clear();
         }
 
         void LogPower(MyPanel myPanel) {
             Echo($"LogPower");
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             data.Append($"Status: \n"
                 + $"Pow.: \n"
@@ -763,20 +758,19 @@ namespace IngameScript {
                 + $"\n"
                 + $"{turbineMaxOutput:0.#}\n");
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
             data.Clear();
             data2.Clear();
             data3.Clear();
             data4.Clear();
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsPower(frame, myPanel.viewport.Center, myPanel.minScale);
+                DrawSpritesTabsPower(ref frame, myPanel.viewport.Center, myPanel.minScale);
 
                 Vector2 removePos = new Vector2(-240f, -230f) * myPanel.minScale + myPanel.viewport.Center;
                 Vector2 startPos = new Vector2(240f, 230f) * myPanel.minScale + myPanel.viewport.Center;
@@ -784,7 +778,7 @@ namespace IngameScript {
                 float columnSizeMultiplier = 200f * myPanel.minScale / 100f;
                 float width = 2f * myPanel.minScale;
 
-                tankCapacityOutputs = DrawMovingGraph(frame, tankCapacityOutputs,
+                tankCapacityOutputs = DrawMovingGraph(ref frame, tankCapacityOutputs,
                     movementPos,
                     removePos.X,
                     startPos,
@@ -792,7 +786,7 @@ namespace IngameScript {
                     (float)tankCapacityPercent,
                     width, transparentGreen);
 
-                hEngOutputs = DrawMovingGraph(frame, hEngOutputs,
+                hEngOutputs = DrawMovingGraph(ref frame, hEngOutputs,
                     movementPos,
                     removePos.X,
                     startPos,
@@ -800,7 +794,7 @@ namespace IngameScript {
                     hEngCurrentOutput / hEngMaxOutput * 100f,
                     width, deepPurple);
 
-                reactorsOutputs = DrawMovingGraph(frame, reactorsOutputs,
+                reactorsOutputs = DrawMovingGraph(ref frame, reactorsOutputs,
                     movementPos,
                     removePos.X,
                     startPos,
@@ -808,7 +802,7 @@ namespace IngameScript {
                     reactorsCurrentOutput / reactorsMaxOutput * 100f,
                     width, transparentBlue);
 
-                battsCurrentStoredPowers = DrawMovingGraph(frame, battsCurrentStoredPowers,
+                battsCurrentStoredPowers = DrawMovingGraph(ref frame, battsCurrentStoredPowers,
                     movementPos,
                     removePos.X,
                     startPos,
@@ -816,7 +810,7 @@ namespace IngameScript {
                     battsCurrentStoredPower / battsMaxStoredPower * 100f,
                     width, transparentMagenta);
 
-                batteriesOutputs = DrawMovingGraph(frame, batteriesOutputs,
+                batteriesOutputs = DrawMovingGraph(ref frame, batteriesOutputs,
                     movementPos,
                     removePos.X,
                     startPos,
@@ -824,7 +818,7 @@ namespace IngameScript {
                     battsCurrentOutput / battsMaxOutput * 100f,
                     width, transparentNeonMagenta);
 
-                terminalOutputs = DrawMovingGraph(frame, terminalOutputs,
+                terminalOutputs = DrawMovingGraph(ref frame, terminalOutputs,
                     movementPos,
                     removePos.X,
                     startPos,
@@ -844,26 +838,25 @@ namespace IngameScript {
                 data3.Append("\n\n\n\n\n\n\n\nIce: ");
                 data4.Append($"\n\n\n\n\n\n\n\n{ice:0.#}");
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+                frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-                sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+                frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
                 data.Clear();
                 data2.Clear();
                 data3.Clear();
                 data4.Clear();
             }
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
+
             frame.Dispose();
-            sprites.Clear();
         }
 
         void LogComponentsAmmo(MyPanel myPanel) {
             Echo($"LogComponentsAmmo");
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             data5.Append($"COMPONENTS\n\n\n\n\n\n\n\n\n\n\n\n\nAMMO");
 
@@ -919,13 +912,13 @@ namespace IngameScript {
                 }
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 75f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, purple, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 75f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale - 0.1f, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -933,19 +926,17 @@ namespace IngameScript {
             data4.Clear();
             data5.Clear();
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsComponentsAmmo(frame, myPanel.viewport.Center, myPanel.minScale);
+                DrawSpritesTabsComponentsAmmo(ref frame, myPanel.viewport.Center, myPanel.minScale);
             }
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
+
             frame.Dispose();
-            sprites.Clear();
         }
 
         void LogOreIngots(MyPanel myPanel) {
             Echo($"LogOreIngots");
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             data5.Append($"\nORE\n\n\n\n\n\n\n\nINGOTS");
 
@@ -1001,13 +992,13 @@ namespace IngameScript {
                 }
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 50f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 50f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 50f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 50f, myPanel.col1_4.Y + 20f), data5.ToString(), "Default", myPanel.minScale, purple, TextAlignment.RIGHT));
 
             data.Clear();
             data2.Clear();
@@ -1015,23 +1006,21 @@ namespace IngameScript {
             data4.Clear();
             data5.Clear();
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
             if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsOreIngots(frame, myPanel.viewport.Center, myPanel.animationCount, myPanel.minScale);
+                DrawSpritesTabsOreIngots(ref frame, myPanel.viewport.Center, myPanel.animationCount, myPanel.minScale);
                 myPanel.animationCount++;
                 if (myPanel.animationCount > 5) {
                     myPanel.animationCount = 0;
                 }
             }
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
+
             frame.Dispose();
-            sprites.Clear();
         }
 
         void LogOverview(MyPanel myPanel) {
             Echo($"LogOverview");
+
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             float orizontalMargin = 20f * myPanel.minScale;
             float verticalMargin = 30f * myPanel.minScale;
@@ -1074,9 +1063,9 @@ namespace IngameScript {
                 }
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
                 data.ToString(), "Default", myPanel.minScale, magenta));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
                 data2.ToString(), "Default", myPanel.minScale, purple));
 
             data.Clear();
@@ -1111,9 +1100,9 @@ namespace IngameScript {
                 data2.Append("Creative\n"); data.Append("\n");
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
                 data.ToString(), "Default", myPanel.minScale, azure));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_3.X + orizontalMargin, myPanel.col1_3.Y + verticalMargin),
                 data2.ToString(), "Default", myPanel.minScale, purple));
 
             data.Clear();
@@ -1145,9 +1134,9 @@ namespace IngameScript {
                 }
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
                 data.ToString(), "Default", myPanel.minScale, magenta));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
                 data2.ToString(), "Default", myPanel.minScale, purple));
 
             data.Clear();
@@ -1178,9 +1167,9 @@ namespace IngameScript {
                 data2.Append("CloseRange\n"); data.Append("\n");
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
                 data.ToString(), "Default", myPanel.minScale, azure));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_3.X + orizontalMargin, myPanel.col2_3.Y + verticalMargin),
                 data2.ToString(), "Default", myPanel.minScale, purple));
 
             data.Clear();
@@ -1223,9 +1212,9 @@ namespace IngameScript {
                 data2.Append("SunAlign\n"); data.Append("\n");
             }
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_3.X + myPanel.col3_3.Width + orizontalMargin, myPanel.col3_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_3.X + myPanel.col3_3.Width + orizontalMargin, myPanel.col3_3.Y + verticalMargin),
                 data.ToString(), "Default", myPanel.minScale, azure));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_3.X + myPanel.col3_3.Width + orizontalMargin, myPanel.col3_3.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_3.X + myPanel.col3_3.Width + orizontalMargin, myPanel.col3_3.Y + verticalMargin),
                 data2.ToString(), "Default", myPanel.minScale, purple));
 
             data.Clear();
@@ -1259,14 +1248,14 @@ namespace IngameScript {
 
             orizontalMargin = 75f * myPanel.minScale;
             verticalMargin = 50f * myPanel.minScale;
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + orizontalMargin, myPanel.col1_4.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + orizontalMargin, myPanel.col1_4.Y + verticalMargin),
                 data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + orizontalMargin, myPanel.col2_4.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + orizontalMargin, myPanel.col2_4.Y + verticalMargin),
                 data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + orizontalMargin, myPanel.col3_4.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + orizontalMargin, myPanel.col3_4.Y + verticalMargin),
                 data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-            sprites.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + orizontalMargin, myPanel.col4_4.Y + verticalMargin),
+            frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + orizontalMargin, myPanel.col4_4.Y + verticalMargin),
                 data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
 
             data.Clear();
@@ -1274,29 +1263,21 @@ namespace IngameScript {
             data3.Clear();
             data4.Clear();
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
             frame.Dispose();
-            sprites.Clear();
         }
 
         void PlayCommercials(MyPanel myPanel) {
             Echo("PlayCommercials");
 
+            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+
             int randomId = random.Next(0, 15);
             string pictureId;
             commercialsDict.TryGetValue(randomId, out pictureId);
 
-            sprites.Add(DrawSpritePicture(new Vector2(myPanel.viewport.Center.X - myPanel.viewport.Width / 2, myPanel.viewport.Y + myPanel.viewport.Center.Y), pictureId, "Default"));
+            frame.Add(DrawSpritePicture(new Vector2(myPanel.viewport.Center.X - myPanel.viewport.Width / 2, myPanel.viewport.Y + myPanel.viewport.Center.Y), pictureId, "Default"));
 
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
-            foreach (var sprite in sprites) {
-                frame.Add(sprite);
-            }
             frame.Dispose();
-            sprites.Clear();
         }
 
         MySprite DrawSpriteText(Vector2 pos, string data, string font, float scale, Color? color = null, TextAlignment alignment = TextAlignment.LEFT) {
@@ -1323,7 +1304,7 @@ namespace IngameScript {
             };
         }
 
-        public void DrawSpritesTabsOreIngots(MySpriteDrawFrame frame, Vector2 centerPos, int animationCount, float scale = 1f) {
+        public void DrawSpritesTabsOreIngots(ref MySpriteDrawFrame frame, Vector2 centerPos, int animationCount, float scale = 1f) {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -90f) * scale + centerPos, new Vector2(500f, 179f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 12f) * scale + centerPos, new Vector2(350f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple bottom corner
             frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 12f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 1.5708f)); // purple bottom triangle
@@ -1339,7 +1320,7 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -192f) * scale + centerPos, new Vector2(36f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 2.3736f)); // purple  top line c
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -225f) * scale + centerPos, new Vector2(501f, 40f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // inv bar
 
-            DrawStatusBar(frame, new Vector2(90f, -223f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)cargoPercentage / 100f, transparentBlue, azure, TextAlignment.LEFT);
+            DrawStatusBar(ref frame, new Vector2(90f, -223f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)cargoPercentage / 100f, transparentBlue, azure, TextAlignment.LEFT);
 
             frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(235f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 0 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle2
             frame.Add(new MySprite(SpriteType.TEXTURE, "Triangle", new Vector2(215f, 25f) * scale + centerPos, new Vector2(40f, 23f) * scale, animationCount == 1 ? azure : transparentBlue, null, TextAlignment.CENTER, 4.7124f)); // triangle3
@@ -1355,7 +1336,7 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 144f) * scale + centerPos, new Vector2(2f, 187f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue line
         }
 
-        public void DrawSpritesTabsComponentsAmmo(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+        public void DrawSpritesTabsComponentsAmmo(ref MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -64f) * scale + centerPos, new Vector2(500f, 286f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-75f, 91f) * scale + centerPos, new Vector2(350f, 25f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue bottom corner
             frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(112f, 91f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 1.5708f)); // blue bottom triangle
@@ -1382,7 +1363,7 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, 181f) * scale + centerPos, new Vector2(2f, 113f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // magenta left line
         }
 
-        public void DrawSpritesTabsPower(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+        public void DrawSpritesTabsPower(ref MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -120f) * scale + centerPos, new Vector2(500f, 240f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // magenta base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // right line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-250f, -120f) * scale + centerPos, new Vector2(2f, 240f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // left line
@@ -1395,26 +1376,26 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 10f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // top line
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 250f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentNeonMagenta, null, TextAlignment.CENTER, 0f)); // bottom line
 
-            DrawStatusBar(frame, new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)tankCapacityPercent / 100f, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+            DrawStatusBar(ref frame, new Vector2(-15f, -18f) * scale + centerPos, new Vector2(200f, 25f) * scale, (float)tankCapacityPercent / 100f, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
 
             if (hEngMaxOutput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, hEngCurrentOutput / hEngMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(ref frame, new Vector2(-15f, -76f) * scale + centerPos, new Vector2(200f, 25f) * scale, hEngCurrentOutput / hEngMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (reactorsMaxOutput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, reactorsCurrentOutput / reactorsMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(ref frame, new Vector2(-15f, -105f) * scale + centerPos, new Vector2(200f, 25f) * scale, reactorsCurrentOutput / reactorsMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (battsMaxStoredPower != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentStoredPower / battsMaxStoredPower, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(ref frame, new Vector2(-15f, -134f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentStoredPower / battsMaxStoredPower, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (battsMaxOutput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentOutput / battsMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(ref frame, new Vector2(-15f, -163f) * scale + centerPos, new Vector2(200f, 25f) * scale, battsCurrentOutput / battsMaxOutput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
             if (terminalMaxRequiredInput != 0f) {
-                DrawStatusBar(frame, new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, terminalCurrentInput / terminalMaxRequiredInput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
+                DrawStatusBar(ref frame, new Vector2(-15f, -192f) * scale + centerPos, new Vector2(200f, 25f) * scale, terminalCurrentInput / terminalMaxRequiredInput, transparentMagenta, transparentNeonAzure, TextAlignment.RIGHT);
             }
         }
 
-        public void DrawSpritesTabsJumpRangeFinder(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+        public void DrawSpritesTabsJumpRangeFinder(ref MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -151f) * scale + centerPos, new Vector2(500f, 118f) * scale, transparentDarkBlue, null, TextAlignment.CENTER, 0f)); // blue base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -222f) * scale + centerPos, new Vector2(275f, 25f) * scale, deepBlue, null, TextAlignment.CENTER, 0f)); // blue top corner
             frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -222f) * scale + centerPos, new Vector2(25f, 25f) * scale, deepBlue, null, TextAlignment.CENTER, 4.7124f)); // blue top triangle
@@ -1442,7 +1423,7 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, 233f) * scale + centerPos, new Vector2(500f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 0f)); // blue bottom line a
         }
 
-        public void DrawSpritesTabsPainter(MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
+        public void DrawSpritesTabsPainter(ref MySpriteDrawFrame frame, Vector2 centerPos, float scale = 1f) {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(0f, -172f) * scale + centerPos, new Vector2(500f, 88f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple base
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(111f, -228f) * scale + centerPos, new Vector2(275f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 0f)); // purple top corner
             frame.Add(new MySprite(SpriteType.TEXTURE, "RightTriangle", new Vector2(-39f, -228f) * scale + centerPos, new Vector2(25f, 25f) * scale, transparentMagenta, null, TextAlignment.CENTER, 4.7124f)); // purple top triangle
@@ -1463,7 +1444,7 @@ namespace IngameScript {
             frame.Add(new MySprite(SpriteType.TEXTURE, "SquareSimple", new Vector2(-39f, -112f) * scale + centerPos, new Vector2(36f, 2f) * scale, transparentBlue, null, TextAlignment.CENTER, 2.3736f)); // blue  top line c
         }
 
-        void DrawStatusBar(MySpriteDrawFrame frame, Vector2 position, Vector2 size, float proportion, Color backgroundColor, Color barColor, TextAlignment barAlignment) {
+        void DrawStatusBar(ref MySpriteDrawFrame frame, Vector2 position, Vector2 size, float proportion, Color backgroundColor, Color barColor, TextAlignment barAlignment) {
             proportion = MathHelper.Clamp(proportion, 0, 1);
 
             var barBackground = MySprite.CreateSprite("SquareSimple", position, size);
@@ -1490,7 +1471,7 @@ namespace IngameScript {
             frame.Add(barSprite);
         }
 
-        List<Vector2> DrawMovingGraph(MySpriteDrawFrame frame, List<Vector2> positions, Vector2 movementValue, float removeValue, Vector2 startPosition, float multiplier, float inputValue, float width, Color color) {
+        List<Vector2> DrawMovingGraph(ref MySpriteDrawFrame frame, List<Vector2> positions, Vector2 movementValue, float removeValue, Vector2 startPosition, float multiplier, float inputValue, float width, Color color) {
             for (int i = 0; i < positions.Count; i++) {
                 positions[i] = positions[i] + movementValue;
             }
@@ -1508,12 +1489,12 @@ namespace IngameScript {
             positions.Add(position);
 
             for (int i = 0; i < positions.Count - 1; i++) {
-                DrawLine(frame, positions[i], positions[i + 1], width, color);//TODO use ref
+                DrawLine(ref frame, positions[i], positions[i + 1], width, color);
             }
             return positions;
         }
 
-        void DrawRandomGraph(MySpriteDrawFrame frame, List<Vector2> positions, float multiplier, float width, Color color, float scale, Vector2 center) {
+        void DrawRandomGraph(ref MySpriteDrawFrame frame, List<Vector2> positions, float multiplier, float width, Color color, float scale, Vector2 center) {
             for (int i = 0; i < positions.Count; i++) {
                 float rand = random.Next(0, 101);
                 float columnSize = rand * multiplier;
@@ -1522,11 +1503,11 @@ namespace IngameScript {
             }
 
             for (int i = 0; i < positions.Count - 1; i++) {
-                DrawLine(frame, positions[i], positions[i + 1], width, color);//TODO use ref
+                DrawLine(ref frame, positions[i], positions[i + 1], width, color);
             }
         }
 
-        void DrawLine(MySpriteDrawFrame frame, Vector2 point1, Vector2 point2, float width, Color color) {
+        void DrawLine(ref MySpriteDrawFrame frame, Vector2 point1, Vector2 point2, float width, Color color) {
             Vector2 position = 0.5f * (point1 + point2);
             Vector2 diff = point1 - point2;
             float length = diff.Length();
