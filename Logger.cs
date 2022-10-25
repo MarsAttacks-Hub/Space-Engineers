@@ -118,6 +118,7 @@ namespace IngameScript {
         readonly MyIni myIni = new MyIni();
         public IMyBroadcastListener BROADCASTLISTENER;
         IEnumerator<bool> stateMachine;
+        IEnumerator<bool> powerStateMachine;
 
         public StringBuilder data = new StringBuilder("");
         public StringBuilder data2 = new StringBuilder("");
@@ -217,6 +218,7 @@ namespace IngameScript {
                 randomPositions2.Add(new Vector2(240f, 225f));
             }
             stateMachine = RunOverTime();
+            powerStateMachine = RunPowerOverTime();
         }
 
         public void Main(string arg, UpdateType updateType) {
@@ -240,6 +242,8 @@ namespace IngameScript {
                 } else {
                     if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
                         RunStateMachine();
+
+                        RunPowerStateMachine();
                     }
                 }
             } catch (Exception e) {
@@ -255,7 +259,6 @@ namespace IngameScript {
         }
 
         public IEnumerator<bool> RunOverTime() {
-
             double lastRun = Runtime.TimeSinceLastRun.TotalSeconds;
 
             if (COMMERCIALS.Count > 0) {
@@ -289,14 +292,6 @@ namespace IngameScript {
                 painter = false;
             }
 
-            if (power) {
-                foreach (MyPanel myPanel in POWER) {
-                    LogPower(myPanel);
-                    yield return true;
-                }
-                power = false;
-            }
-
             if (inventory) {
                 foreach (MyPanel myPanel in COMPONENTSAMMO) {
                     LogComponentsAmmo(myPanel);
@@ -325,6 +320,127 @@ namespace IngameScript {
 
                     stateMachine.Dispose();
                     stateMachine = RunOverTime();//stateMachine = null;
+                }
+            }
+        }
+
+        public IEnumerator<bool> RunPowerOverTime() {
+            GetBroadcastPowerMessages();
+            yield return true;
+
+            if (power) {
+                foreach (MyPanel myPanel in POWER) {
+
+                    MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
+
+                    LogPower(myPanel, ref frame);
+
+                    if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
+
+                        DrawSpritesTabsPower(ref frame, myPanel.viewport.Center, myPanel.minScale);
+                        yield return true;
+
+                        Vector2 removePos = new Vector2(-240f, -230f) * myPanel.minScale + myPanel.viewport.Center;
+                        Vector2 startPos = new Vector2(240f, 230f) * myPanel.minScale + myPanel.viewport.Center;
+                        Vector2 movementPos = new Vector2(-5f, 0f) * myPanel.minScale;
+                        float columnSizeMultiplier = 200f * myPanel.minScale / 100f;
+                        float width = 2f * myPanel.minScale;
+
+                        tankCapacityOutputs = DrawMovingGraph(ref frame, tankCapacityOutputs,
+                            movementPos,
+                            removePos.X,
+                            startPos,
+                            columnSizeMultiplier,
+                            (float)tankCapacityPercent,
+                            width, transparentGreen);
+                        yield return true;
+
+                        hEngOutputs = DrawMovingGraph(ref frame, hEngOutputs,
+                            movementPos,
+                            removePos.X,
+                            startPos,
+                            columnSizeMultiplier,
+                            hEngCurrentOutput / hEngMaxOutput * 100f,
+                            width, deepPurple);
+                        yield return true;
+
+                        reactorsOutputs = DrawMovingGraph(ref frame, reactorsOutputs,
+                            movementPos,
+                            removePos.X,
+                            startPos,
+                            columnSizeMultiplier,
+                            reactorsCurrentOutput / reactorsMaxOutput * 100f,
+                            width, transparentBlue);
+                        yield return true;
+
+                        battsCurrentStoredPowers = DrawMovingGraph(ref frame, battsCurrentStoredPowers,
+                            movementPos,
+                            removePos.X,
+                            startPos,
+                            columnSizeMultiplier,
+                            battsCurrentStoredPower / battsMaxStoredPower * 100f,
+                            width, transparentMagenta);
+                        yield return true;
+
+                        batteriesOutputs = DrawMovingGraph(ref frame, batteriesOutputs,
+                            movementPos,
+                            removePos.X,
+                            startPos,
+                            columnSizeMultiplier,
+                            battsCurrentOutput / battsMaxOutput * 100f,
+                            width, transparentNeonMagenta);
+                        yield return true;
+
+                        terminalOutputs = DrawMovingGraph(ref frame, terminalOutputs,
+                            movementPos,
+                            removePos.X,
+                            startPos,
+                            columnSizeMultiplier,
+                            terminalCurrentInput / terminalMaxRequiredInput * 100f,
+                            width, transparentNeonAzure);
+
+                    } else if (myPanel.subTypeId == "SmallCockpitPanel") {
+
+                        string uranium;
+                        ingotsLogDict.TryGetValue("Uranium", out uranium);
+
+                        string ice;
+                        oreLogDict.TryGetValue("Ice", out ice);
+
+                        data.Append("\n\n\n\n\n\n\n\nUranium: ");
+                        data2.Append($"\n\n\n\n\n\n\n\n{uranium:0.#}");
+                        data3.Append("\n\n\n\n\n\n\n\nIce: ");
+                        data4.Append($"\n\n\n\n\n\n\n\n{ice:0.#}");
+
+                        frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                        frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+
+                        frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                        frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+
+                        data.Clear();
+                        data2.Clear();
+                        data3.Clear();
+                        data4.Clear();
+                    }
+
+                    frame.Dispose();
+                    yield return true;
+                }
+                power = false;
+            }
+        }
+
+        public void RunPowerStateMachine() {
+            if (powerStateMachine != null) {
+                bool hasMoreSteps = powerStateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
+                } else {
+                    Echo($"PowerDispose");
+
+                    powerStateMachine.Dispose();
+                    powerStateMachine = RunPowerOverTime();
                 }
             }
         }
@@ -461,47 +577,6 @@ namespace IngameScript {
 
                     painter = true;
                 }
-                //POWERMANAGER
-                else if (igcMessage.Data is MyTuple<
-                    MyTuple<string, float, float>,
-                    MyTuple<float, float, float, float, float>,
-                    MyTuple<float, float>,
-                    MyTuple<float, float>,
-                    MyTuple<float, float>,
-                    double
-                >) {
-                    var data = (MyTuple<
-                        MyTuple<string, float, float>,
-                        MyTuple<float, float, float, float, float>,
-                        MyTuple<float, float>,
-                        MyTuple<float, float>,
-                        MyTuple<float, float>,
-                        double
-                    >)igcMessage.Data;
-
-                    powerStatus = data.Item1.Item1;
-                    terminalCurrentInput = data.Item1.Item2;
-                    terminalMaxRequiredInput = data.Item1.Item3;
-
-                    battsCurrentInput = data.Item2.Item1;
-                    battsCurrentOutput = data.Item2.Item2;
-                    battsMaxOutput = data.Item2.Item3;
-                    battsCurrentStoredPower = data.Item2.Item4;
-                    battsMaxStoredPower = data.Item2.Item5;
-
-                    reactorsCurrentOutput = data.Item3.Item1;
-                    reactorsMaxOutput = data.Item3.Item2;
-
-                    hEngCurrentOutput = data.Item4.Item1;
-                    hEngMaxOutput = data.Item4.Item2;
-
-                    solarMaxOutput = data.Item5.Item1;
-                    turbineMaxOutput = data.Item5.Item2;
-
-                    tankCapacityPercent = data.Item6;
-
-                    power = true;
-                }
                 //INVENTORYMANAGER
                 else if (igcMessage.Data is MyTuple<double, string, string, string, string>) {
                     var data = (MyTuple<double, string, string, string, string>)igcMessage.Data;
@@ -547,6 +622,55 @@ namespace IngameScript {
                     toggleJolt = data.Item3;
                     readyDecoy = data.Item4;
                     toggleDecoy = data.Item5;
+                }
+            }
+        }
+
+        void GetBroadcastPowerMessages() {
+            Echo($"GetBroadcastPowerMessages");
+
+            while (BROADCASTLISTENER.HasPendingMessage) {
+                MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
+
+                if (igcMessage.Data is MyTuple<
+                    MyTuple<string, float, float>,
+                    MyTuple<float, float, float, float, float>,
+                    MyTuple<float, float>,
+                    MyTuple<float, float>,
+                    MyTuple<float, float>,
+                    double
+                >) {
+                    var data = (MyTuple<
+                        MyTuple<string, float, float>,
+                        MyTuple<float, float, float, float, float>,
+                        MyTuple<float, float>,
+                        MyTuple<float, float>,
+                        MyTuple<float, float>,
+                        double
+                    >)igcMessage.Data;
+
+                    powerStatus = data.Item1.Item1;
+                    terminalCurrentInput = data.Item1.Item2;
+                    terminalMaxRequiredInput = data.Item1.Item3;
+
+                    battsCurrentInput = data.Item2.Item1;
+                    battsCurrentOutput = data.Item2.Item2;
+                    battsMaxOutput = data.Item2.Item3;
+                    battsCurrentStoredPower = data.Item2.Item4;
+                    battsMaxStoredPower = data.Item2.Item5;
+
+                    reactorsCurrentOutput = data.Item3.Item1;
+                    reactorsMaxOutput = data.Item3.Item2;
+
+                    hEngCurrentOutput = data.Item4.Item1;
+                    hEngMaxOutput = data.Item4.Item2;
+
+                    solarMaxOutput = data.Item5.Item1;
+                    turbineMaxOutput = data.Item5.Item2;
+
+                    tankCapacityPercent = data.Item6;
+
+                    power = true;
                 }
             }
         }
@@ -719,10 +843,8 @@ namespace IngameScript {
             frame.Dispose();
         }
 
-        void LogPower(MyPanel myPanel) {
+        void LogPower(MyPanel myPanel, ref MySpriteDrawFrame frame) {
             Echo($"LogPower");
-
-            MySpriteDrawFrame frame = myPanel.surface.DrawFrame();
 
             data.Append($"Status: \n"
                 + $"Pow.: \n"
@@ -768,89 +890,6 @@ namespace IngameScript {
             data2.Clear();
             data3.Clear();
             data4.Clear();
-
-            if (beautifyLog && myPanel.subTypeId == "LargeLCDPanel") {
-                DrawSpritesTabsPower(ref frame, myPanel.viewport.Center, myPanel.minScale);
-
-                Vector2 removePos = new Vector2(-240f, -230f) * myPanel.minScale + myPanel.viewport.Center;
-                Vector2 startPos = new Vector2(240f, 230f) * myPanel.minScale + myPanel.viewport.Center;
-                Vector2 movementPos = new Vector2(-5f, 0f) * myPanel.minScale;
-                float columnSizeMultiplier = 200f * myPanel.minScale / 100f;
-                float width = 2f * myPanel.minScale;
-
-                tankCapacityOutputs = DrawMovingGraph(ref frame, tankCapacityOutputs,
-                    movementPos,
-                    removePos.X,
-                    startPos,
-                    columnSizeMultiplier,
-                    (float)tankCapacityPercent,
-                    width, transparentGreen);
-
-                hEngOutputs = DrawMovingGraph(ref frame, hEngOutputs,
-                    movementPos,
-                    removePos.X,
-                    startPos,
-                    columnSizeMultiplier,
-                    hEngCurrentOutput / hEngMaxOutput * 100f,
-                    width, deepPurple);
-
-                reactorsOutputs = DrawMovingGraph(ref frame, reactorsOutputs,
-                    movementPos,
-                    removePos.X,
-                    startPos,
-                    columnSizeMultiplier,
-                    reactorsCurrentOutput / reactorsMaxOutput * 100f,
-                    width, transparentBlue);
-
-                battsCurrentStoredPowers = DrawMovingGraph(ref frame, battsCurrentStoredPowers,
-                    movementPos,
-                    removePos.X,
-                    startPos,
-                    columnSizeMultiplier,
-                    battsCurrentStoredPower / battsMaxStoredPower * 100f,
-                    width, transparentMagenta);
-
-                batteriesOutputs = DrawMovingGraph(ref frame, batteriesOutputs,
-                    movementPos,
-                    removePos.X,
-                    startPos,
-                    columnSizeMultiplier,
-                    battsCurrentOutput / battsMaxOutput * 100f,
-                    width, transparentNeonMagenta);
-
-                terminalOutputs = DrawMovingGraph(ref frame, terminalOutputs,
-                    movementPos,
-                    removePos.X,
-                    startPos,
-                    columnSizeMultiplier,
-                    terminalCurrentInput / terminalMaxRequiredInput * 100f,
-                    width, transparentNeonAzure);
-
-            } else if (myPanel.subTypeId == "SmallCockpitPanel") {
-                string uranium;
-                ingotsLogDict.TryGetValue("Uranium", out uranium);
-
-                string ice;
-                oreLogDict.TryGetValue("Ice", out ice);
-
-                data.Append("\n\n\n\n\n\n\n\nUranium: ");
-                data2.Append($"\n\n\n\n\n\n\n\n{uranium:0.#}");
-                data3.Append("\n\n\n\n\n\n\n\nIce: ");
-                data4.Append($"\n\n\n\n\n\n\n\n{ice:0.#}");
-
-                frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + 20f, myPanel.col1_4.Y + 20f), data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-                frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + 20f, myPanel.col2_4.Y + 20f), data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
-
-                frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + 20f, myPanel.col3_4.Y + 20f), data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
-                frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + 20f, myPanel.col4_4.Y + 20f), data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
-
-                data.Clear();
-                data2.Clear();
-                data3.Clear();
-                data4.Clear();
-            }
-
-            frame.Dispose();
         }
 
         void LogComponentsAmmo(MyPanel myPanel) {
@@ -1155,7 +1194,6 @@ namespace IngameScript {
             } else {
                 data2.Append("Evasion\n"); data.Append("\n");
             }
-            //TODO
             if (obstaclesAvoidance) {
                 data.Append("Obstacles\n"); data2.Append("\n");
             } else {
@@ -1174,7 +1212,6 @@ namespace IngameScript {
 
             data.Clear();
             data2.Clear();
-
 
             if (magneticDrive) {
                 data.Append("Magnetic\n"); data2.Append("\n");
@@ -1249,14 +1286,14 @@ namespace IngameScript {
             orizontalMargin = 75f * myPanel.minScale;
             verticalMargin = 50f * myPanel.minScale;
             frame.Add(DrawSpriteText(new Vector2(myPanel.col1_4.X + myPanel.col1_4.Width + orizontalMargin, myPanel.col1_4.Y + verticalMargin),
-                data.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                data.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));//TODO
             frame.Add(DrawSpriteText(new Vector2(myPanel.col2_4.X + orizontalMargin, myPanel.col2_4.Y + verticalMargin),
-                data2.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+                data2.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));//TODO
 
             frame.Add(DrawSpriteText(new Vector2(myPanel.col3_4.X + myPanel.col3_4.Width + orizontalMargin, myPanel.col3_4.Y + verticalMargin),
-                data3.ToString(), "Default", myPanel.minScale, azure, TextAlignment.RIGHT));
+                data3.ToString(), "Default", myPanel.minScale - 0.1f, azure, TextAlignment.RIGHT));//TODO
             frame.Add(DrawSpriteText(new Vector2(myPanel.col4_4.X + orizontalMargin, myPanel.col4_4.Y + verticalMargin),
-                data4.ToString(), "Default", myPanel.minScale, magenta, TextAlignment.LEFT));
+                data4.ToString(), "Default", myPanel.minScale - 0.1f, magenta, TextAlignment.LEFT));//TODO
 
             data.Clear();
             data2.Clear();
