@@ -270,11 +270,13 @@ namespace IngameScript {
                 if (magneticDrive) {
                     needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || isAutoPiloted || mySpeed > 2d
                         || targFound || !Vector3D.IsZero(returnPosition) || !Vector3D.IsZero(dockPosition)
-                        || !Vector3D.IsZero(dockHitPosition) || !Vector3D.IsZero(landPosition) || !Vector3D.IsZero(rangeFinderPosition);
+                        || !Vector3D.IsZero(dockHitPosition) || !Vector3D.IsZero(landPosition) || !Vector3D.IsZero(rangeFinderPosition)
+                        || follow;
                 } else {
                     needControl = CONTROLLER.IsUnderControl || REMOTE.IsUnderControl || targFound
                         || !Vector3D.IsZero(returnPosition) || !Vector3D.IsZero(dockPosition) || !Vector3D.IsZero(dockHitPosition)
-                        || !Vector3D.IsZero(landPosition) || !Vector3D.IsZero(rangeFinderPosition);
+                        || !Vector3D.IsZero(landPosition) || !Vector3D.IsZero(rangeFinderPosition)
+                        || follow;
                 }
 
                 if (aimTarget) {
@@ -494,7 +496,7 @@ namespace IngameScript {
             if (BROADCASTLISTENER.HasPendingMessage) {
                 while (BROADCASTLISTENER.HasPendingMessage) {
                     MyIGCMessage igcMessage = BROADCASTLISTENER.AcceptMessage();
-                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool>) {//TODO
+                    if (igcMessage.Data is MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool>) {
                         MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool> data = (MyTuple<bool, Vector3D, Vector3D, MatrixD, Vector3D, bool>)igcMessage.Data;
                         targFound = data.Item1;
                         targHitPos = data.Item2;
@@ -559,7 +561,7 @@ namespace IngameScript {
                         MyTuple.Create(timeRemaining, maxJump, currentJump, totJumpPercent, currentStoredPower, maxStoredPower),
                         MyTuple.Create(rangeFinderPosition, !string.IsNullOrEmpty(rangeFinderName) ? rangeFinderName : selectedPlanet, rangeFinderDistance, rangeFinderDiameter),
                         MyTuple.Create(magneticDrive, idleThrusters, sunAlign, safetyDampeners, useGyrosToStabilize, autoCombat),
-                        MyTuple.Create(obstaclesAvoidance, enemyEvasion, keepAltitude, moddedSensor, closeRangeCombat)//TODO
+                        MyTuple.Create(obstaclesAvoidance, enemyEvasion, keepAltitude, moddedSensor, closeRangeCombat)
                         );
                     IGC.SendBroadcastMessage("[LOGGER]", tuple, TransmissionDistance.ConnectedConstructs);
                     sendMessageCount = 0;
@@ -2254,9 +2256,9 @@ namespace IngameScript {
             }
 
             //----------------------------------------------
-            Debug.PrintHUD($"yawPID:{yawController.KP:0.####}, {yawController.KI:0.####}, {yawController.KD:0.####}");
-            Debug.PrintHUD($"pitchPID:{pitchController.KP:0.####}, {pitchController.KI:0.####}, {pitchController.KD:0.####}");
-            Debug.PrintHUD($"rollPID:{rollController.KP:0.####}, {rollController.KI:0.####}, {rollController.KD:0.####}");
+            //Debug.PrintHUD($"yawPID:{yawController.KP:0.####}, {yawController.KI:0.####}, {yawController.KD:0.####}");
+            //Debug.PrintHUD($"pitchPID:{pitchController.KP:0.####}, {pitchController.KI:0.####}, {pitchController.KD:0.####}");
+            //Debug.PrintHUD($"rollPID:{rollController.KP:0.####}, {rollController.KI:0.####}, {rollController.KD:0.####}");
             //----------------------------------------------
         }
 
