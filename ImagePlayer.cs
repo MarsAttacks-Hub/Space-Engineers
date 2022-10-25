@@ -39,8 +39,8 @@ namespace IngameScript {
         readonly double dangerTimeDelay = 3d;
         readonly double colorMorphTimeDelay = 1d;
 
-        bool player = true;
-        bool runningLights = true;
+        bool player = true;//enable/disable image player
+        bool runningLights = false;//enable/disable morphing lights
 
         int beerFrame = 72;
         int warn1Frame = 18;

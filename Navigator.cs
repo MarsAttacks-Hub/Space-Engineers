@@ -1904,14 +1904,14 @@ namespace IngameScript {
                 }
                 double pitch = 0d;
                 double yaw = 0d;
-                if (power < .02) {
+                if (power < 0.02f) {
                     if (unlockSunAlignOnce) {
                         UnlockGyros();
                         unlockSunAlignOnce = false;
                     }
                     return;
                 }
-                if (power > .98) {
+                if (power > 0.98f) {
                     if (sunAlignmentStep > 0) {
                         sunAlignmentStep = 0;
                         if (unlockSunAlignOnce) {
