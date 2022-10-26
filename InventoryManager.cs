@@ -27,9 +27,6 @@ namespace IngameScript {
         bool logger = true;//enable/disable logging
 
         double cargoPercentage = 0;
-        int ticks = 0;
-        int productionTicks = 0;
-        int messageTicks = 0;
 
         public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
         public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
@@ -52,6 +49,10 @@ namespace IngameScript {
         IMyTextPanel LCDUPDATEQUOTA;
 
         readonly MyIni myIni = new MyIni();
+
+        IEnumerator<bool> inventoryStateMachine;
+        IEnumerator<bool> productionStateMachine;
+        IEnumerator<bool> readerStateMachine;
 
         public Dictionary<MyDefinitionId, MyTuple<string, double>> componentsDefBpQuota = new Dictionary<MyDefinitionId, MyTuple<string, double>>() {
             { MyItemType.MakeAmmo("Missile200mm"),              MyTuple.Create("Missile200mm",                  5d) },
@@ -275,50 +276,29 @@ namespace IngameScript {
         void Setup() {
             GetBlocks();
             Me.GetSurface(0).BackgroundColor = togglePB ? new Color(25, 0, 100) : new Color(0, 0, 0);
+            inventoryStateMachine = RunInventoryOverTime();
+            productionStateMachine = RunProductionOverTime();
+            readerStateMachine = RunReaderOverTime();
         }
 
-        public void Main(string argument) {
+        public void Main(string argument, UpdateType updateType) {
             try {
-                Echo($"ticks:{ticks}");
-                Echo($"productionTicks:{productionTicks}");
                 Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
 
                 if (!string.IsNullOrEmpty(argument)) {
                     ProcessArgument(argument);
                     if (!togglePB) { return; } else if (argument == "UpdateQuota") { return; }
-                }
+                } else {
+                    if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
+                        bool executed = RunInventoryStateMachine();
 
-                if (ticks == 1) {
-                    MoveItemsIntoCargo(CONNECTORSINVENTORIES);
-                } else if (ticks == 3) {
-                    CompactInventory(INVENTORIES);
-                } else if (ticks == 5) {
-                    SortCargos();
-                } else if (ticks == 7) {
-                    ReadInventoryInfos();
-                    ticks = -1;
-                }
-                ticks++;
+                        if (!executed) {
+                            RunProductionStateMachine();
+                        }
 
-                if (productionTicks == 2) {
-                    AutoAssemblers();
-                } else if (productionTicks == 4) {
-                    AutoRefineries();
-                } else if (productionTicks == 6) {
-                    MoveProductionOutputsToMainInventory();
-                } else if (productionTicks >= 100) {
-                    productionTicks = -1;
-                }
-                productionTicks++;
-
-                if (logger) {
-                    if (messageTicks >= 10) {
-                        SendBroadcastMessage();
-                        messageTicks = 0;
+                        RunReaderStateMachine();
                     }
-                    messageTicks++;
                 }
-
             } catch (Exception e) {
                 IMyTextPanel DEBUG = GridTerminalSystem.GetBlockWithName("[CRX] Debug") as IMyTextPanel;
                 if (DEBUG != null) {
@@ -390,7 +370,166 @@ namespace IngameScript {
             }
         }
 
+        public IEnumerator<bool> RunInventoryOverTime() {
+            foreach (IMyInventory inv in CONNECTORSINVENTORIES) {
+                Echo($"MoveItemsIntoCargo");
+
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                inv.GetItems(items);
+                foreach (MyInventoryItem item in items) {
+                    foreach (IMyInventory cargoInv in CARGOINVENTORIES) {
+                        if (inv.CanTransferItemTo(cargoInv, item.Type) && cargoInv.CanItemsBeAdded(item.Amount, item.Type)) {
+                            inv.TransferItemTo(cargoInv, item);
+                        }
+                    }
+                }
+                yield return true;
+                yield return false;
+            }
+
+            foreach (IMyInventory inventory in INVENTORIES) {
+                Echo($"CompactInventory");
+
+                for (int i = inventory.ItemCount - 1; i > 0; i--) {
+                    inventory.TransferItemTo(inventory, i, stackIfPossible: true);
+                }
+                yield return true;
+                yield return false;
+            }
+
+            List<IMyCargoContainer> reversedCargo = CONTAINERS;
+            reversedCargo.Reverse();
+            foreach (IMyCargoContainer rCargo in reversedCargo) {
+                Echo($"SortCargos");
+
+                IMyInventory rInventory = rCargo.GetInventory();
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                rInventory.GetItems(items);
+                if (items.Count > 0) {
+                    foreach (IMyCargoContainer cargo in CONTAINERS) {
+                        if (cargo.EntityId != rCargo.EntityId) {
+                            IMyInventory inventory = cargo.GetInventory();
+                            foreach (MyInventoryItem item in items) {
+                                if (rInventory.CanTransferItemTo(inventory, item.Type) && inventory.CanItemsBeAdded(item.Amount, item.Type)) {
+                                    rInventory.TransferItemTo(inventory, item);
+                                }
+                            }
+                        }
+                    }
+                }
+                yield return true;
+                yield return false;
+            }
+        }
+
+        public IEnumerator<bool> RunProductionOverTime() {
+            AutoAssemblers();
+            yield return true;
+
+            AutoRefineries();
+            yield return true;
+
+            MoveProductionOutputsToMainInventory();
+            yield return true;
+
+            int count = 0;
+            while (count <= 50) {
+                Echo($"production count: {count}");
+
+                count++;
+                yield return true;
+            }
+        }
+
+        public IEnumerator<bool> RunReaderOverTime() {
+
+            ReadInventoriesFillPercentage(CARGOINVENTORIES, out cargoPercentage);
+            yield return true;
+
+            ResetComponentsDict();
+            ResetIngotDict();
+            ResetOreDict();
+            ResetRefineryOreDict();
+            ResetAmmosDict();
+            foreach (IMyInventory inventory in INVENTORIES) {
+                Echo($"ReadAllItems");
+
+                List<MyInventoryItem> items = new List<MyInventoryItem>();
+                inventory.GetItems(items);
+                foreach (MyInventoryItem item in items) {
+                    if (item.Type.GetItemInfo().IsOre) {
+                        double num;
+                        if (oreDict.TryGetValue(item.Type, out num)) { oreDict[item.Type] = num + (double)item.Amount; }
+                        if (refineryOreDict.TryGetValue(item.Type, out num)) { refineryOreDict[item.Type] = num + (double)item.Amount; }
+                        if (baseRefineryOreDict.TryGetValue(item.Type, out num)) { baseRefineryOreDict[item.Type] = num + (double)item.Amount; }
+                    } else if (item.Type.GetItemInfo().IsIngot) {
+                        double num;
+                        if (ingotsDict.TryGetValue(item.Type, out num)) { ingotsDict[item.Type] = num + (double)item.Amount; }
+                    } else if (item.Type.GetItemInfo().IsComponent) {
+                        double num;
+                        if (componentsDict.TryGetValue(item.Type, out num)) { componentsDict[item.Type] = num + (double)item.Amount; }
+                    } else if (item.Type.GetItemInfo().IsAmmo) {
+                        double num;
+                        if (ammosDict.TryGetValue(item.Type, out num)) { ammosDict[item.Type] = num + (double)item.Amount; }
+                    }
+                }
+                yield return true;
+            }
+
+            if (logger) {
+                SendBroadcastMessage();
+                yield return true;
+            }
+        }
+
+        public bool RunInventoryStateMachine() {
+            if (inventoryStateMachine != null) {
+                bool hasMoreSteps = inventoryStateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
+                } else {
+                    Echo($"InventoryDispose");
+
+                    inventoryStateMachine.Dispose();
+                    inventoryStateMachine = RunInventoryOverTime();//stateMachine = null;
+                }
+
+                return inventoryStateMachine.Current;
+            }
+            return false;
+        }
+
+        public void RunProductionStateMachine() {
+            if (productionStateMachine != null) {
+                bool hasMoreSteps = productionStateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
+                } else {
+                    Echo($"ProductionDispose");
+
+                    productionStateMachine.Dispose();
+                    productionStateMachine = RunProductionOverTime();
+                }
+            }
+        }
+
+        public void RunReaderStateMachine() {
+            if (readerStateMachine != null) {
+                bool hasMoreSteps = readerStateMachine.MoveNext();
+                if (hasMoreSteps) {
+                    Runtime.UpdateFrequency |= UpdateFrequency.Update10;
+                } else {
+                    Echo($"ReaderDispose");
+
+                    readerStateMachine.Dispose();
+                    readerStateMachine = RunReaderOverTime();
+                }
+            }
+        }
+
         void SendBroadcastMessage() {
+            Echo($"SendBroadcastMessage");
+
             StringBuilder oresLog = new StringBuilder("");
             StringBuilder ingotsLog = new StringBuilder("");
             StringBuilder ammosLog = new StringBuilder("");
@@ -446,6 +585,8 @@ namespace IngameScript {
         }
 
         void ReadInventoryInfos() {
+            Echo($"ReadInventoryInfos");
+
             ReadInventoriesFillPercentage(CARGOINVENTORIES, out cargoPercentage);
             ReadAllItems(INVENTORIES);
         }
@@ -480,6 +621,8 @@ namespace IngameScript {
         }
 
         void ReadInventoriesFillPercentage(List<IMyInventory> inventories, out double invPercent) {
+            Echo($"ReadInventoriesFillPercentage");
+
             invPercent = 0d;
             foreach (IMyInventory inventory in inventories) {
                 double inventoriesPercent = 0d;
@@ -493,6 +636,8 @@ namespace IngameScript {
         }
 
         void MoveProductionOutputsToMainInventory() {
+            Echo($"MoveProductionOutputsToMainInventory");
+
             foreach (IMyRefinery block in REFINERIES) {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 block.OutputInventory.GetItems(items);
@@ -520,12 +665,16 @@ namespace IngameScript {
         }
 
         void CompactInventory(List<IMyInventory> inventories) {
+            Echo($"CompactInventory");
+
             foreach (IMyInventory inventory in inventories) {
                 for (int i = inventory.ItemCount - 1; i > 0; i--) { inventory.TransferItemTo(inventory, i, stackIfPossible: true); }
             }
         }
 
         void AutoAssemblers() {
+            Echo($"AutoAssemblers");
+
             int clearQueue = 0;
             foreach (KeyValuePair<MyDefinitionId, MyTuple<string, double>> element in componentsDefBpQuota) {
                 MyDefinitionId component = element.Key;
@@ -584,6 +733,8 @@ namespace IngameScript {
         }
 
         void AutoRefineries() {
+            Echo($"AutoRefineries");
+
             MoveItemsIntoCargo(REFINERIESINVENTORIES);
             ReadAllItems(CARGOINVENTORIES);
             MyDefinitionId blueprintDef = default(MyDefinitionId);
@@ -670,6 +821,8 @@ namespace IngameScript {
         }
 
         void SortCargos() {
+            Echo($"SortCargos");
+
             List<IMyCargoContainer> reversedCargo = CONTAINERS;
             reversedCargo.Reverse();
             foreach (IMyCargoContainer rCargo in reversedCargo) {
@@ -692,6 +845,8 @@ namespace IngameScript {
         }
 
         void MoveItemsIntoCargo(List<IMyInventory> inventories) {
+            Echo($"MoveItemsIntoCargo");
+
             foreach (IMyInventory inv in inventories) {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 inv.GetItems(items);
