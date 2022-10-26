@@ -26,7 +26,8 @@ namespace IngameScript {
         bool togglePB = true;//enable/disable PB
         bool logger = true;//enable/disable logging
 
-        bool proceed = false;
+        bool initProduction;
+        bool executeProduction;
         double cargoPercentage = 0;
         int readerCount = 0;
         int productionCount = 0;
@@ -287,7 +288,7 @@ namespace IngameScript {
         public void Main(string argument, UpdateType updateType) {
             try {
                 Echo($"LastRunTime:{Runtime.LastRunTimeMs}");
-                Echo($"proceed:{proceed}, reader:{readerCount}");
+                Echo($"reader:{readerCount}");
 
                 if (!string.IsNullOrEmpty(argument)) {
                     ProcessArgument(argument);
@@ -297,17 +298,16 @@ namespace IngameScript {
                         bool executed = RunInventoryStateMachine();
 
                         bool read = RunReaderStateMachine();
-                        if (read) {
-                            proceed = true;
-                        } else if (executed && read) {
-                            proceed = true;
-                        } else {
-                            proceed = false;
+
+                        if (!executeProduction) {
+                            if (read) {
+                                executeProduction = true;
+                            }
                         }
 
                         if (!executed) {
                             productionCount++;
-                            RunProductionStateMachine();
+                            RunProductionStateMachine();//TODO
                         }
                     }
                 }
@@ -440,7 +440,8 @@ namespace IngameScript {
         }
 
         public IEnumerator<bool> RunProductionOverTime() {
-            if (proceed && productionCount >= 50) {
+
+            if (executeProduction && productionCount >= 50) {//TODO
                 AutoAssemblers();
                 yield return true;
 
@@ -448,10 +449,11 @@ namespace IngameScript {
                 yield return true;
 
                 MoveProductionOutputsToMainInventory();
-                proceed = false;
+                executeProduction = false;
                 productionCount = 0;
                 yield return true;
             } else {
+                executeProduction = false;
                 yield return true;
             }
         }
