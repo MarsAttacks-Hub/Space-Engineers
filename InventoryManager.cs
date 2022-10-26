@@ -29,6 +29,7 @@ namespace IngameScript {
         bool proceed = false;
         double cargoPercentage = 0;
         int readerCount = 0;
+        int productionCount = 0;
 
         public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
         public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
@@ -298,9 +299,14 @@ namespace IngameScript {
                         bool read = RunReaderStateMachine();
                         if (read) {
                             proceed = true;
+                        } else if (executed && read) {
+                            proceed = true;
+                        } else {
+                            proceed = false;
                         }
 
                         if (!executed) {
+                            productionCount++;
                             RunProductionStateMachine();
                         }
                     }
@@ -434,15 +440,7 @@ namespace IngameScript {
         }
 
         public IEnumerator<bool> RunProductionOverTime() {
-            int count = 0;
-            while (count <= 50) {
-                Echo($"production count: {count}");
-
-                count++;
-                yield return true;
-            }
-
-            if (proceed) {
+            if (proceed && productionCount >= 50) {
                 AutoAssemblers();
                 yield return true;
 
@@ -451,6 +449,7 @@ namespace IngameScript {
 
                 MoveProductionOutputsToMainInventory();
                 proceed = false;
+                productionCount = 0;
                 yield return true;
             } else {
                 yield return true;
