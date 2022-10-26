@@ -26,7 +26,6 @@ namespace IngameScript {
         bool togglePB = true;//enable/disable PB
         bool logger = true;//enable/disable logging
 
-        bool initProduction;
         bool executeProduction;
         double cargoPercentage = 0;
         int readerCount = 0;
@@ -307,7 +306,7 @@ namespace IngameScript {
 
                         if (!executed) {
                             productionCount++;
-                            RunProductionStateMachine();//TODO
+                            RunProductionStateMachine();
                         }
                     }
                 }
@@ -441,7 +440,7 @@ namespace IngameScript {
 
         public IEnumerator<bool> RunProductionOverTime() {
 
-            if (executeProduction && productionCount >= 50) {//TODO
+            if (executeProduction && productionCount >= 50) {
                 AutoAssemblers();
                 yield return true;
 
