@@ -26,7 +26,9 @@ namespace IngameScript {
         bool togglePB = true;//enable/disable PB
         bool logger = true;//enable/disable logging
 
+        bool proceed = false;
         double cargoPercentage = 0;
+        int readerCount = 0;
 
         public List<IMyInventory> INVENTORIES = new List<IMyInventory>();
         public List<IMyCargoContainer> CONTAINERS = new List<IMyCargoContainer>();
@@ -283,7 +285,8 @@ namespace IngameScript {
 
         public void Main(string argument, UpdateType updateType) {
             try {
-                Echo($"LastRunTimeMs:{Runtime.LastRunTimeMs}");
+                Echo($"LastRunTime:{Runtime.LastRunTimeMs}");
+                Echo($"proceed:{proceed}, reader:{readerCount}");
 
                 if (!string.IsNullOrEmpty(argument)) {
                     ProcessArgument(argument);
@@ -292,11 +295,14 @@ namespace IngameScript {
                     if ((updateType & UpdateType.Update10) == UpdateType.Update10) {
                         bool executed = RunInventoryStateMachine();
 
+                        bool read = RunReaderStateMachine();
+                        if (read) {
+                            proceed = true;
+                        }
+
                         if (!executed) {
                             RunProductionStateMachine();
                         }
-
-                        RunReaderStateMachine();
                     }
                 }
             } catch (Exception e) {
@@ -371,7 +377,9 @@ namespace IngameScript {
         }
 
         public IEnumerator<bool> RunInventoryOverTime() {
+
             foreach (IMyInventory inv in CONNECTORSINVENTORIES) {
+                //if (inv.ItemCount > 0) {
                 Echo($"MoveItemsIntoCargo");
 
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
@@ -385,6 +393,7 @@ namespace IngameScript {
                 }
                 yield return true;
                 yield return false;
+                //}
             }
 
             foreach (IMyInventory inventory in INVENTORIES) {
@@ -400,9 +409,10 @@ namespace IngameScript {
             List<IMyCargoContainer> reversedCargo = CONTAINERS;
             reversedCargo.Reverse();
             foreach (IMyCargoContainer rCargo in reversedCargo) {
+                IMyInventory rInventory = rCargo.GetInventory();
+                //if (rInventory.ItemCount > 0) {
                 Echo($"SortCargos");
 
-                IMyInventory rInventory = rCargo.GetInventory();
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 rInventory.GetItems(items);
                 if (items.Count > 0) {
@@ -419,19 +429,11 @@ namespace IngameScript {
                 }
                 yield return true;
                 yield return false;
+                //}
             }
         }
 
         public IEnumerator<bool> RunProductionOverTime() {
-            AutoAssemblers();
-            yield return true;
-
-            AutoRefineries();
-            yield return true;
-
-            MoveProductionOutputsToMainInventory();
-            yield return true;
-
             int count = 0;
             while (count <= 50) {
                 Echo($"production count: {count}");
@@ -439,12 +441,23 @@ namespace IngameScript {
                 count++;
                 yield return true;
             }
+
+            if (proceed) {
+                AutoAssemblers();
+                yield return true;
+
+                AutoRefineries();
+                yield return true;
+
+                MoveProductionOutputsToMainInventory();
+                proceed = false;
+                yield return true;
+            } else {
+                yield return true;
+            }
         }
 
         public IEnumerator<bool> RunReaderOverTime() {
-
-            ReadInventoriesFillPercentage(CARGOINVENTORIES, out cargoPercentage);
-            yield return true;
 
             ResetComponentsDict();
             ResetIngotDict();
@@ -452,6 +465,7 @@ namespace IngameScript {
             ResetRefineryOreDict();
             ResetAmmosDict();
             foreach (IMyInventory inventory in INVENTORIES) {
+                //if (inventory.ItemCount > 0) {
                 Echo($"ReadAllItems");
 
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
@@ -473,11 +487,25 @@ namespace IngameScript {
                         if (ammosDict.TryGetValue(item.Type, out num)) { ammosDict[item.Type] = num + (double)item.Amount; }
                     }
                 }
-                yield return true;
+                if (logger) { readerCount++; }
+                yield return false;
+                //}
             }
 
             if (logger) {
-                SendBroadcastMessage();
+                readerCount++;
+
+                if (readerCount >= 9) {
+                    ReadInventoriesFillPercentage(CARGOINVENTORIES, out cargoPercentage);
+                    yield return false;
+
+                    SendBroadcastMessage();
+                    readerCount = 0;
+                    yield return true;
+                } else {
+                    yield return true;
+                }
+            } else {
                 yield return true;
             }
         }
@@ -513,7 +541,7 @@ namespace IngameScript {
             }
         }
 
-        public void RunReaderStateMachine() {
+        public bool RunReaderStateMachine() {
             if (readerStateMachine != null) {
                 bool hasMoreSteps = readerStateMachine.MoveNext();
                 if (hasMoreSteps) {
@@ -524,7 +552,10 @@ namespace IngameScript {
                     readerStateMachine.Dispose();
                     readerStateMachine = RunReaderOverTime();
                 }
+
+                return readerStateMachine.Current;
             }
+            return false;
         }
 
         void SendBroadcastMessage() {
@@ -625,13 +656,15 @@ namespace IngameScript {
 
             invPercent = 0d;
             foreach (IMyInventory inventory in inventories) {
-                double inventoriesPercent = 0d;
-                double currentVolume = (double)inventory.CurrentVolume;
-                double maxVolume = (double)inventory.MaxVolume;
-                if (maxVolume != 0d) {
-                    inventoriesPercent = currentVolume / maxVolume * 100d;
+                if (inventory.ItemCount > 0) {
+                    double inventoriesPercent = 0d;
+                    double currentVolume = (double)inventory.CurrentVolume;
+                    double maxVolume = (double)inventory.MaxVolume;
+                    if (maxVolume != 0d) {
+                        inventoriesPercent = currentVolume / maxVolume * 100d;
+                    }
+                    invPercent += inventoriesPercent;
                 }
-                invPercent += inventoriesPercent;
             }
         }
 
