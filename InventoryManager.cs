@@ -130,7 +130,7 @@ namespace IngameScript {
             {MyItemType.MakeComponent("Superconductor"),0d}, {MyItemType.MakeComponent("Thrust"),0d}, {MyItemType.MakeComponent("ZoneChip"),0d}
         };
 
-        public Dictionary<MyDefinitionId, double> ammosDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
+        public Dictionary<MyDefinitionId, double> ammoDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
             {MyItemType.MakeAmmo("NATO_25x184mm"),0d},
             {MyItemType.MakeAmmo("AutocannonClip"),0d},
             {MyItemType.MakeAmmo("Missile200mm"),0d},
@@ -459,11 +459,12 @@ namespace IngameScript {
 
         public IEnumerator<bool> RunReaderOverTime() {
 
-            ResetComponentsDict();
-            ResetIngotDict();
-            ResetOreDict();
-            ResetRefineryOreDict();
-            ResetAmmosDict();
+            Dictionary<MyDefinitionId, double> components = ResetComponentsDict();
+            Dictionary<MyDefinitionId, double> ingots = ResetIngotDict();
+            Dictionary<MyDefinitionId, double> ore = ResetOreDict();
+            Dictionary<MyDefinitionId, double> refineryOre = ResetRefineryOreDict();
+            Dictionary<MyDefinitionId, double> baseRefineryOre = ResetBaseRefineryOreDict();
+            Dictionary<MyDefinitionId, double> ammo = ResetAmmosDict();
             foreach (IMyInventory inventory in INVENTORIES) {
                 //if (inventory.ItemCount > 0) {
                 Echo($"ReadAllItems");
@@ -473,24 +474,30 @@ namespace IngameScript {
                 foreach (MyInventoryItem item in items) {
                     if (item.Type.GetItemInfo().IsOre) {
                         double num;
-                        if (oreDict.TryGetValue(item.Type, out num)) { oreDict[item.Type] = num + (double)item.Amount; }
-                        if (refineryOreDict.TryGetValue(item.Type, out num)) { refineryOreDict[item.Type] = num + (double)item.Amount; }
-                        if (baseRefineryOreDict.TryGetValue(item.Type, out num)) { baseRefineryOreDict[item.Type] = num + (double)item.Amount; }
+                        if (ore.TryGetValue(item.Type, out num)) { ore[item.Type] = num + (double)item.Amount; }
+                        if (refineryOre.TryGetValue(item.Type, out num)) { refineryOre[item.Type] = num + (double)item.Amount; }
+                        if (baseRefineryOre.TryGetValue(item.Type, out num)) { baseRefineryOre[item.Type] = num + (double)item.Amount; }
                     } else if (item.Type.GetItemInfo().IsIngot) {
                         double num;
-                        if (ingotsDict.TryGetValue(item.Type, out num)) { ingotsDict[item.Type] = num + (double)item.Amount; }
+                        if (ingots.TryGetValue(item.Type, out num)) { ingots[item.Type] = num + (double)item.Amount; }
                     } else if (item.Type.GetItemInfo().IsComponent) {
                         double num;
-                        if (componentsDict.TryGetValue(item.Type, out num)) { componentsDict[item.Type] = num + (double)item.Amount; }
+                        if (components.TryGetValue(item.Type, out num)) { components[item.Type] = num + (double)item.Amount; }
                     } else if (item.Type.GetItemInfo().IsAmmo) {
                         double num;
-                        if (ammosDict.TryGetValue(item.Type, out num)) { ammosDict[item.Type] = num + (double)item.Amount; }
+                        if (ammo.TryGetValue(item.Type, out num)) { ammo[item.Type] = num + (double)item.Amount; }
                     }
                 }
                 if (logger) { readerCount++; }
                 yield return false;
                 //}
             }
+            componentsDict = components;
+            ingotsDict = ingots;
+            oreDict = ore;
+            refineryOreDict = refineryOre;
+            baseRefineryOreDict = baseRefineryOre;
+            ammoDict = ammo;
 
             if (logger) {
                 readerCount++;
@@ -567,8 +574,8 @@ namespace IngameScript {
             StringBuilder componentsLog = new StringBuilder("");
 
             int count = 1;
-            foreach (KeyValuePair<MyDefinitionId, double> entry in ammosDict) {
-                if (count == ammosDict.Count) {
+            foreach (KeyValuePair<MyDefinitionId, double> entry in ammoDict) {
+                if (count == ammoDict.Count) {
                     ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value}");
                 } else {
                     ammosLog.Append($"{entry.Key.SubtypeId}={(int)entry.Value},");
@@ -623,11 +630,12 @@ namespace IngameScript {
         }
 
         void ReadAllItems(List<IMyInventory> inventories) {
-            ResetComponentsDict();
-            ResetIngotDict();
-            ResetOreDict();
-            ResetRefineryOreDict();
-            ResetAmmosDict();
+            componentsDict = ResetComponentsDict();
+            ingotsDict = ResetIngotDict();
+            oreDict = ResetOreDict();
+            refineryOreDict = ResetRefineryOreDict();
+            baseRefineryOreDict = ResetBaseRefineryOreDict();
+            ammoDict = ResetAmmosDict();
             foreach (IMyInventory inventory in inventories) {
                 List<MyInventoryItem> items = new List<MyInventoryItem>();
                 inventory.GetItems(items);
@@ -645,7 +653,7 @@ namespace IngameScript {
                         if (componentsDict.TryGetValue(item.Type, out num)) { componentsDict[item.Type] = num + (double)item.Amount; }
                     } else if (item.Type.GetItemInfo().IsAmmo) {
                         double num;
-                        if (ammosDict.TryGetValue(item.Type, out num)) { ammosDict[item.Type] = num + (double)item.Amount; }
+                        if (ammoDict.TryGetValue(item.Type, out num)) { ammoDict[item.Type] = num + (double)item.Amount; }
                     }
                 }
             }
@@ -716,7 +724,7 @@ namespace IngameScript {
                 MyDefinitionId blueprintDef = MyDefinitionId.Parse("MyObjectBuilder_BlueprintDefinition/" + componentBp);
                 double cargoAmount = 0d;
                 bool itemFound = componentsDict.TryGetValue(component, out cargoAmount);
-                if (!itemFound) { itemFound = ammosDict.TryGetValue(component, out cargoAmount); }
+                if (!itemFound) { itemFound = ammoDict.TryGetValue(component, out cargoAmount); }
                 Dictionary<MyDefinitionId, double> ingotsNeeded = new Dictionary<MyDefinitionId, double>();
                 bool ingotNeededFound = componentsPartsDict.TryGetValue(component, out ingotsNeeded);
                 bool enoughIngots = false;
@@ -1091,37 +1099,39 @@ namespace IngameScript {
             LCDUPDATEQUOTA = GridTerminalSystem.GetBlockWithName("[CRX] LCD Update Quota") as IMyTextPanel;
         }
 
-        void ResetOreDict() {
-            oreDict = new Dictionary<MyDefinitionId, double>() {
+        Dictionary<MyDefinitionId, double> ResetOreDict() {
+            return new Dictionary<MyDefinitionId, double>() {
                 {MyItemType.MakeOre("Cobalt"),0d}, {MyItemType.MakeOre("Gold"),0d}, {MyItemType.MakeOre("Ice"),0d}, {MyItemType.MakeOre("Iron"),0d}, {MyItemType.MakeOre("Magnesium"),0d},
                 {MyItemType.MakeOre("Nickel"),0d}, {MyItemType.MakeOre("Organic"),0d}, {MyItemType.MakeOre("Platinum"),0d}, {MyItemType.MakeOre("Scrap"),0d}, {MyItemType.MakeOre("Silicon"),0d},
                 {MyItemType.MakeOre("Silver"),0d}, {MyItemType.MakeOre("Stone"),0d}, {MyItemType.MakeOre("Uranium"),0d}
             };
         }
 
-        void ResetRefineryOreDict() {
-            refineryOreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
+        Dictionary<MyDefinitionId, double> ResetRefineryOreDict() {
+            return new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
                 {MyItemType.MakeOre("Cobalt"),0d}, {MyItemType.MakeOre("Gold"),0d}, {MyItemType.MakeOre("Iron"),0d}, {MyItemType.MakeOre("Magnesium"),0d}, {MyItemType.MakeOre("Nickel"),0d},
                 {MyItemType.MakeOre("Platinum"),0d}, {MyItemType.MakeOre("Scrap"),0d}, {MyItemType.MakeOre("Silicon"),0d}, {MyItemType.MakeOre("Silver"),0d}, {MyItemType.MakeOre("Stone"),0d},
                 {MyItemType.MakeOre("Uranium"),0d}
             };
+        }
 
-            baseRefineryOreDict = new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
+        Dictionary<MyDefinitionId, double> ResetBaseRefineryOreDict() {
+            return new Dictionary<MyDefinitionId, double>(MyDefinitionId.Comparer) {
                 {MyItemType.MakeOre("Cobalt"),0d}, {MyItemType.MakeOre("Iron"),0d}, {MyItemType.MakeOre("Magnesium"),0d}, {MyItemType.MakeOre("Nickel"),0d}, {MyItemType.MakeOre("Scrap"),0d},
                 {MyItemType.MakeOre("Silicon"),0d}, {MyItemType.MakeOre("Stone"),0d},
             };
         }
 
-        void ResetIngotDict() {
-            ingotsDict = new Dictionary<MyDefinitionId, double>() {
+        Dictionary<MyDefinitionId, double> ResetIngotDict() {
+            return new Dictionary<MyDefinitionId, double>() {
                 {MyItemType.MakeIngot("Cobalt"),0d}, {MyItemType.MakeIngot("Gold"),0d}, {MyItemType.MakeIngot("Stone"),0d}, {MyItemType.MakeIngot("Iron"),0d}, {MyItemType.MakeIngot("Magnesium"),0d},
                 {MyItemType.MakeIngot("Nickel"),0d}, {MyItemType.MakeIngot("Scrap"),0d}, {MyItemType.MakeIngot("Platinum"),0d}, {MyItemType.MakeIngot("Silicon"),0d},
                 {MyItemType.MakeIngot("Silver"),0d}, {MyItemType.MakeIngot("Uranium"),0d}
             };
         }
 
-        void ResetComponentsDict() {
-            componentsDict = new Dictionary<MyDefinitionId, double>() {
+        Dictionary<MyDefinitionId, double> ResetComponentsDict() {
+            return new Dictionary<MyDefinitionId, double>() {
                 {MyItemType.MakeComponent("BulletproofGlass"),0d}, {MyItemType.MakeComponent("Canvas"),0d}, {MyItemType.MakeComponent("Computer"),0d}, {MyItemType.MakeComponent("Construction"),0d},
                 {MyItemType.MakeComponent("Detector"),0d}, {MyItemType.MakeComponent("Display"),0d}, {MyItemType.MakeComponent("Explosives"),0d}, {MyItemType.MakeComponent("Girder"),0d},
                 {MyItemType.MakeComponent("GravityGenerator"),0d}, {MyItemType.MakeComponent("InteriorPlate"),0d}, {MyItemType.MakeComponent("LargeTube"),0d}, {MyItemType.MakeComponent("Medical"),0d},
@@ -1131,8 +1141,8 @@ namespace IngameScript {
             };
         }
 
-        void ResetAmmosDict() {
-            ammosDict = new Dictionary<MyDefinitionId, double>() {
+        Dictionary<MyDefinitionId, double> ResetAmmosDict() {
+            return new Dictionary<MyDefinitionId, double>() {
                 {MyItemType.MakeAmmo("NATO_25x184mm"),0d},
                 {MyItemType.MakeAmmo("AutocannonClip"),0d},
                 {MyItemType.MakeAmmo("Missile200mm"),0d},
