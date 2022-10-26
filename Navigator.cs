@@ -748,7 +748,7 @@ namespace IngameScript {
                 }
             }
 
-            if (enemyEvasion && !isAutoPiloted && targFound) {
+            if (enemyEvasion && !isAutoPiloted && targFound && !follow) {
                 Vector3D dirEva = EvadeEnemy(targOrientation, targVelVec, targPosition, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity);//world normal
                 foreach (MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> target in targetsInfo) {//HitPosition, Velocity, Orientation, Position, EntityId
                     Vector3D evasionDir = EvadeEnemy(target.Item3, target.Item2, target.Item4, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity);//world normal
@@ -888,7 +888,7 @@ namespace IngameScript {
                         Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
                         Debug.DrawPoint(dockPosition, Color.Red, 10f, onTop: true);
                         Debug.DrawPoint(pos, Color.Yellow, 10f, onTop: true);
-                        Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
+                        //Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
                         //----------------------------------
 
                         if (Vector3D.Distance(dockPosition, DOCKCONNECTOR.GetPosition()) <= 20d) {
@@ -918,7 +918,7 @@ namespace IngameScript {
                         Debug.DrawLine(DOCKCONNECTOR.GetPosition(), DOCKCONNECTOR.GetPosition() + (dir * 500d), Color.Yellow, thickness: 2f, onTop: true);
                         Debug.DrawPoint(dockHitPosition, Color.Red, 10f, onTop: true);
                         Debug.DrawPoint(pos, Color.Yellow, 10f, onTop: true);
-                        Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
+                        //Debug.PrintHUD($"acceleration:{acceleration:0.####}, stopDistance:{stopDistance:0.####}");
                         //----------------------------------
 
                         if (Vector3D.Distance(dockHitPosition, connectorPosition) <= 0.5d) {
@@ -986,7 +986,7 @@ namespace IngameScript {
                 }
             }
 
-            if (enemyEvasion && targFound) {
+            if (enemyEvasion && targFound && !follow) {
                 Vector3D dirEva = EvadeEnemy(targOrientation, targVelVec, targPosition, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity);//world normal
                 foreach (MyTuple<Vector3D, Vector3D, MatrixD, Vector3D, long> target in targetsInfo) {//HitPosition, Velocity, Orientation, Position, EntityId
                     Vector3D evasionDir = EvadeEnemy(target.Item3, target.Item2, target.Item4, CONTROLLER.CubeGrid.WorldVolume.Center, myVelocity, gravity);//world normal
@@ -1491,7 +1491,7 @@ namespace IngameScript {
             //---------------------------------------------------------------------------
             Debug.DrawLine(targPos, targPos + (enemyForwardVec * 2000d), Color.Orange, thickness: 2f, onTop: true);
             Debug.DrawLine(targPos, targPos + (Vector3D.Normalize(enemyAim) * 2000d), Color.Magenta, thickness: 2f, onTop: true);
-            Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.##}, safety:{4500d / distance:0.##}");
+            //Debug.PrintHUD($"EvadeEnemy, angle:{angle:0.##}, safety:{4500d / distance:0.##}");
             //---------------------------------------------------------------------------
 
             if (angle < (4500d / distance)) {//not good, TODO 9000d if dot with forward and toEnemy isn't > 0.999d
@@ -1574,9 +1574,9 @@ namespace IngameScript {
             stopDistance += dist;
 
             //----------------------------------
-            Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Blue, 5f, onTop: true);
-            Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Cyan, thickness: 2f, onTop: true);
-            Debug.PrintHUD($"raycast stopDistance:{stopDirection.Length():0.##}, multiplied:{stopDistance:0.##}");
+            //Debug.DrawPoint(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Blue, 5f, onTop: true);
+            //Debug.DrawLine(CONTROLLER.CubeGrid.WorldVolume.Center, CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance), Color.Cyan, thickness: 2f, onTop: true);
+            //Debug.PrintHUD($"raycast stopDistance:{stopDirection.Length():0.##}, multiplied:{stopDistance:0.##}");
             //----------------------------------
 
             MyDetectedEntityInfo entityInfo = lidar.Raycast(CONTROLLER.CubeGrid.WorldVolume.Center + (normalizedVelocity * stopDistance));
