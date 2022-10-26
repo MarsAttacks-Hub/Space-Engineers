@@ -288,6 +288,7 @@ namespace IngameScript {
             try {
                 Echo($"LastRunTime:{Runtime.LastRunTimeMs}");
                 Echo($"reader:{readerCount}");
+                Echo($"productionCount:{productionCount}, executeProduction:{executeProduction}");
 
                 if (!string.IsNullOrEmpty(argument)) {
                     ProcessArgument(argument);
